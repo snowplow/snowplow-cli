@@ -61,3 +61,35 @@ func TestDataStructuJsonParseSuccess(t *testing.T) {
 	}
 
 }
+
+func TestDataStructuJsonParseFailureWrongFormat(t *testing.T) {
+	jsonString := string(`{
+	  "meta": {
+		"hidden": true,
+		"schemaType": "entity",
+		"customData": {
+		  "additionalProp1": "string",
+		  "additionalProp2": "string",
+		  "additionalProp3": "string"
+		}
+	  },
+	  "data": {
+		"self": {
+		  "vendor": "string",
+		  "name": "string",
+		  "format": "string",
+		  "version": {
+			"model": 1073741824,
+			"revision": 1073741824,
+			"addition": 1073741824
+		  }
+		},
+	  }
+	}`)
+	res := DataStructure{}
+	err := json.Unmarshal([]byte(jsonString), &res)
+	if err == nil {
+		t.Fatal("Parsed data structure without schema")
+	}
+
+}
