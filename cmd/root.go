@@ -1,6 +1,5 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -50,6 +49,10 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	rootCmd.PersistentFlags().StringP("api-key", "a", "", "BDP console api key")
+	rootCmd.PersistentFlags().StringP("host", "H", "console.snowplowanalytics.com", "BDP console host")
+	rootCmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
 }
 
 // initConfig reads in config file and ENV variables if set.
