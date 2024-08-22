@@ -3,6 +3,8 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
 package cmd
 
+import "github.com/go-viper/mapstructure/v2"
+
 type SchemaType string
 
 const (
@@ -16,25 +18,26 @@ type DataStructureMeta struct {
 	CustomData map[string]string `yaml:"customData" json:"customData"`
 }
 
-type DataStructureVersion struct {
-	Model    int `yaml:"model" json:"model"`
-	Revision int `yaml:"revision" json:"revision"`
-	Addition int `yaml:"addition" json:"addition"`
+type DataStructure struct {
+	Meta DataStructureMeta `yaml:"meta" json:"meta"`
+	Data map[string]any    `yaml:"data" json:"data"`
+}
+
+func (d DataStructure) parseData() (DataStrucutreData, error) {
+	var data DataStrucutreData
+	err := mapstructure.Decode(d.Data, &data)
+	return data, err
 }
 
 type DataStructureSelf struct {
-	Vendor  string               `yaml:"vendor" json:"vendor"`
-	Name    string               `yaml:"name" json:"name"`
-	Format  string               `yaml:"format" json:"format"`
-	Version DataStructureVersion `yaml:"version" json:"version"`
+	Vendor  string `mapstructure:"vendor"`
+	Name    string `mapstructure:"name"`
+	Format  string `mapstructure:"format"`
+	Version string `mapstructure:"version"`
 }
 
 type DataStrucutreData struct {
-	Self   DataStructureSelf `yaml:"self" json:"self"`
-	Schema string            `yaml:"schema" json:"schema"`
-}
-
-type DataStructure struct {
-	Meta DataStructureMeta `yaml:"meta" json:"meta"`
-	Data DataStrucutreData `yaml:"data" json:"data"`
+	Self   DataStructureSelf `mapstructure:"self"`
+	Schema string            `mapstructure:"schema"`
+	Other  map[string]any    `mapstructure:",remain"`
 }

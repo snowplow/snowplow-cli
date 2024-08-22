@@ -53,6 +53,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("api-key", "a", "", "BDP console api key")
 	rootCmd.PersistentFlags().StringP("host", "H", "console.snowplowanalytics.com", "BDP console host")
 	rootCmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
+	rootCmd.PersistentFlags().StringP("data-structures", "d", "data-structures", "Data structures directory name")
 }
 
 // initConfig reads in config file and ENV variables if set.
