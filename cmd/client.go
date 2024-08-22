@@ -23,7 +23,7 @@ func NewApiClient(ctx context.Context, host string, apikey string, orgid string)
 
 	h := &http.Client{}
 
-	baseUrl := fmt.Sprintf("https://%s/api/msc/v1/organizations/%s", host, orgid)
+	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
 
 	url := fmt.Sprintf("%s/credentials/v2/token", baseUrl)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
