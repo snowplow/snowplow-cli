@@ -8,6 +8,8 @@ import (
 )
 
 func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
+	vendor1 := "test.my.vendor"
+	name1 := "my-test-ds"
 	ds1 := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
 			"additionalProp1": "string",
@@ -15,19 +17,17 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 			"additionalProp3": "string",
 		},
 		},
-		Data: DataStrucutreData{
-			Self: DataStructureSelf{
-				Vendor: "test.my.vendor",
-				Name:   "my-test-ds",
-				Format: "string",
-				Version: DataStructureVersion{
-					Model:    1073741824,
-					Revision: 1073741824,
-					Addition: 1073741824,
-				},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  vendor1,
+				"name":    name1,
+				"format":  "string",
+				"version": "1-2-0",
 			},
-			Schema: "string"},
+			"schema": "string"},
 	}
+	vendor2 := "com.test.vendor"
+	name2 := "ds2"
 	ds2 := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
 			"additionalProp1": "string",
@@ -35,18 +35,14 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 			"additionalProp3": "string",
 		},
 		},
-		Data: DataStrucutreData{
-			Self: DataStructureSelf{
-				Vendor: "com.test.vendor",
-				Name:   "ds2",
-				Format: "string",
-				Version: DataStructureVersion{
-					Model:    1073741824,
-					Revision: 1073741824,
-					Addition: 1073741824,
-				},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  vendor2,
+				"name":    name2,
+				"format":  "string",
+				"version": "1-0-1",
 			},
-			Schema: "string"},
+			"schema": "string"},
 	}
 
 	dir := filepath.Join("..", "out", "test-ds2")
@@ -61,12 +57,12 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 		t.Fatalf("%s does not exists", dir)
 	}
 
-	filePath1 := filepath.Join(dir, ds1.Data.Self.Vendor, fmt.Sprintf("%s.%s", ds1.Data.Self.Name, "yaml"))
+	filePath1 := filepath.Join(dir, vendor1, fmt.Sprintf("%s.%s", name1, "yaml"))
 	if _, err := os.Stat(filePath1); os.IsNotExist(err) {
 		t.Fatalf("%s does not exists", filePath1)
 	}
 
-	filePath2 := filepath.Join(dir, ds2.Data.Self.Vendor, fmt.Sprintf("%s.%s", ds2.Data.Self.Name, "yaml"))
+	filePath2 := filepath.Join(dir, vendor2, fmt.Sprintf("%s.%s", name2, "yaml"))
 	if _, err := os.Stat(filePath2); os.IsNotExist(err) {
 		t.Fatalf("%s does not exists", filePath2)
 	}

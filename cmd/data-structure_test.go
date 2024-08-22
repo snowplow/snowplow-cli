@@ -5,9 +5,10 @@ package cmd
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
 	"reflect"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestDataStructureJsonParseSuccess(t *testing.T) {
@@ -26,11 +27,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
           "vendor": "string",
           "name": "string",
           "format": "string",
-          "version": {
-            "model": 1073741824,
-            "revision": 1073741824,
-            "addition": 1073741824
-          }
+          "version": "1-0-1"
         },
         "schema": "string"
       }
@@ -42,18 +39,14 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
 			"additionalProp3": "string",
 		},
 		},
-		Data: DataStrucutreData{
-			Self: DataStructureSelf{
-				Vendor: "string",
-				Name:   "string",
-				Format: "string",
-				Version: DataStructureVersion{
-					Model:    1073741824,
-					Revision: 1073741824,
-					Addition: 1073741824,
-				},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-0-1",
 			},
-			Schema: "string"},
+			"schema": "string"},
 	}
 	res := DataStructure{}
 	err := json.Unmarshal([]byte(jsonString), &res)
@@ -79,11 +72,7 @@ func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
           "vendor": "string",
           "name": "string",
           "format": "string",
-          "version": {
-            "model": 1073741824,
-            "revision": 1073741824,
-            "addition": 1073741824
-          }
+          "version": "1-2-0"
         },
       }
     }`)
@@ -108,10 +97,7 @@ data:
     vendor: string
     name: string
     format: string
-    version:
-      model: 1073741824
-      revision: 1073741824
-      addition: 1073741824
+    version: 1-2-0
   schema: string`)
 	expected := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
@@ -120,18 +106,14 @@ data:
 			"additionalProp3": "string",
 		},
 		},
-		Data: DataStrucutreData{
-			Self: DataStructureSelf{
-				Vendor: "string",
-				Name:   "string",
-				Format: "string",
-				Version: DataStructureVersion{
-					Model:    1073741824,
-					Revision: 1073741824,
-					Addition: 1073741824,
-				},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-2-0",
 			},
-			Schema: "string"},
+			"schema": "string"},
 	}
 	res := DataStructure{}
 	err := yaml.Unmarshal([]byte(yamlString), &res)
@@ -139,4 +121,41 @@ data:
 		t.Fatalf("Cant' parse yaml %s\n parsed %#v\n expected %#v", err, res, expected)
 	}
 
+}
+
+func TestParseDataParses(t *testing.T) {
+	ds := DataStructure{
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
+			"additionalProp1": "string",
+			"additionalProp2": "string",
+			"additionalProp3": "string",
+		},
+		},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-2-0",
+			},
+			"schema":                "string",
+			"additionalPropperties": false},
+	}
+	expected := DataStrucutreData{
+		Self: DataStructureSelf{
+			Vendor:  "string",
+			Name:    "string",
+			Format:  "string",
+			Version: "1-2-0",
+		},
+		Schema: "string",
+		Other: map[string]any{
+			"additionalPropperties": false,
+		},
+	}
+
+	dsParsed, err := ds.parseData()
+	if !reflect.DeepEqual(dsParsed, expected) || err != nil {
+		t.Fatalf("Cant' parse map %s\n parsed %#v\n expected %#v", err, dsParsed, expected)
+	}
 }
