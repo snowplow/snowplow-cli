@@ -102,3 +102,107 @@ func Test_Validate_Fail(t *testing.T) {
 		t.Error("expected failure, got success")
 	}
 }
+
+func Test_Validate_FailCompletely(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/validation-requests" {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"message":"bad"}`)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := Validate(cnx, client, &DataStructure{})
+
+	if result != nil {
+		t.Error(result)
+	}
+
+	if err == nil {
+		t.Error("expected failure, got success")
+	}
+}
+
+func Test_publish_Ok(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
+			w.WriteHeader(http.StatusCreated)
+			io.WriteString(w, `{"success":true}`)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !result.Success {
+		t.Error("expected success, got failure")
+	}
+}
+
+func Test_publish_Fail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
+			w.WriteHeader(http.StatusCreated)
+			io.WriteString(w, `{"success":false, "errors": ["error1"]}`)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+
+	if result != nil {
+		t.Error(result)
+	}
+
+	if err == nil || err.Error() != "error1" {
+		t.Error("expected failure, got success")
+	}
+}
+
+func Test_publish_FailCompletely(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
+			w.WriteHeader(http.StatusBadRequest)
+			io.WriteString(w, `{"message":"very bad"}`)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+
+	if result != nil {
+		t.Error(result)
+	}
+
+	if err == nil {
+		t.Error("expected failure, got success")
+	}
+}

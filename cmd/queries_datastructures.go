@@ -9,8 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 type pubResponse struct {
@@ -50,7 +48,6 @@ type publishRequest struct {
 	Vendor  string           `json:"vendor"`
 	Version string           `json:"version"`
 }
-
 
 func Validate(cnx context.Context, client *ApiClient, ds *DataStructure) (*ValidateResponse, error) {
 
@@ -102,8 +99,7 @@ func PublishProd(cnx context.Context, client *ApiClient, ds *DataStructure) (*Pu
 
 func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds *DataStructure) (*PublishResponse, error) {
 
-	var self DataStructureSelf
-	err := mapstructure.Decode(ds.Data["self"], &self)
+	dsData, err := ds.parseData()
 	if err != nil {
 		return nil, err
 	}
@@ -112,10 +108,10 @@ func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to d
 		Message: "",
 		Source:  from,
 		Target:  to,
-		Vendor:  self.Vendor,
-		Name:    self.Name,
-		Format:  self.Format,
-		Version: self.Version,
+		Vendor:  dsData.Self.Vendor,
+		Name:    dsData.Self.Name,
+		Format:  dsData.Self.Format,
+		Version: dsData.Self.Version,
 	}
 
 	body, err := json.Marshal(pr)
