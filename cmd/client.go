@@ -1,4 +1,4 @@
-package api
+package cmd
 
 import (
 	"context"
@@ -9,20 +9,23 @@ import (
 	"net/http"
 )
 
-type Client struct {
+type ApiClient struct {
 	Http *http.Client
 	Jwt  string
+	BaseUrl string
 }
 
 type tokenResponse struct {
 	AccessToken string
 }
 
-func NewClient(ctx context.Context, host string, apikey string, orgid string) (*Client, error) {
+func NewApiClient(ctx context.Context, host string, apikey string, orgid string) (*ApiClient, error) {
 
 	h := &http.Client{}
 
-	url := fmt.Sprintf("https://%s/api/msc/v1/organizations/%s/credentials/v2/token", host, orgid)
+	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
+
+	url := fmt.Sprintf("%s/credentials/v2/token", baseUrl)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -47,5 +50,5 @@ func NewClient(ctx context.Context, host string, apikey string, orgid string) (*
 		return nil, err
 	}
 
-	return &Client{Http: &http.Client{}, Jwt: token.AccessToken}, nil
+	return &ApiClient{Http: &http.Client{}, Jwt: token.AccessToken, BaseUrl: baseUrl}, nil
 }

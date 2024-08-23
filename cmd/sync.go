@@ -4,11 +4,8 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log"
 
-	"github.com/snowplow-product/dps-cli/api"
 	"github.com/spf13/cobra"
 )
 
@@ -24,16 +21,6 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("sync called")
-		apikey, _ := cmd.Flags().GetString("api-key")
-		host, _ := cmd.Flags().GetString("host")
-		org, _ := cmd.Flags().GetString("org-id")
-
-		c, err := api.NewClient(context.Background(), host, apikey, org)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("%#v\n", c)
-
 	},
 }
 

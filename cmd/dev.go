@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// validateCmd represents the validate command
-var validateCmd = &cobra.Command{
-	Use:   "validate",
+// devCmd represents the dev command
+var devCmd = &cobra.Command{
+	Use:   "dev",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -42,20 +42,24 @@ to quickly create a Cobra application.`,
 			if err != nil {
 				log.Fatal(err)
 			}
+			_, err = PublishDev(cnx, c, ds)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	},
 }
 
 func init() {
-	syncCmd.AddCommand(validateCmd)
+	syncCmd.AddCommand(devCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// validateCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// devCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// validateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// devCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
