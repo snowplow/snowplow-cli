@@ -61,7 +61,7 @@ func Test_Validate_Ok(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	ds := &DataStructure{
+	ds := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{}},
 		Data: map[string]any{},
 	}
@@ -92,7 +92,7 @@ func Test_Validate_Fail(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := Validate(cnx, client, &DataStructure{})
+	result, err := Validate(cnx, client, DataStructure{})
 
 	if result != nil {
 		t.Error(result)
@@ -118,7 +118,7 @@ func Test_Validate_FailCompletely(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := Validate(cnx, client, &DataStructure{})
+	result, err := Validate(cnx, client, DataStructure{})
 
 	if result != nil {
 		t.Error(result)
@@ -144,7 +144,7 @@ func Test_publish_Ok(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
 
 	if err != nil {
 		t.Error(err)
@@ -170,7 +170,7 @@ func Test_publish_Fail(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
 
 	if result != nil {
 		t.Error(result)
@@ -196,7 +196,7 @@ func Test_publish_FailCompletely(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, &DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
 
 	if result != nil {
 		t.Error(result)
