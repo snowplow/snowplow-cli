@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,10 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 				return err
 			}
 		} else {
-			bytes = nil
+			bytes, err = json.MarshalIndent(ds, "", "  ")
+			if err != nil {
+				return err
+			}
 		}
 
 		filePath := filepath.Join(vendorPath, fmt.Sprintf("%s.%s", data.Self.Name, f.ExtentionPreference))
