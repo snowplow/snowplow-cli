@@ -151,3 +151,93 @@ func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to d
 
 	return &dresp, nil
 }
+
+type deployment struct {
+	Version string           `json:"version"`
+	Env     dataStructureEnv `json:"env"`
+}
+
+type listRespone struct {
+	Hash        string            `json:"hash"`
+	Vendor      string            `json:"vendor"`
+	Name        string            `json:"name"`
+	Meta        DataStructureMeta `json:"meta"`
+	Deployments []deployment      `json:"deployments"`
+}
+
+func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructure, error) {
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp []listRespone
+	err = json.Unmarshal(rbody, &listResp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
+	}
+
+	fmt.Println(listResp)
+
+	var res []DataStructure
+
+	for _, dsResp := range listResp {
+		for _, deployment := range dsResp.Deployments {
+			if deployment.Env == DEV {
+				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
+				auth := fmt.Sprintf("Bearer %s", client.Jwt)
+				req.Header.Add("authorization", auth)
+				fmt.Printf("Requesting %s:%s hash %s version %s\n", dsResp.Vendor, dsResp.Name, dsResp.Hash, deployment.Version)
+
+				if err != nil {
+					return nil, err
+				}
+				resp, err := client.Http.Do(req)
+				if err != nil {
+					return nil, err
+				}
+				rbody, err := io.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err != nil {
+					return nil, err
+				}
+
+				var ds map[string]any
+				err = json.Unmarshal(rbody, &ds)
+				if err != nil {
+					return nil, err
+				}
+
+				if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+					return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
+				}
+				if resp.StatusCode != http.StatusNotFound {
+					dataStructure := DataStructure{dsResp.Meta, ds}
+					res = append(res, dataStructure)
+					fmt.Println("request ended!")
+				}
+			}
+		}
+	}
+	fmt.Println(res)
+
+	return res, nil
+
+}
