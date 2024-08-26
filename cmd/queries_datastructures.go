@@ -194,8 +194,6 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 		return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
 	}
 
-	fmt.Println(listResp)
-
 	var res []DataStructure
 
 	for _, dsResp := range listResp {
@@ -204,7 +202,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
 				auth := fmt.Sprintf("Bearer %s", client.Jwt)
 				req.Header.Add("authorization", auth)
-				fmt.Printf("Requesting %s:%s hash %s version %s\n", dsResp.Vendor, dsResp.Name, dsResp.Hash, deployment.Version)
+				fmt.Printf("Fetching %s:%s version %s\n", dsResp.Vendor, dsResp.Name, deployment.Version)
 
 				if err != nil {
 					return nil, err
@@ -225,18 +223,19 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 					return nil, err
 				}
 
-				if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+				if resp.StatusCode == http.StatusNotFound {
+					continue
+				}
+
+				if resp.StatusCode != http.StatusOK {
 					return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
 				}
-				if resp.StatusCode != http.StatusNotFound {
-					dataStructure := DataStructure{dsResp.Meta, ds}
-					res = append(res, dataStructure)
-					fmt.Println("request ended!")
-				}
+
+				dataStructure := DataStructure{dsResp.Meta, ds}
+				res = append(res, dataStructure)
 			}
 		}
 	}
-	fmt.Println(res)
 
 	return res, nil
 
