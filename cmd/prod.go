@@ -25,7 +25,7 @@ to quickly create a Cobra application.`,
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructures, err := DataStructuresFromFileNames(args)
+		dataStructures, err := DataStructuresFromPaths(args)
 		if err != nil {
 			log.Fatal(err)
 		}

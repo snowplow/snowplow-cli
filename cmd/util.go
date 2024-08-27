@@ -1,41 +1,75 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
 
-func DataStructuresFromFileNames(files []string) ([]*DataStructure, error) {
+func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 
-	var dataStructures []*DataStructure
+	files := map[string]bool{}
 
-	for _, f := range files {
-		err := func() error {
-			file, err := os.Open(f)
+	for _, path := range paths {
+		filepath.WalkDir(path, func(path string, di fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
-			body, err := io.ReadAll(file)
-			if err != nil {
-				return err
+			if !di.IsDir() {
+				files[path] = true
 			}
-			ds := DataStructure{}
-			err = yaml.Unmarshal(body, &ds)
-			if err != nil {
-				return err
-			}
-			dataStructures = append(dataStructures, &ds)
 			return nil
-		}()
+		})
+	}
 
-		if err != nil {
-			return nil, err
+	ds := make(map[string]DataStructure)
+
+	exts := []string{".yaml", ".yml", ".json"}
+
+	for k := range files {
+		if slices.Index(exts, filepath.Ext(k)) != -1 {
+			d, err := dataStructureFromFileName(k)
+			if err != nil {
+				return nil, errors.Join(err, fmt.Errorf("file: %s", k))
+			} else {
+				ds[k] = *d
+			}
 		}
 	}
 
-	return dataStructures, nil
+	return ds, nil
+}
 
+func dataStructureFromFileName(f string) (*DataStructure, error) {
+	file, err := os.Open(f)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	body, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	ds := DataStructure{}
+	switch filepath.Ext(file.Name()) {
+	case ".json":
+		err = json.Unmarshal(body, &ds)
+	case ".yaml", ".yml":
+		err = yaml.Unmarshal(body, &ds)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ds, nil
 }

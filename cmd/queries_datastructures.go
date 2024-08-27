@@ -49,7 +49,7 @@ type publishRequest struct {
 	Version string           `json:"version"`
 }
 
-func Validate(cnx context.Context, client *ApiClient, ds *DataStructure) (*ValidateResponse, error) {
+func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*ValidateResponse, error) {
 
 	body, err := json.Marshal(ds)
 	if err != nil {
@@ -89,15 +89,15 @@ func Validate(cnx context.Context, client *ApiClient, ds *DataStructure) (*Valid
 	return &vresp, nil
 }
 
-func PublishDev(cnx context.Context, client *ApiClient, ds *DataStructure) (*PublishResponse, error) {
+func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure) (*PublishResponse, error) {
 	return publish(cnx, client, VALIDATED, DEV, ds)
 }
 
-func PublishProd(cnx context.Context, client *ApiClient, ds *DataStructure) (*PublishResponse, error) {
+func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure) (*PublishResponse, error) {
 	return publish(cnx, client, DEV, PROD, ds)
 }
 
-func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds *DataStructure) (*PublishResponse, error) {
+func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds DataStructure) (*PublishResponse, error) {
 
 	dsData, err := ds.parseData()
 	if err != nil {
