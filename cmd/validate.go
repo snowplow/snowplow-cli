@@ -37,10 +37,10 @@ to quickly create a Cobra application.`,
 			log.Fatal(err)
 		}
 
-		for _, ds := range dataStructures {
+		for f, ds := range dataStructures {
 			_, err := Validate(cnx, c, ds)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("%s: %s\n", f, err)
 			}
 		}
 	},

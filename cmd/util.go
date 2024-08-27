@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,7 +37,7 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 		if slices.Index(exts, filepath.Ext(k)) != -1 {
 			d, err := dataStructureFromFileName(k)
 			if err != nil {
-				return nil, errors.Wrapf(err, "file: %s", k)
+				return nil, errors.Join(err, fmt.Errorf("file: %s", k))
 			} else {
 				ds[k] = *d
 			}
