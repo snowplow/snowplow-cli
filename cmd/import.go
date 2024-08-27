@@ -4,7 +4,9 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -21,9 +23,29 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dataStructuresFolder, _ := cmd.Flags().GetString("data-structures")
-		files := Files{dataStructuresFolder, "yaml"}
-		files.createDataStructures(nil)
+		format, _ := cmd.Flags().GetString("format")
+		files := Files{dataStructuresFolder, format}
+
+		apikey, _ := cmd.Flags().GetString("api-key")
+		host, _ := cmd.Flags().GetString("host")
+		org, _ := cmd.Flags().GetString("org-id")
+
+		cnx := context.Background()
+
 		fmt.Println("import called")
+
+		c, err := NewApiClient(cnx, host, apikey, org)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dss, err := GetAllDataStructures(cnx, c)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		files.createDataStructures(dss)
+
 	},
 }
 
