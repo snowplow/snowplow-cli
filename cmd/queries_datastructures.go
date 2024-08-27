@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +12,14 @@ import (
 	"strings"
 )
 
+type msgResponse struct {
+	Message string
+}
+
 type pubResponse struct {
 	Success bool
 	Errors  []string
-	Message string
+	msgResponse
 }
 
 type pubError struct {
@@ -191,7 +196,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 	}
 
 	var res []DataStructure
@@ -228,7 +233,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 				}
 
 				if resp.StatusCode != http.StatusOK {
-					return nil, errors.New(fmt.Sprintf("Not expected response code %d", resp.StatusCode))
+					return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 				}
 
 				dataStructure := DataStructure{dsResp.Meta, ds}
@@ -238,5 +243,52 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 	}
 
 	return res, nil
+}
 
+func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure) error {
+
+	data, err := ds.parseData()
+	if err != nil {
+		return err
+	}
+
+	toHash := fmt.Sprintf("%s-%s-%s-%s", client.OrgId, data.Self.Vendor, data.Self.Name, data.Self.Format)
+	dsHash := sha256.Sum256([]byte(toHash))
+
+	body, err := json.Marshal(ds.Meta)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/data-structures/v1/%x/meta", client.BaseUrl, dsHash)
+	req, err := http.NewRequestWithContext(cnx, "PUT", url, bytes.NewBuffer(body))
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+
+	if err != nil {
+		return err
+	}
+
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp.Message)
+	}
+
+	return nil
 }

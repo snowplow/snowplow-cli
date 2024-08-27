@@ -13,6 +13,7 @@ type ApiClient struct {
 	Http *http.Client
 	Jwt  string
 	BaseUrl string
+	OrgId string
 }
 
 type tokenResponse struct {
@@ -50,5 +51,5 @@ func NewApiClient(ctx context.Context, host string, apikey string, orgid string)
 		return nil, err
 	}
 
-	return &ApiClient{Http: &http.Client{}, Jwt: token.AccessToken, BaseUrl: baseUrl}, nil
+	return &ApiClient{Http: &http.Client{}, Jwt: token.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
 }

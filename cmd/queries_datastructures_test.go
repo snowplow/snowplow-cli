@@ -494,7 +494,6 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 		t.Errorf("Unexpected number of results, expected 2, got: %d", len(result))
 	}
 
-
 }
 
 func Test_GetAllDataStructuresSkips404(t *testing.T) {
@@ -603,6 +602,56 @@ func Test_GetAllDataStructuresSkips404(t *testing.T) {
 	if len(result) != 1 {
 		t.Errorf("Unexpected number of results, expected 1, got: %d", len(result))
 	}
+}
 
+func Test_MetadataUpdate_Ok(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/20308fa345d397de04f26a34a6083744d06ae1aeb673e1658b0b50a7a86ea395/meta" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
+		t.Fatalf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	orgId := "00000000-0000-0000-0000-000000000000"
+	var ds DataStructure
+	json.Unmarshal([]byte(`{
+		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
+		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
+	}`), &ds)
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
+
+	err := MetadateUpdate(cnx, client, &ds)
+
+	if err != nil {
+		t.Fatal("expected failure, got success")
+	}
+}
+
+func Test_MetadataUpdate_Fail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, `{"message":"very bad"}`)
+	}))
+	defer server.Close()
+
+	orgId := "00000000-0000-0000-0000-000000000000"
+	var ds DataStructure
+	json.Unmarshal([]byte(`{
+		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
+		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
+	}`), &ds)
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
+
+	err := MetadateUpdate(cnx, client, &ds)
+
+	if err == nil {
+		t.Fatal("expected failure, got success")
+	}
 }
