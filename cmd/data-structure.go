@@ -38,6 +38,6 @@ type DataStructureSelf struct {
 
 type DataStrucutreData struct {
 	Self   DataStructureSelf `mapstructure:"self"`
-	Schema string            `mapstructure:"schema"`
+	Schema map[string]any    `mapstructure:"schema"`
 	Other  map[string]any    `mapstructure:",remain"`
 }

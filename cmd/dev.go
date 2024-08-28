@@ -25,7 +25,7 @@ to quickly create a Cobra application.`,
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructures, err := DataStructuresFromPaths(args)
+		dataStructuresLocal, err := DataStructuresFromPaths(args)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -37,7 +37,11 @@ to quickly create a Cobra application.`,
 			log.Fatal(err)
 		}
 
-		for _, ds := range dataStructures {
+		for _, ds := range dataStructuresLocal {
+			_, err := Validate(cnx, c, ds)
+			if err != nil {
+				log.Fatal(err)
+			}
 			_, err = PublishDev(cnx, c, ds)
 			if err != nil {
 				log.Fatal(err)
