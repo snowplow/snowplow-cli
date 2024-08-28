@@ -15,7 +15,7 @@ func Test_ShowsDifferenceInMetadata(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 	localDs := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "event"},
@@ -26,7 +26,7 @@ func Test_ShowsDifferenceInMetadata(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 
 	diff, err := DiffDs([]DataStructure{localDs}, []DataStructure{remoteDs})
@@ -54,7 +54,7 @@ func Test_ShowsDifferenceInMetadataKnownField(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 	localDs := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
@@ -67,7 +67,7 @@ func Test_ShowsDifferenceInMetadataKnownField(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 
 	diff, err := DiffDs([]DataStructure{localDs}, []DataStructure{remoteDs})
@@ -96,7 +96,7 @@ func Test_ShowDifferenceInMetadataUnknownField(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 	localDs := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
@@ -109,7 +109,7 @@ func Test_ShowDifferenceInMetadataUnknownField(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 
 	diff, err := DiffDs([]DataStructure{localDs}, []DataStructure{remoteDs})
@@ -138,7 +138,7 @@ func Test_ShowDifferenceInSchemaSelf(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 	localDs := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity"},
@@ -149,7 +149,7 @@ func Test_ShowDifferenceInSchemaSelf(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-2",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 
 	diff, err := DiffDs([]DataStructure{localDs}, []DataStructure{remoteDs})
@@ -178,7 +178,7 @@ func Test_ShowDifferenceInSchema(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": "string"},
+			"schema": map[string]any{}},
 	}
 	localDs := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity"},
@@ -189,7 +189,7 @@ func Test_ShowDifferenceInSchema(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": `{"test": "test"}`},
+			"schema": map[string]any{"test": "test"}},
 	}
 
 	diff, err := DiffDs([]DataStructure{localDs}, []DataStructure{remoteDs})
@@ -202,7 +202,7 @@ func Test_ShowDifferenceInSchema(t *testing.T) {
 		t.Fatalf("Not expected amount of changes, expected: 1, got: %d", len(diff))
 	}
 
-	if !reflect.DeepEqual(diff[0].Diff[0].Path, []string{"Data", "schema"}) {
+	if !reflect.DeepEqual(diff[0].Diff[0].Path, []string{"Data", "schema", "test"}) {
 		t.Fatalf("Not expected change path, %v", diff[0].Diff[0].Path)
 	}
 
