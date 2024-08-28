@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 
 	"github.com/r3labs/diff/v3"
 )
@@ -12,18 +11,30 @@ type DataStructureWithDiff struct {
 	Diff          diff.Changelog
 }
 
+type DataStructureId struct {
+	Vendor string
+	Name   string
+	Format string
+}
+
+func idFromSelf(self DataStructureSelf) DataStructureId {
+	return DataStructureId{
+		self.Vendor,
+		self.Name,
+		self.Format,
+	}
+}
+
 func DiffDs(locals []DataStructure, remotes []DataStructure) ([]DataStructureWithDiff, error) {
-	fmt.Printf("locals: %v\n\n", locals)
-	fmt.Printf("remotes: %v\n\n", remotes)
 	var res []DataStructureWithDiff
-	remotesSet := make(map[DataStructureSelf]DataStructure)
+	remotesSet := make(map[DataStructureId]DataStructure)
 
 	for _, remote := range remotes {
 		dataRemote, err := remote.parseData()
 		if err != nil {
 			return nil, err
 		}
-		remotesSet[dataRemote.Self] = remote
+		remotesSet[idFromSelf(dataRemote.Self)] = remote
 	}
 
 	for _, local := range locals {
@@ -31,7 +42,7 @@ func DiffDs(locals []DataStructure, remotes []DataStructure) ([]DataStructureWit
 		if err != nil {
 			return nil, err
 		}
-		remote, remoteExists := remotesSet[dataLocal.Self]
+		remote, remoteExists := remotesSet[idFromSelf(dataLocal.Self)]
 		if !remoteExists {
 			res = append(res, DataStructureWithDiff{DataStructure: local, Operation: "CREATE"})
 		} else {
@@ -46,8 +57,6 @@ func DiffDs(locals []DataStructure, remotes []DataStructure) ([]DataStructureWit
 		}
 
 	}
-
-	fmt.Printf("Differences %+v", res)
 
 	return res, nil
 }
