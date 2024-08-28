@@ -29,7 +29,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
           "format": "string",
           "version": "1-0-1"
         },
-        "schema": {}
+        "schema": "string"
       }
     }`)
 	expected := DataStructure{
@@ -46,7 +46,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": map[string]any{}},
+			"schema": "string"},
 	}
 	res := DataStructure{}
 	err := json.Unmarshal([]byte(jsonString), &res)
@@ -138,7 +138,7 @@ func TestParseDataParses(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"schema":                map[string]any{},
+			"schema":                "string",
 			"additionalPropperties": false},
 	}
 	expected := DataStrucutreData{
@@ -148,7 +148,7 @@ func TestParseDataParses(t *testing.T) {
 			Format:  "string",
 			Version: "1-2-0",
 		},
-		Schema: map[string]any{},
+		Schema: "string",
 		Other: map[string]any{
 			"additionalPropperties": false,
 		},

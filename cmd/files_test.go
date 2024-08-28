@@ -25,7 +25,7 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"schema": map[string]any{}},
+			"schema": "string"},
 	}
 	vendor2 := "com.test.vendor"
 	name2 := "ds2"
@@ -43,7 +43,7 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": map[string]any{}},
+			"schema": "string"},
 	}
 
 	dir := filepath.Join("..", "out", "test-ds2")
@@ -88,7 +88,7 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"schema": map[string]any{}},
+			"schema": "string"},
 	}
 	vendor2 := "com.test.vendor"
 	name2 := "ds2"
@@ -106,7 +106,7 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 				"format":  "string",
 				"version": "1-0-1",
 			},
-			"schema": map[string]any{}},
+			"schema": "string"},
 	}
 
 	dir := filepath.Join("..", "out", "test-ds2")
