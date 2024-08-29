@@ -168,7 +168,7 @@ func printChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s.%s\n", data.Self.Vendor, data.Self.Name)
+			fmt.Printf("	%s-%s\n", data.Self.Vendor, data.Self.Name)
 		}
 	}
 	if len(changes.toCreate) != 0 {
@@ -178,7 +178,7 @@ func printChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s.%s\n", data.Self.Vendor, data.Self.Name)
+			fmt.Printf("	%s-%s\n", data.Self.Vendor, data.Self.Name)
 		}
 	}
 	if len(changes.toUpdateNewVersion) != 0 {
@@ -188,7 +188,7 @@ func printChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s.%s.%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
+			fmt.Printf("	%s-%s-%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
 		}
 	}
 	if len(changes.toUpdatePatch) != 0 {
@@ -198,7 +198,7 @@ func printChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s.%s.%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
+			fmt.Printf("	%s-%s-%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
 		}
 	}
 	return nil
