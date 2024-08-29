@@ -47,10 +47,14 @@ to quickly create a Cobra application.`,
 		files.createDataStructures(dss)
 
 	},
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return InitConsoleConfig(cmd)
+	},
 }
 
 func init() {
 	rootCmd.AddCommand(importCmd)
+	InitConsoleFlags(importCmd)
 
 	// Here you will define your flags and configuration settings.
 
