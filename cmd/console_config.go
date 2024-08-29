@@ -28,6 +28,7 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 
 		v.AddConfigPath(home)
 		v.AddConfigPath("$XDG_CONFIG_HOME/snowplow")
+		v.AddConfigPath("$HOME/.config/snowplow")
 		v.SetConfigName(".snowplow")
 	}
 
