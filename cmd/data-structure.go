@@ -3,7 +3,14 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
 package cmd
 
-import "github.com/go-viper/mapstructure/v2"
+import (
+	"bytes"
+	"crypto"
+	"encoding/json"
+	"fmt"
+
+	"github.com/go-viper/mapstructure/v2"
+)
 
 type SchemaType string
 
@@ -21,6 +28,23 @@ type DataStructureMeta struct {
 type DataStructure struct {
 	Meta DataStructureMeta `yaml:"meta" json:"meta"`
 	Data map[string]any    `yaml:"data" json:"data"`
+}
+
+func (ds DataStructure) getContentHash() (string, error) {
+	byteBuffer := new(bytes.Buffer)
+	e := json.NewEncoder(byteBuffer)
+	e.SetEscapeHTML(false)
+	err := e.Encode(ds.Data)
+	if err != nil {
+		return "", err
+	}
+	// Encode adds a line feed at the end, scala does not
+	b := byteBuffer.Bytes()[:len(byteBuffer.Bytes())-1]
+	hasher := crypto.SHA256.New()
+	hasher.Write(b)
+	hash := hasher.Sum(nil)
+	// render bytes as base-16
+	return fmt.Sprintf("%x", hash), nil
 }
 
 func (d DataStructure) parseData() (DataStrucutreData, error) {

@@ -159,3 +159,55 @@ func TestParseDataParses(t *testing.T) {
 		t.Fatalf("Cant' parse map %s\n parsed %#v\n expected %#v", err, dsParsed, expected)
 	}
 }
+
+func TestDataStructureHash(t *testing.T) {
+	jsonString := string(`
+	{
+      "meta": {
+        "hidden": true,
+        "schemaType": "entity",
+        "customData": {
+          "additionalProp1": "string",
+          "additionalProp2": "string",
+          "additionalProp3": "string"
+        }
+      },
+      "data": {
+		  "description": "Schema for an example event",
+		  "properties": {
+			"cursed": {
+			  "type": "string",
+			  "description": "zażółć gęślą jaźń ->",
+			  "maxLength": 10
+			}
+		  },
+		  "additionalProperties": false,
+		  "type": "object",
+		  "required": [
+			"cursed"
+		  ],
+		  "self": {
+			"vendor": "cursed",
+			"name": "unicode_normal",
+			"format": "jsonschema",
+			"version": "1-0-10"
+		  },
+		  "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+		}
+	}`)
+
+	expectedHash := "3bbd73b8afe99e47d1b02d04750ba03704a95a511035910f718ac9fb6c401490"
+	res := DataStructure{}
+	err := json.Unmarshal([]byte(jsonString), &res)
+	if err != nil {
+		t.Fatalf("Cant' parse json %s\n parsed %#v\n ", err, res)
+	}
+
+	hash, err := res.getContentHash()
+	if err != nil {
+		t.Fatalf("Can't calculate hash: %s", err)
+	}
+	if hash != expectedHash {
+		t.Fatalf("Not expected hash, expected: %s, got: %s\n", expectedHash, hash)
+	}
+}

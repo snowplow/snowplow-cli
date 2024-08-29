@@ -157,21 +157,21 @@ func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to d
 	return &dresp, nil
 }
 
-type deployment struct {
-	Version string           `json:"version"`
-	Env     dataStructureEnv `json:"env"`
+type Deployment struct {
+	Version     string           `json:"version"`
+	Env         dataStructureEnv `json:"env"`
+	ContentHash string           `json:"contentHash"`
 }
 
-type listRespone struct {
+type ListResponse struct {
 	Hash        string            `json:"hash"`
 	Vendor      string            `json:"vendor"`
 	Name        string            `json:"name"`
 	Meta        DataStructureMeta `json:"meta"`
-	Deployments []deployment      `json:"deployments"`
+	Deployments []Deployment      `json:"deployments"`
 }
 
-func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructure, error) {
-
+func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
@@ -189,7 +189,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 		return nil, err
 	}
 
-	var listResp []listRespone
+	var listResp []ListResponse
 	err = json.Unmarshal(rbody, &listResp)
 	if err != nil {
 		return nil, err
@@ -197,6 +197,23 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+	return listResp, nil
+}
+
+func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructure, error) {
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+
+	if err != nil {
+		return nil, err
+	}
+
+	listResp, err := GetDataStructureListing(cnx, client)
+	if err != nil {
+		return nil, err
 	}
 
 	var res []DataStructure
