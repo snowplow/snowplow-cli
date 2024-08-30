@@ -168,6 +168,7 @@ type ListResponse struct {
 	Vendor      string            `json:"vendor"`
 	Name        string            `json:"name"`
 	Meta        DataStructureMeta `json:"meta"`
+	Format      string            `json:"format"`
 	Deployments []Deployment      `json:"deployments"`
 }
 

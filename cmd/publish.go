@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 )
 
 var publishCmd = &cobra.Command{
@@ -44,16 +46,25 @@ Changes to it will be published by this command.
 			log.Fatal(err)
 		}
 
-		for _, ds := range dataStructuresLocal {
-			_, err := Validate(cnx, c, ds)
-			if err != nil {
-				log.Fatal(err)
-			}
-			_, err = PublishDev(cnx, c, ds)
-			if err != nil {
-				log.Fatal(err)
-			}
+		remotesListing, err := GetDataStructureListing(cnx, c)
+		if err != nil {
+			log.Fatal(err)
 		}
+
+		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "DEV")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = printChangeset(changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = performChangesDev(cnx, c, changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("All done!")
 	},
 }
 

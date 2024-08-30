@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 )
 
 var validateCmd = &cobra.Command{
@@ -17,7 +18,7 @@ var validateCmd = &cobra.Command{
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructures, err := DataStructuresFromPaths(args)
+		dataStructuresLocal, err := DataStructuresFromPaths(args)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -29,12 +30,26 @@ var validateCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		for f, ds := range dataStructures {
-			_, err := Validate(cnx, c, ds)
-			if err != nil {
-				log.Printf("%s: %s\n", f, err)
-			}
+		remotesListing, err := GetDataStructureListing(cnx, c)
+		if err != nil {
+			log.Fatal(err)
 		}
+
+		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "DEV")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = printChangeset(changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = validate(cnx, c, changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 	},
 }
 
