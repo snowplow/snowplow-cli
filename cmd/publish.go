@@ -82,7 +82,7 @@ environment will be published to your production environment.
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructures, err := DataStructuresFromPaths(args)
+		dataStructuresLocal, err := DataStructuresFromPaths(args)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -94,12 +94,25 @@ environment will be published to your production environment.
 			log.Fatal(err)
 		}
 
-		for _, ds := range dataStructures {
-			_, err = PublishProd(cnx, c, ds)
-			if err != nil {
-				log.Fatal(err)
-			}
+		remotesListing, err := GetDataStructureListing(cnx, c)
+		if err != nil {
+			log.Fatal(err)
 		}
+
+		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "PROD")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = printChangeset(changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = performChangesProd(cnx, c, changes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("All done!")
 	},
 }
 
