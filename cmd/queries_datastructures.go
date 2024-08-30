@@ -315,8 +315,3 @@ func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure) e
 
 	return nil
 }
-
-func Patch(cnx context.Context, client *ApiClient, ds DataStructure, env dataStructureEnv) error {
-
-	return nil
-}
