@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -171,9 +172,9 @@ type Deployment struct {
 type ListResponse struct {
 	Hash        string            `json:"hash"`
 	Vendor      string            `json:"vendor"`
+	Format      string            `json:"format"`
 	Name        string            `json:"name"`
 	Meta        DataStructureMeta `json:"meta"`
-	Format      string            `json:"format"`
 	Deployments []Deployment      `json:"deployments"`
 }
 
@@ -230,7 +231,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
 				auth := fmt.Sprintf("Bearer %s", client.Jwt)
 				req.Header.Add("authorization", auth)
-				fmt.Printf("Fetching %s:%s version %s\n", dsResp.Vendor, dsResp.Name, deployment.Version)
+				slog.Info("fetching data structure", "uri",  fmt.Sprintf("iglu:%s/%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version))
 
 				if err != nil {
 					return nil, err

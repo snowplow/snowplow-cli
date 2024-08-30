@@ -6,23 +6,48 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"time"
 )
 
 type ApiClient struct {
-	Http *http.Client
-	Jwt  string
+	Http    *http.Client
+	Jwt     string
 	BaseUrl string
-	OrgId string
+	OrgId   string
 }
 
 type tokenResponse struct {
 	AccessToken string
 }
 
+type loggingRoundTripper struct{
+	Transport   http.RoundTripper
+}
+
+func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+
+	slog.Debug("-->", "method", req.Method, "url", req.URL)
+
+	resp, err := t.Transport.RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
+
+	slog.Debug("<--", "status", resp.StatusCode, "url", resp.Request.URL, "t", time.Since(start))
+
+	return resp, err
+}
+
 func NewApiClient(ctx context.Context, host string, apikey string, orgid string) (*ApiClient, error) {
 
-	h := &http.Client{}
+	h := &http.Client{
+		Transport: &loggingRoundTripper{
+			Transport: http.DefaultTransport,
+		},
+	}
 
 	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
 
@@ -51,5 +76,5 @@ func NewApiClient(ctx context.Context, host string, apikey string, orgid string)
 		return nil, err
 	}
 
-	return &ApiClient{Http: &http.Client{}, Jwt: token.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
+	return &ApiClient{Http: h, Jwt: token.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
 }

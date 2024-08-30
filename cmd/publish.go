@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/maps"
 )
 
 var publishCmd = &cobra.Command{
@@ -35,36 +33,38 @@ Changes to it will be published by this command.
 		org, _ := cmd.Flags().GetString("org-id")
 
 		dataStructuresLocal, err := DataStructuresFromPaths(args)
+		slog.Info("publishing to dev from", "paths", args)
+
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		cnx := context.Background()
 
 		c, err := NewApiClient(cnx, host, apikey, org)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := GetDataStructureListing(cnx, c)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
-		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "DEV")
+		changes, err := getChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		err = printChangeset(changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 		err = performChangesDev(cnx, c, changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
-		fmt.Println("All done!")
+		slog.Info("all done!")
 	},
 }
 
@@ -84,35 +84,35 @@ environment will be published to your production environment.
 
 		dataStructuresLocal, err := DataStructuresFromPaths(args)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		cnx := context.Background()
 
 		c, err := NewApiClient(cnx, host, apikey, org)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := GetDataStructureListing(cnx, c)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
-		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "PROD")
+		changes, err := getChanges(dataStructuresLocal, remotesListing, "PROD")
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		err = printChangeset(changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 		err = performChangesProd(cnx, c, changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
-		fmt.Println("All done!")
+		slog.Info("all done!")
 	},
 }
 

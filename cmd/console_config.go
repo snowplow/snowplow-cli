@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,10 +28,21 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
+		userConfigDir, err := os.UserConfigDir()
+		if err != nil {
+			return err
+		}
+		configDir := filepath.Join(userConfigDir, "snowplow")
+		unixish := filepath.Join(home, ".config", "snowplow")
+
+		slog.Debug(
+			"looking for '.snowplow.(toml|yaml|json)'",
+			"paths", strings.Join([]string{configDir, unixish, home}, "\n"),
+		)
 
 		v.AddConfigPath(home)
-		v.AddConfigPath("$XDG_CONFIG_HOME/snowplow")
-		v.AddConfigPath("$HOME/.config/snowplow")
+		v.AddConfigPath(unixish)
+		v.AddConfigPath(configDir)
 		v.SetConfigName(".snowplow")
 	}
 
@@ -37,7 +51,7 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", v.ConfigFileUsed())
+		slog.Debug("found config", "file", v.ConfigFileUsed())
 	}
 
 	err := populateCmdConsoleConfigFlags(cmd, v)
@@ -61,7 +75,7 @@ func populateCmdConsoleConfigFlags(cmd *cobra.Command, v *viper.Viper) error {
 
 	m, ok := v.Get("console").(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("console config file key parse failure, got: %v", v.Get("console"))
+		return errors.New("console config file parse failure")
 	}
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {

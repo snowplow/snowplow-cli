@@ -33,4 +33,7 @@ func init() {
 then $XDG_CONFIG_HOME/snowplow/.snowplow.{yaml|json|toml})
 then $HOME/.config/snowplow/.snowplow.{yaml|json|toml})`,
 	)
+	rootCmd.PersistentFlags().Bool("debug", false, "Log output level to Debug")
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Log output level to Warn")
+	rootCmd.PersistentFlags().BoolP("silent", "s", false, "Disable output")
 }
