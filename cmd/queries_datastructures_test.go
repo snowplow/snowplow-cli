@@ -144,7 +144,7 @@ func Test_publish_Ok(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 
 	if err != nil {
 		t.Error(err)
@@ -170,7 +170,7 @@ func Test_publish_Fail(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 
 	if result != nil {
 		t.Error(result)
@@ -196,7 +196,7 @@ func Test_publish_FailCompletely(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{})
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 
 	if result != nil {
 		t.Error(result)
@@ -653,5 +653,30 @@ func Test_MetadataUpdate_Fail(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected failure, got success")
+	}
+}
+
+func Test_Patch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" && r.URL.Query().Get("patch") == "true" {
+			w.WriteHeader(http.StatusCreated)
+			io.WriteString(w, `{"success":true}`)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, true)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !result.Success {
+		t.Error("expected success, got failure")
 	}
 }
