@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -137,14 +138,48 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 
 func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error {
 	// Create and create new version both follow the same logic
-	// Patch there will error out on validate, we'll implement it separately
-	validatePublish := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
+	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
 		_, err := Validate(cnx, c, ds)
 		if err != nil {
 			return err
 		}
-		_, err = PublishDev(cnx, c, ds)
+		_, err = PublishDev(cnx, c, ds, false)
+		if err != nil {
+			return err
+		}
+	}
+	for _, ds := range changes.toUpdatePatch {
+		_, err := Validate(cnx, c, ds)
+		if err != nil {
+			return err
+		}
+		_, err = PublishDev(cnx, c, ds, true)
+		if err != nil {
+			return err
+		}
+	}
+	for _, ds := range changes.toUpdateMeta {
+		err := MetadateUpdate(cnx, c, &ds)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
+	if len(changes.toUpdatePatch) != 0 {
+		return errors.New("Patching is not availabe on prod")
+	}
+	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
+	for _, ds := range validatePublish {
+		_, err := Validate(cnx, c, ds)
+		if err != nil {
+			return err
+		}
+		_, err = PublishProd(cnx, c, ds)
 		if err != nil {
 			return err
 		}
@@ -192,7 +227,7 @@ func printChangeset(changes Changes) error {
 		}
 	}
 	if len(changes.toUpdatePatch) != 0 {
-		fmt.Println("PATCHING NOT SUPPORTED YET, BUMP VERSION, but in future Going to patch an existing version of a data stucture")
+		fmt.Println("Going to patch an existing version of a data stucture")
 		for _, ds := range changes.toUpdatePatch {
 			data, err := ds.parseData()
 			if err != nil {

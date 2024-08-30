@@ -94,15 +94,15 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 	return &vresp, nil
 }
 
-func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure) (*PublishResponse, error) {
-	return publish(cnx, client, VALIDATED, DEV, ds)
+func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatch bool) (*PublishResponse, error) {
+	return publish(cnx, client, VALIDATED, DEV, ds, isPatch)
 }
 
 func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure) (*PublishResponse, error) {
-	return publish(cnx, client, DEV, PROD, ds)
+	return publish(cnx, client, DEV, PROD, ds, false)
 }
 
-func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds DataStructure) (*PublishResponse, error) {
+func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds DataStructure, isPatch bool) (*PublishResponse, error) {
 
 	dsData, err := ds.parseData()
 	if err != nil {
@@ -126,6 +126,11 @@ func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to d
 	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/deployment-requests", client.BaseUrl), bytes.NewBuffer(body))
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	if isPatch {
+		q := req.URL.Query()
+		q.Add("patch", "true")
+		req.URL.RawQuery = q.Encode()
+	}
 
 	if err != nil {
 		return nil, err
