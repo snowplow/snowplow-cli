@@ -84,7 +84,7 @@ func populateCmdConsoleConfigFlags(cmd *cobra.Command, v *viper.Viper) error {
 	var err error
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if value, ok := m[f.Name]; err != nil && !f.Changed && ok {
+		if value, ok := m[f.Name]; err == nil && !f.Changed && ok {
 			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%s", value))
 		}
 	})
