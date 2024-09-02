@@ -14,7 +14,7 @@ func Test_NewClient_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/credentials/v2/token" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"accessToken":"token"}`))
+			_, _ = w.Write([]byte(`{"accessToken":"token"}`))
 			return
 		}
 
@@ -43,14 +43,14 @@ func Test_Validate_Ok(t *testing.T) {
 				t.Error(err)
 			}
 			var ds DataStructure
-			json.Unmarshal(b, &ds)
+			_ = json.Unmarshal(b, &ds)
 
 			if ds.Meta.SchemaType != "entity" {
 				t.Errorf("ds meta not as expected, got: %s", ds.Meta.SchemaType)
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			io.WriteString(w, `{"success":true}`)
+			_, _ = io.WriteString(w, `{"success":true}`)
 			return
 		}
 
@@ -81,7 +81,7 @@ func Test_Validate_Fail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/validation-requests" {
 			w.WriteHeader(http.StatusCreated)
-			io.WriteString(w, `{"success":false,"errors":["error1"]}`)
+			_, _ = io.WriteString(w, `{"success":false,"errors":["error1"]}`)
 			return
 		}
 
@@ -107,7 +107,7 @@ func Test_Validate_FailCompletely(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/validation-requests" {
 			w.WriteHeader(http.StatusBadRequest)
-			io.WriteString(w, `{"message":"bad"}`)
+			_, _ = io.WriteString(w, `{"message":"bad"}`)
 			return
 		}
 
@@ -133,7 +133,7 @@ func Test_publish_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
 			w.WriteHeader(http.StatusCreated)
-			io.WriteString(w, `{"success":true}`)
+			_, _ = io.WriteString(w, `{"success":true}`)
 			return
 		}
 
@@ -159,7 +159,7 @@ func Test_publish_Fail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
 			w.WriteHeader(http.StatusCreated)
-			io.WriteString(w, `{"success":false, "errors": ["error1"]}`)
+			_, _ = io.WriteString(w, `{"success":false, "errors": ["error1"]}`)
 			return
 		}
 
@@ -185,7 +185,7 @@ func Test_publish_FailCompletely(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" {
 			w.WriteHeader(http.StatusBadRequest)
-			io.WriteString(w, `{"message":"very bad"}`)
+			_, _ = io.WriteString(w, `{"message":"very bad"}`)
 			return
 		}
 
@@ -267,7 +267,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 				]`
 
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, resp)
+			_, _ = io.WriteString(w, resp)
 			return
 		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8/versions/2-0-0" {
 			if r.Header.Get("authorization") != "Bearer token" {
@@ -454,7 +454,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 					  }`
 
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, resp)
+			_, _ = io.WriteString(w, resp)
 			return
 		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/ea9631259272070c8a6f56aa3ec0c5d3fc41ee7390bf4830211e894128978733/versions/1-0-0" {
 			if r.Header.Get("authorization") != "Bearer token" {
@@ -473,7 +473,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 				  }`
 
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, resp)
+			_, _ = io.WriteString(w, resp)
 			return
 		}
 
@@ -556,14 +556,14 @@ func Test_GetAllDataStructuresSkips404(t *testing.T) {
 				]`
 
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, resp)
+			_, _ = io.WriteString(w, resp)
 			return
 		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8/versions/2-0-0" {
 			if r.Header.Get("authorization") != "Bearer token" {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
 			}
 			w.WriteHeader(http.StatusNotFound)
-			io.WriteString(w, `{"message":"Im lost"}`)
+			_, _ = io.WriteString(w, `{"message":"Im lost"}`)
 			return
 		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/ea9631259272070c8a6f56aa3ec0c5d3fc41ee7390bf4830211e894128978733/versions/1-0-0" {
 			if r.Header.Get("authorization") != "Bearer token" {
@@ -582,7 +582,7 @@ func Test_GetAllDataStructuresSkips404(t *testing.T) {
 				  }`
 
 			w.WriteHeader(http.StatusOK)
-			io.WriteString(w, resp)
+			_, _ = io.WriteString(w, resp)
 			return
 		}
 
@@ -617,7 +617,7 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 
 	orgId := "00000000-0000-0000-0000-000000000000"
 	var ds DataStructure
-	json.Unmarshal([]byte(`{
+	_ = json.Unmarshal([]byte(`{
 		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
 		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
 	}`), &ds)
@@ -635,13 +635,13 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 func Test_MetadataUpdate_Fail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, `{"message":"very bad"}`)
+		_, _ = io.WriteString(w, `{"message":"very bad"}`)
 	}))
 	defer server.Close()
 
 	orgId := "00000000-0000-0000-0000-000000000000"
 	var ds DataStructure
-	json.Unmarshal([]byte(`{
+	_ = json.Unmarshal([]byte(`{
 		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
 		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
 	}`), &ds)
@@ -660,7 +660,7 @@ func Test_Patch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/deployment-requests" && r.URL.Query().Get("patch") == "true" {
 			w.WriteHeader(http.StatusCreated)
-			io.WriteString(w, `{"success":true}`)
+			_, _ = io.WriteString(w, `{"success":true}`)
 			return
 		}
 		t.Errorf("Unexpected request, got: %s", r.URL.Path)

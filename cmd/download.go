@@ -39,7 +39,10 @@ If no directory is provided then defaults to 'data-structures' in the current di
 			LogFatalMsg("data structure fetch failed", err)
 		}
 
-		files.createDataStructures(dss)
+		err = files.createDataStructures(dss)
+		if err != nil {
+			LogFatal(err)
+		}
 
 		slog.Info("wrote data structures", "count", len(dss))
 	},
