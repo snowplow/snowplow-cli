@@ -2,10 +2,9 @@ package cmd
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/maps"
 )
 
 var validateCmd = &cobra.Command{
@@ -19,35 +18,36 @@ var validateCmd = &cobra.Command{
 		org, _ := cmd.Flags().GetString("org-id")
 
 		dataStructuresLocal, err := DataStructuresFromPaths(args)
+		slog.Info("validating from", "paths", args)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		cnx := context.Background()
 
 		c, err := NewApiClient(cnx, host, apikey, org)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := GetDataStructureListing(cnx, c)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
-		changes, err := getChanges(maps.Values(dataStructuresLocal), remotesListing, "DEV")
+		changes, err := getChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		err = printChangeset(changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 		err = validate(cnx, c, changes)
 		if err != nil {
-			log.Fatal(err)
+			LogFatal(err)
 		}
 
 	},

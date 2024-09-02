@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 
 	"github.com/r3labs/diff/v3"
@@ -65,26 +66,46 @@ func DiffDs(locals []DataStructure, remotes []DataStructure) ([]DataStructureWit
 	return res, nil
 }
 
-type Changes struct {
-	toCreate           []DataStructure
-	toUpdateMeta       []DataStructure
-	toUpdateNewVersion []DataStructure
-	toUpdatePatch      []DataStructure
+type DSChangeContext struct {
+	DS                DataStructure
+	FileName          string
+	RemoteVersion     string
+	LocalContentHash  string
+	RemoteContentHash string
 }
 
-func getChanges(locals []DataStructure, remoteListing []ListResponse, env dataStructureEnv) (Changes, error) {
+func NewDSChangeContext(ds DataStructure, fileName string) DSChangeContext {
+	return DSChangeContext{ds, fileName, "", "", ""}
+}
+
+func NewDSChangeContextWithVersion(ds DataStructure, fileName string, v string) DSChangeContext {
+	return DSChangeContext{ds, fileName, v, "", ""}
+}
+
+func NewDSChangeContextWithHashes(ds DataStructure, fileName string, localHash string, remoteHash string) DSChangeContext {
+	return DSChangeContext{ds, fileName, "", localHash, remoteHash}
+}
+
+type Changes struct {
+	toCreate           []DSChangeContext
+	toUpdateMeta       []DSChangeContext
+	toUpdateNewVersion []DSChangeContext
+	toUpdatePatch      []DSChangeContext
+}
+
+func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, env dataStructureEnv) (Changes, error) {
 	res := Changes{
-		make([]DataStructure, 0),
-		make([]DataStructure, 0),
-		make([]DataStructure, 0),
-		make([]DataStructure, 0),
+		make([]DSChangeContext, 0),
+		make([]DSChangeContext, 0),
+		make([]DSChangeContext, 0),
+		make([]DSChangeContext, 0),
 	}
 	remotesSet := make(map[DataStructureId]ListResponse)
 	for _, remote := range remoteListing {
 		remotesSet[DataStructureId{remote.Vendor, remote.Name, remote.Format}] = remote
 	}
 
-	for _, ds := range locals {
+	for f, ds := range locals {
 		data, err := ds.parseData()
 		if err != nil {
 			return Changes{}, err
@@ -92,12 +113,12 @@ func getChanges(locals []DataStructure, remoteListing []ListResponse, env dataSt
 		remotePair, exists := remotesSet[idFromSelf(data.Self)]
 		// DS does not exists, we should create it
 		if !exists {
-			res.toCreate = append(res.toCreate, ds)
+			res.toCreate = append(res.toCreate, NewDSChangeContext(ds, f))
 		} else {
 			//Remote DS exists,
 			if !reflect.DeepEqual(ds.Meta, remotePair.Meta) {
 				// Meta is different, needs updating
-				res.toUpdateMeta = append(res.toUpdateMeta, ds)
+				res.toUpdateMeta = append(res.toUpdateMeta, NewDSChangeContext(ds, f))
 			}
 			contentHash, err := ds.getContentHash()
 			if err != nil {
@@ -110,10 +131,10 @@ func getChanges(locals []DataStructure, remoteListing []ListResponse, env dataSt
 						// data structure has changed
 						if data.Self.Version != deployment.Version {
 							// Different version, create new version
-							res.toUpdateNewVersion = append(res.toUpdateNewVersion, ds)
+							res.toUpdateNewVersion = append(res.toUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, deployment.Version))
 						} else {
 							// Same version, but different hash, patch
-							res.toUpdatePatch = append(res.toUpdatePatch, ds)
+							res.toUpdatePatch = append(res.toUpdatePatch, NewDSChangeContextWithHashes(ds, f, contentHash, deployment.ContentHash))
 						}
 					}
 				}
@@ -127,11 +148,16 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 	// Create and create new version both follow the same logic
 	// Patch there will error out on validate, we'll implement it separately
 	validate := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
+	failed := 0
 	for _, ds := range validate {
-		_, err := Validate(cnx, c, ds)
+		_, err := Validate(cnx, c, ds.DS)
 		if err != nil {
-			return err
+			slog.Error("validation fail", "file", ds.FileName, "error", err)
+			failed++
 		}
+	}
+	if failed > 0 {
+		return fmt.Errorf("%d validation failures", failed)
 	}
 	return nil
 }
@@ -140,27 +166,27 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 	// Create and create new version both follow the same logic
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := Validate(cnx, c, ds)
+		_, err := Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
-		_, err = PublishDev(cnx, c, ds, false)
+		_, err = PublishDev(cnx, c, ds.DS, false)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.toUpdatePatch {
-		_, err := Validate(cnx, c, ds)
+		_, err := Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
-		_, err = PublishDev(cnx, c, ds, true)
+		_, err = PublishDev(cnx, c, ds.DS, true)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.toUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds)
+		err := MetadateUpdate(cnx, c, &ds.DS)
 		if err != nil {
 			return err
 		}
@@ -171,21 +197,21 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 
 func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
 	if len(changes.toUpdatePatch) != 0 {
-		return errors.New("Patching is not availabe on prod")
+		return errors.New("Patching is not availabe on prod. You must increment versions on dev before deploying.")
 	}
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := Validate(cnx, c, ds)
+		_, err := Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
-		_, err = PublishProd(cnx, c, ds)
+		_, err = PublishProd(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.toUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds)
+		err := MetadateUpdate(cnx, c, &ds.DS)
 		if err != nil {
 			return err
 		}
@@ -195,45 +221,43 @@ func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) erro
 }
 
 func printChangeset(changes Changes) error {
-	fmt.Println("Planned changes:")
 	if len(changes.toUpdateMeta) != 0 {
-		fmt.Println("Going to update metadata for following data structures:")
 		for _, ds := range changes.toUpdateMeta {
-			data, err := ds.parseData()
+			data, err := ds.DS.parseData()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s-%s\n", data.Self.Vendor, data.Self.Name)
+			slog.Info("will update metadata of", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name)
 		}
 	}
 	if len(changes.toCreate) != 0 {
-		fmt.Println("Going to create new data strucutres")
 		for _, ds := range changes.toCreate {
-			data, err := ds.parseData()
+			data, err := ds.DS.parseData()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s-%s\n", data.Self.Vendor, data.Self.Name)
+			slog.Info("will create", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name, "version", data.Self.Version)
 		}
 	}
 	if len(changes.toUpdateNewVersion) != 0 {
-		fmt.Println("Going to create a new version of a data stucture")
 		for _, ds := range changes.toUpdateNewVersion {
-			data, err := ds.parseData()
+			data, err := ds.DS.parseData()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s-%s-%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
+			slog.Info("will update", "file", ds.FileName, "local", data.Self.Version, "remote", ds.RemoteVersion)
 		}
 	}
 	if len(changes.toUpdatePatch) != 0 {
-		fmt.Println("Going to patch an existing version of a data stucture")
 		for _, ds := range changes.toUpdatePatch {
-			data, err := ds.parseData()
+			data, err := ds.DS.parseData()
 			if err != nil {
 				return err
 			}
-			fmt.Printf("	%s-%s-%s\n", data.Self.Vendor, data.Self.Name, data.Self.Version)
+			slog.Info(
+				"will patch", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name,
+				"version", data.Self.Version, "local", ds.LocalContentHash, "remote", ds.RemoteContentHash,
+			)
 		}
 	}
 	return nil

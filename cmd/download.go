@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 )
@@ -31,15 +31,17 @@ If no directory is provided then defaults to 'data-structures' in the current di
 
 		c, err := NewApiClient(cnx, host, apikey, org)
 		if err != nil {
-			log.Fatal(err)
+			LogFatalMsg("client creation fail", err)
 		}
 
 		dss, err := GetAllDataStructures(cnx, c)
 		if err != nil {
-			log.Fatal(err)
+			LogFatalMsg("data structure fetch failed", err)
 		}
 
 		files.createDataStructures(dss)
+
+		slog.Info("wrote data structures", "count", len(dss))
 	},
 }
 

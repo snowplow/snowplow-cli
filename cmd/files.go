@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -46,6 +47,9 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
+
+		slog.Debug("wrote", "file", filePath)
 	}
+
 	return nil
 }

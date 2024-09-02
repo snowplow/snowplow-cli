@@ -221,7 +221,7 @@ func Test_GetChangesCreate(t *testing.T) {
 			"schema": "string"},
 	}
 
-	res, err := getChanges([]DataStructure{local}, []ListResponse{}, "DEV")
+	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
@@ -252,7 +252,7 @@ func Test_GetChangesUpdateAndMeta(t *testing.T) {
 		Meta:   DataStructureMeta{Hidden: false, SchemaType: "entity"},
 		Format: "string",
 		Deployments: []Deployment{
-			Deployment{
+			{
 				Version:     "1-0-0",
 				Env:         "DEV",
 				ContentHash: "different",
@@ -260,7 +260,7 @@ func Test_GetChangesUpdateAndMeta(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges([]DataStructure{local}, []ListResponse{remote}, "DEV")
+	res, err := getChanges(map[string]DataStructure{"file":local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
@@ -291,7 +291,7 @@ func Test_GetChangesPatch(t *testing.T) {
 		Meta:   DataStructureMeta{Hidden: true, SchemaType: "entity"},
 		Format: "string",
 		Deployments: []Deployment{
-			Deployment{
+			{
 				Version:     "1-0-0",
 				Env:         "DEV",
 				ContentHash: "different",
@@ -299,7 +299,7 @@ func Test_GetChangesPatch(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges([]DataStructure{local}, []ListResponse{remote}, "DEV")
+	res, err := getChanges(map[string]DataStructure{"file":local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
@@ -330,7 +330,7 @@ func Test_GetChangesNoChange(t *testing.T) {
 		Meta:   DataStructureMeta{Hidden: true, SchemaType: "entity"},
 		Format: "string",
 		Deployments: []Deployment{
-			Deployment{
+			{
 				Version:     "1-0-0",
 				Env:         "DEV",
 				ContentHash: "d11f7d148af26aa88594bfe37e94b34dd5d933bbd7a19be50a0cde5feb532e2a",
@@ -338,7 +338,7 @@ func Test_GetChangesNoChange(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges([]DataStructure{local}, []ListResponse{remote}, "DEV")
+	res, err := getChanges(map[string]DataStructure{"file":local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
