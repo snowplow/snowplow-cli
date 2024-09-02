@@ -18,7 +18,7 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 	files := map[string]bool{}
 
 	for _, path := range paths {
-		filepath.WalkDir(path, func(path string, di fs.DirEntry, err error) error {
+		err := filepath.WalkDir(path, func(path string, di fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -27,6 +27,9 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 			}
 			return nil
 		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	ds := make(map[string]DataStructure)

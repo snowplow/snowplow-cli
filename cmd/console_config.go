@@ -60,10 +60,13 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 	}
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if !f.Changed && v.IsSet(f.Name) {
-			cmd.Flags().Set(f.Name, fmt.Sprintf("%s", v.Get(f.Name)))
+		if err != nil && !f.Changed && v.IsSet(f.Name) {
+			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%s", v.Get(f.Name)))
 		}
 	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -78,10 +81,17 @@ func populateCmdConsoleConfigFlags(cmd *cobra.Command, v *viper.Viper) error {
 		return errors.New("console config file parse failure")
 	}
 
+	var err error
+
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if value, ok := m[f.Name]; !f.Changed && ok {
-			cmd.Flags().Set(f.Name, fmt.Sprintf("%s", value))
+		if value, ok := m[f.Name]; err != nil && !f.Changed && ok {
+			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%s", value))
 		}
 	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
