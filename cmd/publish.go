@@ -28,7 +28,8 @@ Changes to it will be published by this command.
 	`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		apikey, _ := cmd.Flags().GetString("api-key")
+		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
@@ -41,7 +42,7 @@ Changes to it will be published by this command.
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apikey, org)
+		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatal(err)
 		}
@@ -78,7 +79,8 @@ Data structures found on <path...> which are deployed to your development
 environment will be published to your production environment.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		apikey, _ := cmd.Flags().GetString("api-key")
+		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
@@ -89,7 +91,7 @@ environment will be published to your production environment.
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apikey, org)
+		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatal(err)
 		}

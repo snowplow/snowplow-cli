@@ -41,7 +41,7 @@ func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, err
 }
 
-func NewApiClient(ctx context.Context, host string, apikey string, orgid string) (*ApiClient, error) {
+func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecret string, orgid string) (*ApiClient, error) {
 
 	h := &http.Client{
 		Transport: &loggingRoundTripper{
@@ -51,12 +51,13 @@ func NewApiClient(ctx context.Context, host string, apikey string, orgid string)
 
 	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
 
-	url := fmt.Sprintf("%s/credentials/v2/token", baseUrl)
+	url := fmt.Sprintf("%s/credentials/v3/token", baseUrl)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("X-API-KEY", apikey)
+	req.Header.Add("X-API-KEY-ID", apiKeyId)
+	req.Header.Add("X-API-KEY", apiKeySecret)
 	resp, err := h.Do(req)
 	if err != nil {
 		return nil, err
