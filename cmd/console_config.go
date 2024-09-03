@@ -14,7 +14,8 @@ import (
 )
 
 func InitConsoleFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringP("api-key", "a", "", "BDP console api key")
+	cmd.PersistentFlags().StringP("api-key-id", "a", "", "BDP console api key id")
+	cmd.PersistentFlags().StringP("api-key-secret", "S", "", "BDP console api key secret")
 	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "BDP console host")
 	cmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
 }

@@ -12,7 +12,9 @@ import (
 
 func Test_NewClient_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/credentials/v2/token" {
+		_, idHeader := r.Header["X-Api-Key-Id"]
+		_, secretHeader := r.Header["X-Api-Key"]
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/credentials/v3/token" && idHeader && secretHeader {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"accessToken":"token"}`))
 			return
@@ -23,7 +25,7 @@ func Test_NewClient_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client, _ := NewApiClient(cnx, server.URL, "apikey", "orgid")
+	client, _ := NewApiClient(cnx, server.URL, "apiKeyId", "apiKeySecret", "orgid")
 
 	if client.Jwt != "token" {
 		t.Errorf("jwt not ok, got: %s", client.Jwt)

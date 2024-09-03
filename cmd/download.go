@@ -23,13 +23,14 @@ If no directory is provided then defaults to 'data-structures' in the current di
 		format, _ := cmd.Flags().GetString("format")
 		files := Files{dataStructuresFolder, format}
 
-		apikey, _ := cmd.Flags().GetString("api-key")
+		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apikey, org)
+		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatalMsg("client creation fail", err)
 		}
