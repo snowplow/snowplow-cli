@@ -26,8 +26,9 @@ type DataStructureMeta struct {
 }
 
 type DataStructure struct {
-	Meta DataStructureMeta `yaml:"meta" json:"meta"`
-	Data map[string]any    `yaml:"data" json:"data"`
+	ApiVersion string            `yaml:"apiVersion" json:"apiVersion"`
+	Meta       DataStructureMeta `yaml:"meta" json:"meta"`
+	Data       map[string]any    `yaml:"data" json:"data"`
 }
 
 func (ds DataStructure) getContentHash() (string, error) {

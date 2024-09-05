@@ -10,7 +10,7 @@ import (
 var validateCmd = &cobra.Command{
 	Use:   "validate path...",
 	Short: "Validate data structures with BDP Console",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Long:  `Sends all data structures from <path> for validation by BDP Console.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
@@ -18,8 +18,13 @@ var validateCmd = &cobra.Command{
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructuresLocal, err := DataStructuresFromPaths(args)
-		slog.Info("validating from", "paths", args)
+		dataStructureFolders := []string{DataStructuresFolder}
+		if len(args) > 0 {
+			dataStructureFolders = args
+		}
+
+		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
+		slog.Info("validating from", "paths", dataStructureFolders)
 		if err != nil {
 			LogFatal(err)
 		}

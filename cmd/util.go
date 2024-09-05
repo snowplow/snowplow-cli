@@ -62,7 +62,7 @@ func dataStructureFromFileName(f string) (*DataStructure, error) {
 		return nil, err
 	}
 
-	ds := DataStructure{}
+	ds := DataStructure{ApiVersion: "v1"}
 	switch filepath.Ext(file.Name()) {
 	case ".json":
 		err = json.Unmarshal(body, &ds)
