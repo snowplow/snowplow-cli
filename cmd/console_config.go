@@ -58,8 +58,8 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
-		if value, ok := os.LookupEnv("SNOWPLOW_CONSOLE_" + name); ok && value != "" {
-			cmd.Flags().Set(f.Name, value)
+		if value, ok := os.LookupEnv("SNOWPLOW_CONSOLE_" + name); err != nil && ok && value != "" {
+			err = cmd.Flags().Set(f.Name, value)
 		}
 	})
 
