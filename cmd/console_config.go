@@ -47,10 +47,6 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 		v.SetConfigName(".snowplow")
 	}
 
-	v.SetEnvPrefix("SNOWPLOW_CONSOLE")
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	v.AutomaticEnv()
-
 	if err := v.ReadInConfig(); err == nil {
 		slog.Debug("found config", "file", v.ConfigFileUsed())
 	}
@@ -61,10 +57,18 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 	}
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
+		if value, ok := os.LookupEnv("SNOWPLOW_CONSOLE_" + name); ok && value != "" {
+			cmd.Flags().Set(f.Name, value)
+		}
+	})
+
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if err != nil && !f.Changed && v.IsSet(f.Name) {
 			err = cmd.Flags().Set(f.Name, fmt.Sprintf("%s", v.Get(f.Name)))
 		}
 	})
+
 	if err != nil {
 		return err
 	}
