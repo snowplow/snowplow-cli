@@ -36,4 +36,5 @@ then $HOME/.config/snowplow/.snowplow.{yaml|json|toml})`,
 	rootCmd.PersistentFlags().Bool("debug", false, "Log output level to Debug")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Log output level to Warn")
 	rootCmd.PersistentFlags().BoolP("silent", "s", false, "Disable output")
+	rootCmd.PersistentFlags().Bool("json-output", false, "Log output as json")
 }

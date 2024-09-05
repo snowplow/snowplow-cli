@@ -27,6 +27,11 @@ func InitLogging(cmd *cobra.Command) error {
 		return err
 	}
 
+	json, err := cmd.Flags().GetBool("json-output")
+	if err != nil {
+		return err
+	}
+
 	if silent {
 		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 		return nil
@@ -37,7 +42,13 @@ func InitLogging(cmd *cobra.Command) error {
 		TimeFormat:      time.Kitchen,
 	})
 
-	logger := slog.New(handler)
+	var logger *slog.Logger
+	if json {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	} else {
+		logger = slog.New(handler)
+	}
+
 	slog.SetDefault(logger)
 
 	if debug {
