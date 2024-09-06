@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
-	"strings"
 
 	"github.com/r3labs/diff/v3"
 )
@@ -125,9 +124,11 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 			if err != nil {
 				return Changes{}, err
 			}
+			var foundDeployment bool
 			// find the correct deployment to compare to
 			for _, deployment := range remotePair.Deployments {
 				if deployment.Env == env {
+					foundDeployment = true
 					if deployment.ContentHash != contentHash {
 						// data structure has changed
 						if data.Self.Version != deployment.Version {
@@ -140,6 +141,11 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 					}
 				}
 			}
+			if !foundDeployment {
+				// DS exists, but we didn't find a version of it
+				// We should deploy from dev to prod
+				res.toUpdateNewVersion = append(res.toUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, ""))
+			}
 		}
 	}
 	return res, nil
@@ -151,17 +157,9 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 	validate := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
 	failed := 0
 	for _, ds := range validate {
-		resp, err := Validate(cnx, c, ds.DS)
-		if resp != nil {
-			if len(resp.Warnings) > 0 {
-				slog.Warn("validation", "file", ds.FileName, "messages", strings.Join(resp.Warnings, "\n"))
-			}
-			if len(resp.Info) > 0 {
-				slog.Info("validation", "file", ds.FileName, "messages", strings.Join(resp.Info, "\n"))
-			}
-		}
+		_, err := Validate(cnx, c, ds.DS)
 		if err != nil {
-			slog.Error("validation", "file", ds.FileName, "messages", err)
+			slog.Error("validation fail", "file", ds.FileName, "error", err)
 			failed++
 		}
 	}

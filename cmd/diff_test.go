@@ -349,3 +349,42 @@ func Test_GetChangesNoChange(t *testing.T) {
 	}
 
 }
+
+func Test_GetChangesProdDeploy(t *testing.T) {
+	local := DataStructure{
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity"},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-0-0",
+			},
+			"schema": "string"},
+	}
+	remote := ListResponse{
+		Hash:   "different",
+		Vendor: "string",
+		Name:   "string",
+		Meta:   DataStructureMeta{Hidden: true, SchemaType: "entity"},
+		Format: "string",
+		Deployments: []Deployment{
+			{
+				Version:     "1-0-0",
+				Env:         "DEV",
+				ContentHash: "different",
+			},
+		},
+	}
+
+	res, err := getChanges(map[string]DataStructure{"file":local}, []ListResponse{remote}, "PROD")
+
+	if err != nil {
+		t.Fatalf("Can't calcuate changes %s", err)
+	}
+
+	if len(res.toCreate) != 0 || len(res.toUpdateMeta) != 0 || len(res.toUpdatePatch) != 0 || len(res.toUpdateNewVersion) != 1 {
+		t.Fatalf("Unexpected result, expecting one data structre to update, got %+v", res)
+	}
+
+}
