@@ -18,8 +18,10 @@ type msgResponse struct {
 }
 
 type pubResponse struct {
-	Success bool
-	Errors  []string
+	Success  bool
+	Errors   []string
+	Warnings []string
+	Info     []string
 	msgResponse
 }
 
@@ -231,7 +233,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
 				auth := fmt.Sprintf("Bearer %s", client.Jwt)
 				req.Header.Add("authorization", auth)
-				slog.Info("fetching data structure", "uri",  fmt.Sprintf("iglu:%s/%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version))
+				slog.Info("fetching data structure", "uri", fmt.Sprintf("iglu:%s/%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version))
 
 				if err != nil {
 					return nil, err
