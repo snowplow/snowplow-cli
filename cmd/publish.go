@@ -32,6 +32,7 @@ Changes to it will be published by this command.
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -67,11 +68,13 @@ Changes to it will be published by this command.
 		if err != nil {
 			LogFatal(err)
 		}
-		err = performChangesDev(cnx, c, changes)
-		if err != nil {
-			LogFatal(err)
+		if !dryRun {
+			err = performChangesDev(cnx, c, changes)
+			if err != nil {
+				LogFatal(err)
+			}
+			slog.Info("all done!")
 		}
-		slog.Info("all done!")
 	},
 }
 
@@ -89,6 +92,7 @@ environment will be published to your production environment.
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -123,11 +127,13 @@ environment will be published to your production environment.
 		if err != nil {
 			LogFatal(err)
 		}
-		err = performChangesProd(cnx, c, changes)
-		if err != nil {
-			LogFatal(err)
+		if !dryRun {
+			err = performChangesProd(cnx, c, changes)
+			if err != nil {
+				LogFatal(err)
+			}
+			slog.Info("all done!")
 		}
-		slog.Info("all done!")
 	},
 }
 
@@ -135,4 +141,8 @@ func init() {
 	dataStructuresCmd.AddCommand(publishCmd)
 	publishCmd.AddCommand(devCmd)
 	publishCmd.AddCommand(prodCmd)
+
+	devCmd.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
+	prodCmd.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
+
 }
