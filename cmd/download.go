@@ -16,7 +16,7 @@ var downloadCmd = &cobra.Command{
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		dataStructuresFolder := "data-structures"
+		dataStructuresFolder := DataStructuresFolder
 		if len(args) > 0 {
 			dataStructuresFolder = args[0]
 		}

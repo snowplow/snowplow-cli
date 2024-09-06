@@ -13,6 +13,7 @@ import (
 
 func TestDataStructureJsonParseSuccess(t *testing.T) {
 	jsonString := string(`{
+	  "apiVersion": "v1",
       "meta": {
         "hidden": true,
         "schemaType": "entity",
@@ -33,6 +34,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
       }
     }`)
 	expected := DataStructure{
+		ApiVersion: "v1",
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
 			"additionalProp1": "string",
 			"additionalProp2": "string",
@@ -58,6 +60,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
 
 func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
 	jsonString := string(`{
+	  "apiVersion": "v1",
       "meta": {
         "hidden": true,
         "schemaType": "entity",
@@ -85,7 +88,9 @@ func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
 }
 
 func TestDataStructureYamlParseSuccess(t *testing.T) {
-	yamlString := string(`meta:
+	yamlString := string(`
+apiVersion: v1
+meta:
   hidden: true
   schemaType: entity
   customData:
@@ -100,6 +105,7 @@ data:
     version: 1-2-0
   schema: string`)
 	expected := DataStructure{
+		ApiVersion: "v1",
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
 			"additionalProp1": "string",
 			"additionalProp2": "string",
@@ -210,4 +216,50 @@ func TestDataStructureHash(t *testing.T) {
 	if hash != expectedHash {
 		t.Fatalf("Not expected hash, expected: %s, got: %s\n", expectedHash, hash)
 	}
+}
+
+func TestDefaultApiVersion(t *testing.T) {
+	jsonString := string(`{
+      "meta": {
+        "hidden": true,
+        "schemaType": "entity",
+        "customData": {
+          "additionalProp1": "string",
+          "additionalProp2": "string",
+          "additionalProp3": "string"
+        }
+      },
+      "data": {
+        "self": {
+          "vendor": "string",
+          "name": "string",
+          "format": "string",
+          "version": "1-0-1"
+        },
+        "schema": "string"
+      }
+    }`)
+	expected := DataStructure{
+		ApiVersion: "v1",
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
+			"additionalProp1": "string",
+			"additionalProp2": "string",
+			"additionalProp3": "string",
+		},
+		},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-0-1",
+			},
+			"schema": "string"},
+	}
+	res := DataStructure{ApiVersion: "v1"}
+	err := json.Unmarshal([]byte(jsonString), &res)
+	if !reflect.DeepEqual(expected, res) || err != nil {
+		t.Fatalf("Cant' parse json %s\n parsed %#v\n expected %#v", err, res, expected)
+	}
+
 }

@@ -18,9 +18,9 @@ Publish local data structures to BDP console.
 }
 
 var devCmd = &cobra.Command{
-	Use:   "dev path...",
+	Use:   "dev [paths...] default: [./data-structures]",
 	Short: "Publish data structures to your development environment",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Long: `Publish modified data structures to BDP Console and your development environment
 
 The 'meta' section of a data structure is not versioned within BDP Console.
@@ -33,12 +33,18 @@ Changes to it will be published by this command.
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructuresLocal, err := DataStructuresFromPaths(args)
-		slog.Info("publishing to dev from", "paths", args)
+		dataStructureFolders := []string{DataStructuresFolder}
+		if len(args) > 0 {
+			dataStructureFolders = args
+		}
+
+		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
 
 		if err != nil {
 			LogFatal(err)
 		}
+
+		slog.Info("publishing to dev from", "paths", dataStructureFolders)
 
 		cnx := context.Background()
 
@@ -70,9 +76,9 @@ Changes to it will be published by this command.
 }
 
 var prodCmd = &cobra.Command{
-	Use:   "prod path...",
+	Use:   "prod [paths...] default: [./data-structures]",
 	Short: "Publish data structures to your production environment",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ArbitraryArgs,
 	Long: `Publish data structures from your development to your production environment
 
 Data structures found on <path...> which are deployed to your development
@@ -84,10 +90,17 @@ environment will be published to your production environment.
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
-		dataStructuresLocal, err := DataStructuresFromPaths(args)
+		dataStructureFolders := []string{DataStructuresFolder}
+		if len(args) > 0 {
+			dataStructureFolders = args
+		}
+
+		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
 		if err != nil {
 			LogFatal(err)
 		}
+
+		slog.Info("publishing to prod from", "paths", dataStructureFolders)
 
 		cnx := context.Background()
 

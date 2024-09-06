@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -36,15 +37,24 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 
 	exts := []string{".yaml", ".yml", ".json"}
 
+	wrongVersions := []string{}
+
 	for k := range files {
 		if slices.Index(exts, filepath.Ext(k)) != -1 {
 			d, err := dataStructureFromFileName(k)
 			if err != nil {
 				return nil, errors.Join(err, fmt.Errorf("file: %s", k))
 			} else {
+				if d.ApiVersion != "v1" {
+					wrongVersions = append(wrongVersions, fmt.Sprintf(`apiVersion %s in file %s is not supported. Supported apiVersions are ["v1"]`, d.ApiVersion, k))
+				}
 				ds[k] = *d
 			}
 		}
+	}
+
+	if len(wrongVersions) > 0 {
+		return nil, errors.New(strings.Join(wrongVersions, "\n"))
 	}
 
 	return ds, nil

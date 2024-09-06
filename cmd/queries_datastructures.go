@@ -262,7 +262,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 					return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 				}
 
-				dataStructure := DataStructure{dsResp.Meta, ds}
+				dataStructure := DataStructure{"v1", dsResp.Meta, ds}
 				res = append(res, dataStructure)
 			}
 		}

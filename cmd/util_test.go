@@ -36,3 +36,25 @@ func Test_DataStructuresFromPaths(t *testing.T) {
 		t.Fatal("didn't find the yaml one")
 	}
 }
+
+func Test_DataStructuresFromPathsFailVersion(t *testing.T) {
+	path := strings.Join([]string{"testdata", "wrong_version"}, string(os.PathSeparator))
+	paths := []string{path}
+
+	_, err := DataStructuresFromPaths(paths)
+
+	if err == nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_DataStructuresFromPathsFailNotASchema(t *testing.T) {
+	path := strings.Join([]string{"testdata", "not-a-schema"}, string(os.PathSeparator))
+	paths := []string{path}
+
+	_, err := DataStructuresFromPaths(paths)
+
+	if err == nil {
+		t.Fatal(err)
+	}
+}
