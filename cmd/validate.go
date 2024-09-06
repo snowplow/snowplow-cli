@@ -8,7 +8,7 @@ import (
 )
 
 var validateCmd = &cobra.Command{
-	Use:   "validate path...",
+	Use:   "validate [paths...] default: [./data-structures]",
 	Short: "Validate data structures with BDP Console",
 	Args:  cobra.ArbitraryArgs,
 	Long:  `Sends all data structures from <path> for validation by BDP Console.`,

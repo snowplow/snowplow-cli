@@ -18,7 +18,7 @@ Publish local data structures to BDP console.
 }
 
 var devCmd = &cobra.Command{
-	Use:   "dev path...",
+	Use:   "dev [paths...] default: [./data-structures]",
 	Short: "Publish data structures to your development environment",
 	Args:  cobra.ArbitraryArgs,
 	Long: `Publish modified data structures to BDP Console and your development environment
@@ -76,7 +76,7 @@ Changes to it will be published by this command.
 }
 
 var prodCmd = &cobra.Command{
-	Use:   "prod path...",
+	Use:   "prod [paths...] default: [./data-structures]",
 	Short: "Publish data structures to your production environment",
 	Args:  cobra.ArbitraryArgs,
 	Long: `Publish data structures from your development to your production environment
