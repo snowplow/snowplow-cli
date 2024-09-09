@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"strings"
 
 	"github.com/r3labs/diff/v3"
 )
@@ -157,9 +158,17 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 	validate := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
 	failed := 0
 	for _, ds := range validate {
-		_, err := Validate(cnx, c, ds.DS)
+		resp, err := Validate(cnx, c, ds.DS)
+		if resp != nil {
+			if len(resp.Warnings) > 0 {
+				slog.Warn("validation", "file", ds.FileName, "messages", strings.Join(resp.Warnings, "\n"))
+			}
+			if len(resp.Info) > 0 {
+				slog.Info("validation", "file", ds.FileName, "messages", strings.Join(resp.Info, "\n"))
+			}
+		}
 		if err != nil {
-			slog.Error("validation fail", "file", ds.FileName, "error", err)
+			slog.Error("validation", "file", ds.FileName, "messages", err)
 			failed++
 		}
 	}
