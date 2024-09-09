@@ -83,8 +83,8 @@ func NewDSChangeContextWithVersion(ds DataStructure, fileName string, v string) 
 	return DSChangeContext{ds, fileName, v, "", ""}
 }
 
-func NewDSChangeContextWithHashes(ds DataStructure, fileName string, localHash string, remoteHash string) DSChangeContext {
-	return DSChangeContext{ds, fileName, "", localHash, remoteHash}
+func NewDSChangeContextWithVersionAndHashes(ds DataStructure, fileName string, v string, localHash string, remoteHash string) DSChangeContext {
+	return DSChangeContext{ds, fileName, v, localHash, remoteHash}
 }
 
 type Changes struct {
@@ -137,7 +137,7 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 							res.toUpdateNewVersion = append(res.toUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, deployment.Version))
 						} else {
 							// Same version, but different hash, patch
-							res.toUpdatePatch = append(res.toUpdatePatch, NewDSChangeContextWithHashes(ds, f, contentHash, deployment.ContentHash))
+							res.toUpdatePatch = append(res.toUpdatePatch, NewDSChangeContextWithVersionAndHashes(ds, f, deployment.Version, contentHash, deployment.ContentHash))
 						}
 					}
 				}
@@ -173,7 +173,8 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 		}
 	}
 
-	for _, ds := range changes.toUpdateNewVersion {
+	migrationsToCheck := append(changes.toUpdateNewVersion, changes.toUpdatePatch...)
+	for _, ds := range migrationsToCheck {
 		result, err := ValidateMigrations(cnx, c, ds)
 		if err != nil {
 			return err
