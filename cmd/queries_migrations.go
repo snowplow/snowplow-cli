@@ -90,7 +90,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 }
 
 func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/destinations/v2", client.BaseUrl), nil)
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/destinations/v3", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
 

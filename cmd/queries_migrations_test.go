@@ -11,7 +11,7 @@ import (
 
 func Test_ValidateMigrationsDestinations_Fail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v2" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v3" {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"message":"bad"}`)
 			return
@@ -37,7 +37,7 @@ func Test_ValidateMigrationsDestinations_Fail(t *testing.T) {
 
 func Test_ValidateMigrations_Fail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v2" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v3" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `[{"destinationType":"something"}]`)
 			return
@@ -80,7 +80,7 @@ func Test_ValidateMigrations_Fail(t *testing.T) {
 
 func migrationServer(changeType string, t *testing.T) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v2" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v3" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `[{"destinationType":"something"},{"destinationType":"otherone"}]`)
 			return
