@@ -55,7 +55,6 @@ var validateCmd = &cobra.Command{
 		if err != nil {
 			LogFatal(err)
 		}
-
 	},
 }
 

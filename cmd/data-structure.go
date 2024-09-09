@@ -55,10 +55,10 @@ func (d DataStructure) parseData() (DataStrucutreData, error) {
 }
 
 type DataStructureSelf struct {
-	Vendor  string `mapstructure:"vendor"`
-	Name    string `mapstructure:"name"`
-	Format  string `mapstructure:"format"`
-	Version string `mapstructure:"version"`
+	Vendor  string `mapstructure:"vendor" json:"vendor"`
+	Name    string `mapstructure:"name" json:"name"`
+	Format  string `mapstructure:"format" json:"format"`
+	Version string `mapstructure:"version" json:"version"`
 }
 
 type DataStrucutreData struct {

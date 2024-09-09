@@ -172,9 +172,21 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 			failed++
 		}
 	}
+
+	for _, ds := range changes.toUpdateNewVersion {
+		result, err := ValidateMigrations(cnx, c, ds)
+		if err != nil {
+			return err
+		}
+		for dest, r := range result {
+			slog.Warn("validation", "file", ds.FileName, "destination", dest, "suggestedVersion", r.SuggestedVersion, "messages", r.CombinedMessages)
+		}
+	}
+
 	if failed > 0 {
 		return fmt.Errorf("%d validation failures", failed)
 	}
+
 	return nil
 }
 
@@ -213,7 +225,7 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 
 func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
 	if len(changes.toUpdatePatch) != 0 {
-		return errors.New("Patching is not availabe on prod. You must increment versions on dev before deploying.")
+		return errors.New("patching is not availabe on prod. You must increment versions on dev before deploying")
 	}
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
