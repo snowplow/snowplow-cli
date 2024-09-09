@@ -125,9 +125,11 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 			if err != nil {
 				return Changes{}, err
 			}
+			var foundDeployment bool
 			// find the correct deployment to compare to
 			for _, deployment := range remotePair.Deployments {
 				if deployment.Env == env {
+					foundDeployment = true
 					if deployment.ContentHash != contentHash {
 						// data structure has changed
 						if data.Self.Version != deployment.Version {
@@ -139,6 +141,11 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 						}
 					}
 				}
+			}
+			if !foundDeployment {
+				// DS exists, but we didn't find a version of it
+				// We should deploy from dev to prod
+				res.toUpdateNewVersion = append(res.toUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, ""))
 			}
 		}
 	}
