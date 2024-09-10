@@ -180,7 +180,8 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 			return err
 		}
 		for dest, r := range result {
-			slog.Warn("validation", "file", ds.FileName, "destination", dest, "suggestedVersion", r.SuggestedVersion, "messages", r.CombinedMessages)
+			slog.Error("validation", "file", ds.FileName, "destination", dest, "suggestedVersion", r.SuggestedVersion, "messages", r.CombinedMessages)
+			failed++
 		}
 	}
 
