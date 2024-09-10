@@ -83,8 +83,8 @@ func NewDSChangeContextWithVersion(ds DataStructure, fileName string, v string) 
 	return DSChangeContext{ds, fileName, v, "", ""}
 }
 
-func NewDSChangeContextWithHashes(ds DataStructure, fileName string, localHash string, remoteHash string) DSChangeContext {
-	return DSChangeContext{ds, fileName, "", localHash, remoteHash}
+func NewDSChangeContextWithVersionAndHashes(ds DataStructure, fileName string, v string, localHash string, remoteHash string) DSChangeContext {
+	return DSChangeContext{ds, fileName, v, localHash, remoteHash}
 }
 
 type Changes struct {
@@ -137,7 +137,7 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 							res.toUpdateNewVersion = append(res.toUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, deployment.Version))
 						} else {
 							// Same version, but different hash, patch
-							res.toUpdatePatch = append(res.toUpdatePatch, NewDSChangeContextWithHashes(ds, f, contentHash, deployment.ContentHash))
+							res.toUpdatePatch = append(res.toUpdatePatch, NewDSChangeContextWithVersionAndHashes(ds, f, deployment.Version, contentHash, deployment.ContentHash))
 						}
 					}
 				}
@@ -172,9 +172,22 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) error {
 			failed++
 		}
 	}
+
+	migrationsToCheck := append(changes.toUpdateNewVersion, changes.toUpdatePatch...)
+	for _, ds := range migrationsToCheck {
+		result, err := ValidateMigrations(cnx, c, ds)
+		if err != nil {
+			return err
+		}
+		for dest, r := range result {
+			slog.Warn("validation", "file", ds.FileName, "destination", dest, "suggestedVersion", r.SuggestedVersion, "messages", r.CombinedMessages)
+		}
+	}
+
 	if failed > 0 {
 		return fmt.Errorf("%d validation failures", failed)
 	}
+
 	return nil
 }
 
@@ -213,7 +226,7 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 
 func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
 	if len(changes.toUpdatePatch) != 0 {
-		return errors.New("Patching is not availabe on prod. You must increment versions on dev before deploying.")
+		return errors.New("patching is not availabe on prod. You must increment versions on dev before deploying")
 	}
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
