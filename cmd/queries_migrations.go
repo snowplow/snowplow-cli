@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -126,39 +125,6 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 
 }
 
-func semNextVer(current string, upgradeType string) (string, error) {
-	version := strings.Split(current, "-")
-
-	intVersion := make([]int, 3)
-
-	var err error
-
-	intVersion[0], err = strconv.Atoi(version[0])
-	if err != nil {
-		return "", err
-	}
-	intVersion[1], err = strconv.Atoi(version[1])
-	if err != nil {
-		return "", err
-	}
-	intVersion[2], err = strconv.Atoi(version[2])
-	if err != nil {
-		return "", err
-	}
-
-	switch upgradeType {
-	case "major":
-		return fmt.Sprintf("%d-%d-%d", intVersion[0]+1, 0, 0), nil
-	case "revision":
-		return fmt.Sprintf("%d-%d-%d", intVersion[0], intVersion[1]+1, 0), nil
-	case "minor":
-		return fmt.Sprintf("%d-%d-%d", intVersion[0], intVersion[1], intVersion[2]+1), nil
-	}
-
-	return current, nil
-
-}
-
 func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeContext) (map[string]MigrationReport, error) {
 
 	destinations, err := fetchDestinations(cnx, client)
@@ -188,13 +154,23 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeConte
 			for _, migration := range m.Migrations {
 				messages = append(messages, migration.Message)
 			}
-			nextVer, err := semNextVer(from.Version, m.ChangeType)
+
+			remoteV, err := parseSemVer(ds.RemoteVersion)
 			if err != nil {
 				return nil, err
 			}
-			result[dest.Type] = MigrationReport{
-				CombinedMessages: strings.Join(messages, "\n"),
-				SuggestedVersion: nextVer,
+			localV, err := parseSemVer(f.Self.Version)
+			if err != nil {
+				return nil, err
+			}
+
+			nextVer := semNextVer(*remoteV, m.ChangeType)
+
+			if semVerCmp(nextVer, *localV) == 1 {
+				result[dest.Type] = MigrationReport{
+					CombinedMessages: strings.Join(messages, "\n"),
+					SuggestedVersion: nextVer.String(),
+				}
 			}
 		}
 	}
