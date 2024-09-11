@@ -6,8 +6,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cfgFile string
-
 var rootCmd = &cobra.Command{
 	Use:   "dps-cli",
 	Short: "A brief description of your application",
@@ -27,11 +25,12 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(
-		&cfgFile, "config", "",
-		`config file (defaults to $HOME/.snowplow.{yaml|json|toml}
-then $XDG_CONFIG_HOME/snowplow/.snowplow.{yaml|json|toml})
-then $HOME/.config/snowplow/.snowplow.{yaml|json|toml})`,
+	rootCmd.PersistentFlags().String("config", "",
+		`Config file. Defaults to $HOME/.config/snowplow/snowplow.yml
+Then on:
+  Unix $XDG_CONFIG_HOME/snowplow/snowplow.yml
+  Darwin $HOME/Library/Application Support/snowplow/snowplow.yml
+  Windows %AppData%\snowplow\snowplow.yml`,
 	)
 	rootCmd.PersistentFlags().Bool("debug", false, "Log output level to Debug")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Log output level to Warn")
