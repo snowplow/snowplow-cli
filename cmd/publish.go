@@ -68,6 +68,12 @@ Changes to it will be published by this command.
 		if err != nil {
 			LogFatal(err)
 		}
+
+		err = validate(cnx, c, changes)
+		if err != nil {
+			LogFatal(err)
+		}
+
 		if !dryRun {
 			err = performChangesDev(cnx, c, changes)
 			if err != nil {
