@@ -144,7 +144,7 @@ func TestParseDataParses(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"schema":                "string",
+			"$schema":                "string",
 			"additionalPropperties": false},
 	}
 	expected := DataStrucutreData{

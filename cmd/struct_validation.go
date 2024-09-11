@@ -38,7 +38,6 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 
 	if errsData != nil {
 		for _, e := range errsData.(validator.ValidationErrors) {
-			println(e.Namespace())
 			path := "dataStructure.data." + strings.TrimPrefix(fieldToPath(e.Namespace()), "dataStrucutreData.")
 			res := validation{lowerFirstLetter(e.Field()), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
@@ -50,7 +49,7 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 		for _, err := range allErrs {
 			switch err.validationType {
 			case "required":
-				result = append(result, errors.New(fmt.Sprintf("Required field %s is missing", err.path)))
+				result = append(result, fmt.Errorf("Required field %s is missing", err.path))
 			case "oneof":
 				firstSentence := fmt.Sprintf("Invalid value %s at %s. Avaliable values are: ", err.value, err.path)
 				var secondSentence string
@@ -82,7 +81,7 @@ func ValidateLocalDs(dss map[string]DataStructure) []error {
 	for fileName, ds := range dss {
 		errs := validateDs(validate, ds)
 		if errs != nil {
-			error := errors.Join(errors.New(fmt.Sprintf("Validation failed for %s", fileName)), errs)
+			error := errors.Join(fmt.Errorf("Validation failed for %s", fileName), errs)
 			allErrors = append(allErrors, error)
 		}
 	}
