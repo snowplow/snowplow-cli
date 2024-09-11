@@ -29,6 +29,11 @@ var validateCmd = &cobra.Command{
 			LogFatal(err)
 		}
 
+		errs := ValidateLocalDs(dataStructuresLocal)
+		if len(errs) > 0{
+			LogFatalMultiple(errs)
+		}
+
 		cnx := context.Background()
 
 		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)

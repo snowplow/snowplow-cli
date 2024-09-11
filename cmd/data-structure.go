@@ -21,14 +21,15 @@ const (
 
 type DataStructureMeta struct {
 	Hidden     bool              `yaml:"hidden" json:"hidden"`
-	SchemaType SchemaType        `yaml:"schemaType" json:"schemaType"`
-	CustomData map[string]string `yaml:"customData" json:"customData"`
+	SchemaType SchemaType        `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
+	CustomData map[string]string `yaml:"customData" json:"customData" validate:"required"`
 }
 
 type DataStructure struct {
-	ApiVersion string            `yaml:"apiVersion" json:"apiVersion"`
-	Meta       DataStructureMeta `yaml:"meta" json:"meta"`
-	Data       map[string]any    `yaml:"data" json:"data"`
+	ApiVersion   string            `yaml:"apiVersion" json:"apiVersion" validate:"required,oneof=v1"`
+	ResourceType string            `yaml:"resourceType" json:"resourceType" validate:"required,oneof=data-structure"`
+	Meta         DataStructureMeta `yaml:"meta" json:"meta" validate:"required"`
+	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
 }
 
 func (ds DataStructure) getContentHash() (string, error) {
@@ -55,14 +56,14 @@ func (d DataStructure) parseData() (DataStrucutreData, error) {
 }
 
 type DataStructureSelf struct {
-	Vendor  string `mapstructure:"vendor" json:"vendor"`
-	Name    string `mapstructure:"name" json:"name"`
-	Format  string `mapstructure:"format" json:"format"`
-	Version string `mapstructure:"version" json:"version"`
+	Vendor  string `mapstructure:"vendor" json:"vendor" validate:"required"`
+	Name    string `mapstructure:"name" json:"name" validate:"required"`
+	Format  string `mapstructure:"format" json:"format" validate:"required,oneof=jsonschema"`
+	Version string `mapstructure:"version" json:"version" validate:"required"`
 }
 
 type DataStrucutreData struct {
-	Self   DataStructureSelf `mapstructure:"self"`
-	Schema string            `mapstructure:"schema"`
+	Self   DataStructureSelf `mapstructure:"self" validate:"required"`
+	Schema string            `mapstructure:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`
 }
