@@ -227,15 +227,11 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 
 func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
 	if len(changes.toUpdatePatch) != 0 {
-		return errors.New("patching is not availabe on prod. You must increment versions on dev before deploying")
+		return errors.New("patching is not available on prod. You must increment versions on dev before deploying")
 	}
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := Validate(cnx, c, ds.DS)
-		if err != nil {
-			return err
-		}
-		_, err = PublishProd(cnx, c, ds.DS)
+		_, err := PublishProd(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
