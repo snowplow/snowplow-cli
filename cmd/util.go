@@ -45,9 +45,6 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 			if err != nil {
 				return nil, errors.Join(err, fmt.Errorf("file: %s", k))
 			} else {
-				if d.ApiVersion != "v1" {
-					wrongVersions = append(wrongVersions, fmt.Sprintf(`apiVersion %s in file %s is not supported. Supported apiVersions are ["v1"]`, d.ApiVersion, k))
-				}
 				ds[k] = *d
 			}
 		}

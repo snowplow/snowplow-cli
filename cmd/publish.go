@@ -45,6 +45,11 @@ Changes to it will be published by this command.
 			LogFatal(err)
 		}
 
+		errs := ValidateLocalDs(dataStructuresLocal)
+		if len(errs) > 0{
+			LogFatalMultiple(errs)
+		}
+
 		slog.Info("publishing to dev from", "paths", dataStructureFolders)
 
 		cnx := context.Background()
@@ -102,6 +107,11 @@ environment will be published to your production environment.
 		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
 		if err != nil {
 			LogFatal(err)
+		}
+
+		errs := ValidateLocalDs(dataStructuresLocal)
+		if len(errs) > 0{
+			LogFatalMultiple(errs)
 		}
 
 		slog.Info("publishing to prod from", "paths", dataStructureFolders)

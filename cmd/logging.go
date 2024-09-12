@@ -74,3 +74,10 @@ func LogFatalMsg(msg string, err error) {
 	slog.Error(msg, "error", err.Error()+"\n")
 	os.Exit(1)
 }
+
+func LogFatalMultiple(errs []error) {
+	for _, e := range errs {
+		slog.Error(e.Error())
+	}
+	os.Exit(1)
+}
