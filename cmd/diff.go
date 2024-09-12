@@ -3,10 +3,8 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"reflect"
-	"strings"
 
 	"github.com/r3labs/diff/v3"
 )
@@ -150,46 +148,6 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 		}
 	}
 	return res, nil
-}
-
-func validate(cnx context.Context, c *ApiClient, changes Changes) error {
-	// Create and create new version both follow the same logic
-	// Patch there will error out on validate, we'll implement it separately
-	validate := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
-	failed := 0
-	for _, ds := range validate {
-		resp, err := Validate(cnx, c, ds.DS)
-		if resp != nil {
-			if len(resp.Warnings) > 0 {
-				slog.Warn("validation", "file", ds.FileName, "messages", strings.Join(resp.Warnings, "\n"))
-			}
-			if len(resp.Info) > 0 {
-				slog.Info("validation", "file", ds.FileName, "messages", strings.Join(resp.Info, "\n"))
-			}
-		}
-		if err != nil {
-			slog.Error("validation", "file", ds.FileName, "messages", err)
-			failed++
-		}
-	}
-
-	migrationsToCheck := append(changes.toUpdateNewVersion, changes.toUpdatePatch...)
-	for _, ds := range migrationsToCheck {
-		result, err := ValidateMigrations(cnx, c, ds)
-		if err != nil {
-			return err
-		}
-		for dest, r := range result {
-			slog.Error("validation", "file", ds.FileName, "destination", dest, "suggestedVersion", r.SuggestedVersion, "messages", r.CombinedMessages)
-			failed++
-		}
-	}
-
-	if failed > 0 {
-		return fmt.Errorf("%d validation failures", failed)
-	}
-
-	return nil
 }
 
 func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error {

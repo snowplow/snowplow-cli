@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ var validateCmd = &cobra.Command{
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
+		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -30,7 +32,7 @@ var validateCmd = &cobra.Command{
 		}
 
 		errs := ValidateLocalDs(dataStructuresLocal)
-		if len(errs) > 0{
+		if len(errs) > 0 {
 			LogFatalMultiple(errs)
 		}
 
@@ -56,13 +58,25 @@ var validateCmd = &cobra.Command{
 			LogFatal(err)
 		}
 
-		err = validate(cnx, c, changes)
+		vr, err := validate(cnx, c, changes)
 		if err != nil {
 			LogFatal(err)
+		}
+
+		vr.Slog()
+
+		if ghOut {
+			vr.GithubAnnotate()
+		}
+
+		if vr.Failed {
+			LogFatal(errors.New(vr.FailedMessage))
 		}
 	},
 }
 
 func init() {
 	dataStructuresCmd.AddCommand(validateCmd)
+
+	validateCmd.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ Changes to it will be published by this command.
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -46,7 +48,7 @@ Changes to it will be published by this command.
 		}
 
 		errs := ValidateLocalDs(dataStructuresLocal)
-		if len(errs) > 0{
+		if len(errs) > 0 {
 			LogFatalMultiple(errs)
 		}
 
@@ -74,9 +76,19 @@ Changes to it will be published by this command.
 			LogFatal(err)
 		}
 
-		err = validate(cnx, c, changes)
+		vr, err := validate(cnx, c, changes)
 		if err != nil {
 			LogFatal(err)
+		}
+
+		vr.Slog()
+
+		if ghOut {
+			vr.GithubAnnotate()
+		}
+
+		if vr.Failed {
+			LogFatal(errors.New(vr.FailedMessage))
 		}
 
 		if !dryRun {
@@ -116,7 +128,7 @@ environment will be published to your production environment.
 		}
 
 		errs := ValidateLocalDs(dataStructuresLocal)
-		if len(errs) > 0{
+		if len(errs) > 0 {
 			LogFatalMultiple(errs)
 		}
 
@@ -161,4 +173,5 @@ func init() {
 	devCmd.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
 	prodCmd.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
 
+	devCmd.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 }

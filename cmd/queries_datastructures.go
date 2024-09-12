@@ -91,7 +91,7 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 	}
 
 	if !vresp.Success {
-		return nil, &ValidationError{Messages: vresp.Errors}
+		return &vresp, &ValidationError{Messages: vresp.Errors}
 	}
 
 	return &vresp, nil
