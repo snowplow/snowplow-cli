@@ -8,6 +8,8 @@
 
 version: 2
 
+project_name: snowplow-cli
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
