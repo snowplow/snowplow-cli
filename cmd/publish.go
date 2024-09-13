@@ -87,8 +87,8 @@ Changes to it will be published by this command.
 			vr.GithubAnnotate()
 		}
 
-		if vr.Failed {
-			LogFatal(errors.New(vr.FailedMessage))
+		if !vr.Valid {
+			LogFatal(errors.New(vr.Message))
 		}
 
 		if !dryRun {

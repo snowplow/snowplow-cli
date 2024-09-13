@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -30,10 +29,10 @@ type migrationValidation struct {
 }
 
 type ValidationResults struct {
-	Failed        bool
-	FailedMessage string
-	Migration     []migrationValidation
-	Iglu          []igluValidation
+	Valid     bool
+	Message   string
+	Migration []migrationValidation
+	Iglu      []igluValidation
 }
 
 func (vr *ValidationResults) GithubAnnotate() {
@@ -80,7 +79,7 @@ func (vr *ValidationResults) Slog() {
 	}
 }
 
-func validate(cnx context.Context, c *ApiClient, changes Changes) (ValidationResults, error) {
+func validate(cnx context.Context, c *ApiClient, changes Changes) (*ValidationResults, error) {
 	var vr ValidationResults
 
 	// Create and create new version both follow the same logic
@@ -101,9 +100,8 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) (ValidationRes
 				failed++
 			}
 		}
-		var vErr *ValidationError
-		if err != nil && !errors.As(err, &vErr) {
-			return vr, err
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -111,7 +109,7 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) (ValidationRes
 	for _, ds := range migrationsToCheck {
 		result, err := ValidateMigrations(cnx, c, ds)
 		if err != nil {
-			return vr, err
+			return nil, err
 		}
 		for dest, r := range result {
 			vr.Migration = append(vr.Migration, migrationValidation{ds.FileName, r.SuggestedVersion, dest, r.Messages})
@@ -120,11 +118,11 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) (ValidationRes
 	}
 
 	if failed > 0 {
-		vr.Failed = true
-		vr.FailedMessage = fmt.Sprintf("%d validation failures", failed)
+		vr.Valid = false
+		vr.Message = fmt.Sprintf("%d validation failures", failed)
 	} else {
-		vr.Failed = false
+		vr.Valid = true
 	}
 
-	return vr, nil
+	return &vr, nil
 }

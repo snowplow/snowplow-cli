@@ -154,9 +154,12 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 	// Create and create new version both follow the same logic
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := Validate(cnx, c, ds.DS)
+		vr, err := Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
+		}
+		if !vr.Valid {
+			return errors.New(vr.Message)
 		}
 		_, err = PublishDev(cnx, c, ds.DS, false)
 		if err != nil {
@@ -164,9 +167,12 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 		}
 	}
 	for _, ds := range changes.toUpdatePatch {
-		_, err := Validate(cnx, c, ds.DS)
+		vr, err := Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
+		}
+		if !vr.Valid {
+			return errors.New(vr.Message)
 		}
 		_, err = PublishDev(cnx, c, ds.DS, true)
 		if err != nil {

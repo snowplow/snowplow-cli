@@ -69,8 +69,8 @@ var validateCmd = &cobra.Command{
 			vr.GithubAnnotate()
 		}
 
-		if vr.Failed {
-			LogFatal(errors.New(vr.FailedMessage))
+		if !vr.Valid {
+			LogFatal(errors.New(vr.Message))
 		}
 	},
 }
