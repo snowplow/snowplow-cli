@@ -30,10 +30,12 @@ type pubError struct {
 }
 
 type PublishResponse = pubResponse
-type ValidateResponse = pubResponse
+type ValidateResponse struct {
+	pubResponse
+	Valid bool
+}
 
 type PublishError = pubError
-type ValidationError = pubError
 
 func (e *pubError) Error() string {
 	return strings.Join(e.Messages, "\n")
@@ -90,9 +92,7 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 		return nil, errors.New(vresp.Message)
 	}
 
-	if !vresp.Success {
-		return nil, &ValidationError{Messages: vresp.Errors}
-	}
+	vresp.Valid = vresp.Success
 
 	return &vresp, nil
 }

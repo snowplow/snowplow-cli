@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 )
 
 type destination struct {
@@ -39,7 +38,7 @@ type migration struct {
 
 type MigrationReport struct {
 	SuggestedVersion string
-	CombinedMessages string
+	Messages         []string
 }
 
 func fetchMigration(cnx context.Context, client *ApiClient, destination string, from DataStructureSelf, to map[string]any) (*migrationResponse, error) {
@@ -168,7 +167,7 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeConte
 
 			if semVerCmp(nextVer, *localV) == 1 {
 				result[dest.Type] = MigrationReport{
-					CombinedMessages: strings.Join(messages, "\n"),
+					Messages:         messages,
 					SuggestedVersion: nextVer.String(),
 				}
 			}

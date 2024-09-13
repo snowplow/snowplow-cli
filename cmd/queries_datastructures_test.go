@@ -94,13 +94,9 @@ func Test_Validate_Fail(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := Validate(cnx, client, DataStructure{})
+	vr, err := Validate(cnx, client, DataStructure{})
 
-	if result != nil {
-		t.Error(result)
-	}
-
-	if err == nil || err.Error() != "error1" {
+	if vr.Valid || err != nil {
 		t.Error("expected failure, got success")
 	}
 }
