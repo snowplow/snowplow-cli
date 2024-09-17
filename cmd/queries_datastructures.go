@@ -59,6 +59,14 @@ type publishRequest struct {
 	Version string           `json:"version"`
 }
 
+type fullMeta struct {
+	Hidden      *bool              `json:"hidden,omitempty"`
+	SchemaType  SchemaType         `json:"schemaType,omitempty"`
+	CustomData  *map[string]string `json:"customData,omitempty"`
+	LockStatus  string             `json:"lockStatus,omitempty"`
+	ManagedFrom string             `json:"managedFrom,omitempty"`
+}
+
 func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*ValidateResponse, error) {
 
 	body, err := json.Marshal(ds)
@@ -97,11 +105,19 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 	return &vresp, nil
 }
 
-func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatch bool) (*PublishResponse, error) {
+func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatch bool, managedFrom string) (*PublishResponse, error) {
+	err := metadataLock(cnx, client, &ds, managedFrom)
+	if err != nil {
+		return nil, err
+	}
 	return publish(cnx, client, VALIDATED, DEV, ds, isPatch)
 }
 
-func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure) (*PublishResponse, error) {
+func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure, managedFrom string) (*PublishResponse, error) {
+	err := metadataLock(cnx, client, &ds, managedFrom)
+	if err != nil {
+		return nil, err
+	}
 	return publish(cnx, client, DEV, PROD, ds, false)
 }
 
@@ -271,22 +287,47 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 	return res, nil
 }
 
-func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure) error {
+func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
 
 	data, err := ds.parseData()
 	if err != nil {
 		return err
 	}
 
-	toHash := fmt.Sprintf("%s-%s-%s-%s", client.OrgId, data.Self.Vendor, data.Self.Name, data.Self.Format)
+	body := fullMeta{
+		Hidden:      &ds.Meta.Hidden,
+		SchemaType:  ds.Meta.SchemaType,
+		CustomData:  &ds.Meta.CustomData,
+		LockStatus:  "locked",
+		ManagedFrom: managedFrom,
+	}
+
+	return patchMeta(cnx, client, &data.Self, body)
+}
+
+func metadataLock(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
+
+	data, err := ds.parseData()
+	if err != nil {
+		return err
+	}
+
+	body := fullMeta{LockStatus: "locked", ManagedFrom: managedFrom}
+
+	return patchMeta(cnx, client, &data.Self, body)
+}
+
+func patchMeta(cnx context.Context, client *ApiClient, ds *DataStructureSelf, fullMeta fullMeta) error {
+
+	toHash := fmt.Sprintf("%s-%s-%s-%s", client.OrgId, ds.Vendor, ds.Name, ds.Format)
 	dsHash := sha256.Sum256([]byte(toHash))
 
-	body, err := json.Marshal(ds.Meta)
+	body, err := json.Marshal(fullMeta)
 	if err != nil {
 		return err
 	}
 	url := fmt.Sprintf("%s/data-structures/v1/%x/meta", client.BaseUrl, dsHash)
-	req, err := http.NewRequestWithContext(cnx, "PUT", url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(cnx, "PATCH", url, bytes.NewBuffer(body))
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
 

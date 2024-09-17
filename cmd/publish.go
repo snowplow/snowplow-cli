@@ -35,6 +35,7 @@ Changes to it will be published by this command.
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
+		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -92,7 +93,7 @@ Changes to it will be published by this command.
 		}
 
 		if !dryRun {
-			err = performChangesDev(cnx, c, changes)
+			err = performChangesDev(cnx, c, changes, managedFrom)
 			if err != nil {
 				LogFatal(err)
 			}
@@ -116,6 +117,7 @@ environment will be published to your production environment.
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
 		dataStructureFolders := []string{DataStructuresFolder}
 		if len(args) > 0 {
@@ -156,7 +158,7 @@ environment will be published to your production environment.
 			LogFatal(err)
 		}
 		if !dryRun {
-			err = performChangesProd(cnx, c, changes)
+			err = performChangesProd(cnx, c, changes, managedFrom)
 			if err != nil {
 				LogFatal(err)
 			}

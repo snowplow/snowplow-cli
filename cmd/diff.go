@@ -29,42 +29,6 @@ func idFromSelf(self DataStructureSelf) DataStructureId {
 	}
 }
 
-func DiffDs(locals []DataStructure, remotes []DataStructure) ([]DataStructureWithDiff, error) {
-	var res []DataStructureWithDiff
-	remotesSet := make(map[DataStructureId]DataStructure)
-
-	for _, remote := range remotes {
-		dataRemote, err := remote.parseData()
-		if err != nil {
-			return nil, err
-		}
-		remotesSet[idFromSelf(dataRemote.Self)] = remote
-	}
-
-	for _, local := range locals {
-		dataLocal, err := local.parseData()
-		if err != nil {
-			return nil, err
-		}
-		remote, remoteExists := remotesSet[idFromSelf(dataLocal.Self)]
-		if !remoteExists {
-			res = append(res, DataStructureWithDiff{DataStructure: local, Operation: "CREATE"})
-		} else {
-			difference, err := diff.Diff(remote, local)
-			if err != nil {
-				return nil, err
-			}
-			if len(difference) != 0 {
-				res = append(res, DataStructureWithDiff{DataStructure: local, Operation: "UPDATE", Diff: difference})
-			}
-
-		}
-
-	}
-
-	return res, nil
-}
-
 type DSChangeContext struct {
 	DS                DataStructure
 	FileName          string
@@ -150,7 +114,7 @@ func getChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 	return res, nil
 }
 
-func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error {
+func performChangesDev(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
 	// Create and create new version both follow the same logic
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
@@ -161,7 +125,7 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 		if !vr.Valid {
 			return errors.New(vr.Message)
 		}
-		_, err = PublishDev(cnx, c, ds.DS, false)
+		_, err = PublishDev(cnx, c, ds.DS, false, managedFrom)
 		if err != nil {
 			return err
 		}
@@ -174,13 +138,13 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 		if !vr.Valid {
 			return errors.New(vr.Message)
 		}
-		_, err = PublishDev(cnx, c, ds.DS, true)
+		_, err = PublishDev(cnx, c, ds.DS, true, managedFrom)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.toUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds.DS)
+		err := MetadateUpdate(cnx, c, &ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
@@ -189,19 +153,19 @@ func performChangesDev(cnx context.Context, c *ApiClient, changes Changes) error
 	return nil
 }
 
-func performChangesProd(cnx context.Context, c *ApiClient, changes Changes) error {
+func performChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
 	if len(changes.toUpdatePatch) != 0 {
 		return errors.New("patching is not available on prod. You must increment versions on dev before deploying")
 	}
 	validatePublish := append(changes.toCreate, changes.toUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := PublishProd(cnx, c, ds.DS)
+		_, err := PublishProd(cnx, c, ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.toUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds.DS)
+		err := MetadateUpdate(cnx, c, &ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
