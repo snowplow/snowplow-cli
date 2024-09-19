@@ -106,11 +106,16 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 }
 
 func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatch bool, managedFrom string) (*PublishResponse, error) {
-	err := metadataLock(cnx, client, &ds, managedFrom)
+	// during first creation we have to publish first, otherwise metatdata patch fails with 404
+	res, err := publish(cnx, client, VALIDATED, DEV, ds, isPatch)
 	if err != nil {
 		return nil, err
 	}
-	return publish(cnx, client, VALIDATED, DEV, ds, isPatch)
+	err = metadataLock(cnx, client, &ds, managedFrom)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure, managedFrom string) (*PublishResponse, error) {
