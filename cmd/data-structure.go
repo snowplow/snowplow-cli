@@ -63,7 +63,7 @@ type DataStructureSelf struct {
 }
 
 type DataStrucutreData struct {
-	Self   DataStructureSelf `mapstructure:"self" validate:"required"`
-	Schema string            `mapstructure:"$schema" validate:"required"`
+	Self   DataStructureSelf `mapstructure:"self" json:"self" validate:"required"`
+	Schema string            `mapstructure:"$schema" json:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`
 }
