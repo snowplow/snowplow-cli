@@ -19,7 +19,10 @@ var draftCmd = &cobra.Command{
 			dataStructuresFolder = args[1]
 		}
 		format, _ := cmd.Flags().GetString("format")
-		CreateNewDataStructureFile(args[0], dataStructuresFolder, format)
+		err := CreateNewDataStructureFile(args[0], dataStructuresFolder, format)
+		if err != nil {
+			LogFatal(err)
+		}
 	},
 }
 

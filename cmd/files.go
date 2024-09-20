@@ -27,7 +27,10 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
-		writeSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		err = writeSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
