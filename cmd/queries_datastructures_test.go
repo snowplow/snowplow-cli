@@ -623,7 +623,7 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
 
-	err := MetadateUpdate(cnx, client, &ds)
+	err := MetadateUpdate(cnx, client, &ds, "")
 
 	if err != nil {
 		t.Fatal("expected failure, got success")
@@ -647,7 +647,7 @@ func Test_MetadataUpdate_Fail(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
 
-	err := MetadateUpdate(cnx, client, &ds)
+	err := MetadateUpdate(cnx, client, &ds, "")
 
 	if err == nil {
 		t.Fatal("expected failure, got success")
