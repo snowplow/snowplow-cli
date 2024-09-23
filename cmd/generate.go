@@ -101,12 +101,19 @@ data:
 
 func init() {
 	dataStructuresCmd.AddCommand(generateCmd)
+
 	generateCmd.Flags().String("name", "", `A name for the data structure.
 Must conform to the regex pattern [a-zA-Z0-9-_]+`)
-	generateCmd.MarkFlagRequired("name")
+	if err := generateCmd.MarkFlagRequired("name"); err != nil {
+		panic(err)
+	}
+
 	generateCmd.Flags().String("vendor", "", `A vendor for the data structure.
 Must conform to the regex pattern [a-zA-Z0-9-_.]+`)
-	generateCmd.MarkFlagRequired("vendor")
+	if err := generateCmd.MarkFlagRequired("vendor"); err != nil {
+		panic(err)
+	}
+
 	generateCmd.Flags().String("output-format", "yaml", "Format for the file (yaml|json)")
 	generateCmd.Flags().String("output-file", "", "Location to write the file defaults to stdout")
 
