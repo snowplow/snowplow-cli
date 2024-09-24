@@ -313,7 +313,7 @@ func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, m
 
 func metadataLock(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
 
-	data, err := ds.parseData()
+	data, err := ds.ParseData()
 	if err != nil {
 		return err
 	}

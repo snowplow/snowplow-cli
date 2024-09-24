@@ -1,4 +1,4 @@
-package cmd
+package ds
 
 import (
 	"encoding/json"
@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/snowplow-product/snowplow-cli/internal/io"
+	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -43,25 +46,25 @@ Example:
 		name := args[0]
 
 		if ok := nameRegexp.Match([]byte(name)); !ok {
-			LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
+			io.LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
 		}
 
 		if ok := vendorRegexp.Match([]byte(vendor)); vendor != "" && !ok {
-			LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
+			io.LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
 		}
 
 		if ok := outFmt == "json" || outFmt == "yaml"; !ok {
-			LogFatal(errors.New("unsupported output format. Was not yaml or json"))
+			io.LogFatal(errors.New("unsupported output format. Was not yaml or json"))
 		}
 
-		outDir := filepath.Join(DataStructuresFolder, vendor)
+		outDir := filepath.Join(util.DataStructuresFolder, vendor)
 		if len(args) > 1 {
 			outDir = filepath.Join(args[1], vendor)
 		}
 
 		outFile := filepath.Join(outDir, name+"."+outFmt)
 		if _, err := os.Stat(outFile); !os.IsNotExist(err) {
-			LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
+			io.LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
 		}
 
 		var schemaType string
@@ -74,28 +77,28 @@ Example:
 
 		yamlOut := fmt.Sprintf(yamlTemplate, schemaType, vendor, name)
 
-		ds := DataStructure{}
+		ds := model.DataStructure{}
 		err := yaml.Unmarshal([]byte(yamlOut), &ds)
 		if err != nil {
-			LogFatal(err)
+			io.LogFatal(err)
 		}
 
 		output := yamlOut
 		if outFmt == "json" {
 			jsonOut, err := json.MarshalIndent(ds, "", "  ")
 			if err != nil {
-				LogFatal(err)
+				io.LogFatal(err)
 			}
 			output = string(jsonOut)
 		}
 
 		err = os.Mkdir(outDir, os.ModePerm)
 		if err != nil {
-			LogFatal(err)
+			io.LogFatal(err)
 		}
 		err = os.WriteFile(outFile, []byte(output), 0644)
 		if err != nil {
-			LogFatal(err)
+			io.LogFatal(err)
 		}
 
 		slog.Info("generate", "wrote", outFile)
@@ -124,7 +127,7 @@ data:
 `
 
 func init() {
-	dataStructuresCmd.AddCommand(generateCmd)
+	DataStructuresCmd.AddCommand(generateCmd)
 
 	generateCmd.Flags().String("vendor", "", `A vendor for the data structure.
 Must conform to the regex pattern [a-zA-Z0-9-_.]+`)

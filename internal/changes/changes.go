@@ -137,7 +137,7 @@ func PerformChangesDev(cnx context.Context, c *ApiClient, changes Changes, manag
 			return err
 		}
 	}
-	for _, ds := range changes.toUpdateMeta {
+	for _, ds := range changes.ToUpdateMeta {
 		err := MetadateUpdate(cnx, c, &ds.DS, managedFrom)
 		if err != nil {
 			return err
