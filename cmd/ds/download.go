@@ -1,9 +1,12 @@
-package cmd
+package ds
 
 import (
 	"context"
 	"log/slog"
 
+	"github.com/snowplow-product/snowplow-cli/internal/console"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -16,12 +19,12 @@ var downloadCmd = &cobra.Command{
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		dataStructuresFolder := DataStructuresFolder
+		dataStructuresFolder := util.DataStructuresFolder
 		if len(args) > 0 {
 			dataStructuresFolder = args[0]
 		}
 		format, _ := cmd.Flags().GetString("format")
-		files := Files{dataStructuresFolder, format}
+		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
@@ -30,17 +33,17 @@ If no directory is provided then defaults to 'data-structures' in the current di
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := GetAllDataStructures(cnx, c)
+		dss, err := console.GetAllDataStructures(cnx, c)
 		if err != nil {
 			LogFatalMsg("data structure fetch failed", err)
 		}
 
-		err = files.createDataStructures(dss)
+		err = files.CreateDataStructures(dss)
 		if err != nil {
 			LogFatal(err)
 		}
@@ -50,7 +53,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 }
 
 func init() {
-	dataStructuresCmd.AddCommand(downloadCmd)
+	DataStructuresCmd.AddCommand(downloadCmd)
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 }

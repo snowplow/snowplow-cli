@@ -1,4 +1,4 @@
-package cmd
+package util
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 )
 
 func Test_DataStructuresFromPaths(t *testing.T) {
-	path := strings.Join([]string{"testdata", "util"}, string(os.PathSeparator))
+	path := strings.Join([]string{"..", "testdata", "util"}, string(os.PathSeparator))
 	paths := []string{path}
 
 	ds, err := DataStructuresFromPaths(paths)
@@ -16,7 +16,7 @@ func Test_DataStructuresFromPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jsonpath := strings.Join([]string{"testdata", "util", "vendor.one", "someds.json"}, string(os.PathSeparator))
+	jsonpath := strings.Join([]string{"..", "testdata", "util", "vendor.one", "someds.json"}, string(os.PathSeparator))
 
 	if json, ok := ds[jsonpath]; ok {
 		if json.Meta.SchemaType != "event" {
@@ -26,7 +26,7 @@ func Test_DataStructuresFromPaths(t *testing.T) {
 		t.Fatal("didn't find the json one")
 	}
 
-	yamlpath := strings.Join([]string{"testdata", "util", "vendor.two", "someds.yaml"}, string(os.PathSeparator))
+	yamlpath := strings.Join([]string{"..", "testdata", "util", "vendor.two", "someds.yaml"}, string(os.PathSeparator))
 
 	if yaml, ok := ds[yamlpath]; ok {
 		if yaml.Meta.SchemaType != "event" {

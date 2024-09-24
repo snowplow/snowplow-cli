@@ -1,10 +1,13 @@
-package cmd
+package validation
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"strings"
+	. "github.com/snowplow-product/snowplow-cli/internal/console"
+	. "github.com/snowplow-product/snowplow-cli/internal/changes"
+
 )
 
 type igluValidationLevel uint
@@ -79,12 +82,12 @@ func (vr *ValidationResults) Slog() {
 	}
 }
 
-func validate(cnx context.Context, c *ApiClient, changes Changes) (*ValidationResults, error) {
+func ValidateChanges(cnx context.Context, c *ApiClient, changes Changes) (*ValidationResults, error) {
 	var vr ValidationResults
 
 	// Create and create new version both follow the same logic
 	// Patch there will error out on validate, we'll implement it separately
-	validate := append(append(changes.toCreate, changes.toUpdateNewVersion...), changes.toUpdatePatch...)
+	validate := append(append(changes.ToCreate, changes.ToUpdateNewVersion...), changes.ToUpdatePatch...)
 	failed := 0
 	for _, ds := range validate {
 		resp, err := Validate(cnx, c, ds.DS)
@@ -105,7 +108,7 @@ func validate(cnx context.Context, c *ApiClient, changes Changes) (*ValidationRe
 		}
 	}
 
-	migrationsToCheck := append(changes.toUpdateNewVersion, changes.toUpdatePatch...)
+	migrationsToCheck := append(changes.ToUpdateNewVersion, changes.ToUpdatePatch...)
 	for _, ds := range migrationsToCheck {
 		result, err := ValidateMigrations(cnx, c, ds)
 		if err != nil {

@@ -1,17 +1,17 @@
-package cmd
+package util
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	"gopkg.in/yaml.v3"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {

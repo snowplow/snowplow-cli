@@ -1,9 +1,10 @@
-package cmd
+package console
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"net/http"
 	"net/http/httptest"

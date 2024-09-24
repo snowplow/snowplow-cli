@@ -1,10 +1,15 @@
-package cmd
+package ds
 
 import (
 	"context"
 	"errors"
 	"log/slog"
 
+	changesPkg "github.com/snowplow-product/snowplow-cli/internal/changes"
+	"github.com/snowplow-product/snowplow-cli/internal/console"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow-product/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -37,18 +42,18 @@ Changes to it will be published by this command.
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
-		dataStructureFolders := []string{DataStructuresFolder}
+		dataStructureFolders := []string{util.DataStructuresFolder}
 		if len(args) > 0 {
 			dataStructureFolders = args
 		}
 
-		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
+		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 
 		if err != nil {
 			LogFatal(err)
 		}
 
-		errs := ValidateLocalDs(dataStructuresLocal)
+		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
 			LogFatalMultiple(errs)
 		}
@@ -57,27 +62,27 @@ Changes to it will be published by this command.
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		remotesListing, err := GetDataStructureListing(cnx, c)
+		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		changes, err := getChanges(dataStructuresLocal, remotesListing, "DEV")
+		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
 			LogFatal(err)
 		}
 
-		err = printChangeset(changes)
+		err = changesPkg.PrintChangeset(changes)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		vr, err := validate(cnx, c, changes)
+		vr, err := validation.ValidateChanges(cnx, c, changes)
 		if err != nil {
 			LogFatal(err)
 		}
@@ -93,7 +98,7 @@ Changes to it will be published by this command.
 		}
 
 		if !dryRun {
-			err = performChangesDev(cnx, c, changes, managedFrom)
+			err = changesPkg.PerformChangesDev(cnx, c, changes, managedFrom)
 			if err != nil {
 				LogFatal(err)
 			}
@@ -119,17 +124,17 @@ environment will be published to your production environment.
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
-		dataStructureFolders := []string{DataStructuresFolder}
+		dataStructureFolders := []string{util.DataStructuresFolder}
 		if len(args) > 0 {
 			dataStructureFolders = args
 		}
 
-		dataStructuresLocal, err := DataStructuresFromPaths(dataStructureFolders)
+		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		errs := ValidateLocalDs(dataStructuresLocal)
+		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
 			LogFatalMultiple(errs)
 		}
@@ -138,27 +143,27 @@ environment will be published to your production environment.
 
 		cnx := context.Background()
 
-		c, err := NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		remotesListing, err := GetDataStructureListing(cnx, c)
+		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
 			LogFatal(err)
 		}
 
-		changes, err := getChanges(dataStructuresLocal, remotesListing, "PROD")
+		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "PROD")
 		if err != nil {
 			LogFatal(err)
 		}
 
-		err = printChangeset(changes)
+		err = changesPkg.PrintChangeset(changes)
 		if err != nil {
 			LogFatal(err)
 		}
 		if !dryRun {
-			err = performChangesProd(cnx, c, changes, managedFrom)
+			err = changesPkg.PerformChangesProd(cnx, c, changes, managedFrom)
 			if err != nil {
 				LogFatal(err)
 			}
@@ -168,7 +173,7 @@ environment will be published to your production environment.
 }
 
 func init() {
-	dataStructuresCmd.AddCommand(publishCmd)
+	DataStructuresCmd.AddCommand(publishCmd)
 	publishCmd.AddCommand(devCmd)
 	publishCmd.AddCommand(prodCmd)
 

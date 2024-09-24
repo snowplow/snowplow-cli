@@ -1,4 +1,4 @@
-package cmd
+package console
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"net/http"
 )
@@ -133,7 +134,7 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeConte
 
 	result := map[string]MigrationReport{}
 
-	f, err := ds.DS.parseData()
+	f, err := ds.DS.ParseData()
 	if err != nil {
 		return nil, err
 	}
@@ -154,18 +155,18 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeConte
 				messages = append(messages, migration.Message)
 			}
 
-			remoteV, err := parseSemVer(ds.RemoteVersion)
+			remoteV, err := ParseSemVer(ds.RemoteVersion)
 			if err != nil {
 				return nil, err
 			}
-			localV, err := parseSemVer(f.Self.Version)
+			localV, err := ParseSemVer(f.Self.Version)
 			if err != nil {
 				return nil, err
 			}
 
-			nextVer := semNextVer(*remoteV, m.ChangeType)
+			nextVer := SemNextVer(*remoteV, m.ChangeType)
 
-			if semVerCmp(nextVer, *localV) == 1 {
+			if SemVerCmp(nextVer, *localV) == 1 {
 				result[dest.Type] = MigrationReport{
 					Messages:         messages,
 					SuggestedVersion: nextVer.String(),

@@ -1,4 +1,4 @@
-package cmd
+package ds
 
 import (
 	"encoding/json"
@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"regexp"
 
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -54,7 +57,7 @@ Example:
 			LogFatal(errors.New("unsupported output format. Was not yaml or json"))
 		}
 
-		outDir := filepath.Join(DataStructuresFolder, vendor)
+		outDir := filepath.Join(util.DataStructuresFolder, vendor)
 		if len(args) > 1 {
 			outDir = filepath.Join(args[1], vendor)
 		}
@@ -74,7 +77,7 @@ Example:
 
 		yamlOut := fmt.Sprintf(yamlTemplate, schemaType, vendor, name)
 
-		ds := DataStructure{}
+		ds := model.DataStructure{}
 		err := yaml.Unmarshal([]byte(yamlOut), &ds)
 		if err != nil {
 			LogFatal(err)
@@ -124,7 +127,7 @@ data:
 `
 
 func init() {
-	dataStructuresCmd.AddCommand(generateCmd)
+	DataStructuresCmd.AddCommand(generateCmd)
 
 	generateCmd.Flags().String("vendor", "", `A vendor for the data structure.
 Must conform to the regex pattern [a-zA-Z0-9-_.]+`)

@@ -1,4 +1,4 @@
-package cmd
+package console
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"log/slog"
 	"net/http"
@@ -41,20 +42,20 @@ func (e *pubError) Error() string {
 	return strings.Join(e.Messages, "\n")
 }
 
-type dataStructureEnv string
+type DataStructureEnv string
 
 const (
-	DEV       dataStructureEnv = "DEV"
-	PROD      dataStructureEnv = "PROD"
-	VALIDATED dataStructureEnv = "VALIDATED"
+	DEV       DataStructureEnv = "DEV"
+	PROD      DataStructureEnv = "PROD"
+	VALIDATED DataStructureEnv = "VALIDATED"
 )
 
 type publishRequest struct {
 	Format  string           `json:"format"`
 	Message string           `json:"message"`
 	Name    string           `json:"name"`
-	Source  dataStructureEnv `json:"source"`
-	Target  dataStructureEnv `json:"target"`
+	Source  DataStructureEnv `json:"source"`
+	Target  DataStructureEnv `json:"target"`
 	Vendor  string           `json:"vendor"`
 	Version string           `json:"version"`
 }
@@ -126,9 +127,9 @@ func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure, manag
 	return publish(cnx, client, DEV, PROD, ds, false)
 }
 
-func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to dataStructureEnv, ds DataStructure, isPatch bool) (*PublishResponse, error) {
+func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to DataStructureEnv, ds DataStructure, isPatch bool) (*PublishResponse, error) {
 
-	dsData, err := ds.parseData()
+	dsData, err := ds.ParseData()
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +189,7 @@ func publish(cnx context.Context, client *ApiClient, from dataStructureEnv, to d
 
 type Deployment struct {
 	Version     string           `json:"version"`
-	Env         dataStructureEnv `json:"env"`
+	Env         DataStructureEnv `json:"env"`
 	ContentHash string           `json:"contentHash"`
 }
 
@@ -283,7 +284,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 					return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 				}
 
-				dataStructure := DataStructure{"v1", "data-structure", dsResp.Meta, ds}
+				dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: ds}
 				res = append(res, dataStructure)
 			}
 		}
@@ -294,7 +295,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 
 func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
 
-	data, err := ds.parseData()
+	data, err := ds.ParseData()
 	if err != nil {
 		return err
 	}
@@ -312,7 +313,7 @@ func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, m
 
 func metadataLock(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
 
-	data, err := ds.parseData()
+	data, err := ds.ParseData()
 	if err != nil {
 		return err
 	}

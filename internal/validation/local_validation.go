@@ -1,8 +1,9 @@
-package cmd
+package validation
 
 import (
 	"errors"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"reflect"
 	"strings"
 
@@ -19,7 +20,7 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 		error          string
 	}
 
-	data, err := ds.parseData()
+	data, err := ds.ParseData()
 	if err != nil {
 		return err
 	}

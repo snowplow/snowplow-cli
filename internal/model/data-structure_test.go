@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
-package cmd
+package model
 
 import (
 	"encoding/json"
@@ -160,7 +160,7 @@ func TestParseDataParses(t *testing.T) {
 		},
 	}
 
-	dsParsed, err := ds.parseData()
+	dsParsed, err := ds.ParseData()
 	if !reflect.DeepEqual(dsParsed, expected) || err != nil {
 		t.Fatalf("Cant' parse map %s\n parsed %#v\n expected %#v", err, dsParsed, expected)
 	}
@@ -209,7 +209,7 @@ func TestDataStructureHash(t *testing.T) {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n ", err, res)
 	}
 
-	hash, err := res.getContentHash()
+	hash, err := res.GetContentHash()
 	if err != nil {
 		t.Fatalf("Can't calculate hash: %s", err)
 	}
