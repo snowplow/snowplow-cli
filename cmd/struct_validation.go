@@ -3,9 +3,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -30,16 +29,17 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 
 	if errs != nil {
 		for _, e := range errs.(validator.ValidationErrors) {
-			path := fieldToPath(e.Namespace())
-			res := validation{lowerFirstLetter(e.Field()), path, e.Tag(), e.Value(), e.Error()}
+			path := "dataStructure." + strings.TrimPrefix(e.Namespace(), "DataStructure.")
+			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
 		}
 	}
 
 	if errsData != nil {
 		for _, e := range errsData.(validator.ValidationErrors) {
-			path := "dataStructure.data." + strings.TrimPrefix(fieldToPath(e.Namespace()), "dataStrucutreData.")
-			res := validation{lowerFirstLetter(e.Field()), path, e.Tag(), e.Value(), e.Error()}
+			path := "dataStructure.data." + strings.TrimPrefix(e.Namespace(), "DataStrucutreData.")
+			println(e.Namespace())
+			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
 		}
 	}
@@ -77,6 +77,9 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 
 func ValidateLocalDs(dss map[string]DataStructure) []error {
 	validate := validator.New(validator.WithRequiredStructEnabled())
+	validate.RegisterTagNameFunc(func(field reflect.StructField) string {
+		return field.Tag.Get("json")
+	})
 	allErrors := []error{}
 	for fileName, ds := range dss {
 		errs := validateDs(validate, ds)
@@ -86,26 +89,4 @@ func ValidateLocalDs(dss map[string]DataStructure) []error {
 		}
 	}
 	return allErrors
-}
-
-func lowerFirstLetter(s string) string {
-	r, size := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError && size <= 1 {
-		return s
-	}
-	lc := unicode.ToLower(r)
-	if r == lc {
-		return s
-	}
-	return string(lc) + s[size:]
-}
-
-func fieldToPath(s string) string {
-	var parts []string
-
-	for _, part := range strings.Split(s, ".") {
-		parts = append(parts, lowerFirstLetter(part))
-	}
-
-	return strings.Join(parts, ".")
 }

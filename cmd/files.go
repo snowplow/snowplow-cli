@@ -27,29 +27,38 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
-
-		var bytes []byte
-
-		if f.ExtentionPreference == "yaml" {
-			bytes, err = yaml.Marshal(ds)
-			if err != nil {
-				return err
-			}
-		} else {
-			bytes, err = json.MarshalIndent(ds, "", "  ")
-			if err != nil {
-				return err
-			}
-		}
-
-		filePath := filepath.Join(vendorPath, fmt.Sprintf("%s.%s", data.Self.Name, f.ExtentionPreference))
-		err = os.WriteFile(filePath, bytes, 0644)
+		err = writeSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
 		if err != nil {
 			return err
 		}
-
-		slog.Debug("wrote", "file", filePath)
 	}
 
 	return nil
+}
+
+func writeSerializableToFile(body any, dir string, name string, ext string) error {
+	var bytes []byte
+	var err error
+
+	if ext == "yaml" {
+		bytes, err = yaml.Marshal(body)
+		if err != nil {
+			return err
+		}
+	} else {
+		bytes, err = json.MarshalIndent(body, "", "  ")
+		if err != nil {
+			return err
+		}
+	}
+
+	filePath := filepath.Join(dir, fmt.Sprintf("%s.%s", name, ext))
+	err = os.WriteFile(filePath, bytes, 0644)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("wrote", "file", filePath)
+
+	return err
 }
