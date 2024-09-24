@@ -1,7 +1,8 @@
-package cmd
+package io
 
 import (
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,9 +47,9 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 			"schema": "string"},
 	}
 
-	dir := filepath.Join("..", "out", "test-ds2")
+	dir := filepath.Join("../..", "out", "test-ds2")
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
-	err := files.createDataStructures([]DataStructure{ds1, ds2})
+	err := files.CreateDataStructures([]DataStructure{ds1, ds2})
 
 	if err != nil {
 		t.Fatalf("Can't create directory %s", err)
@@ -109,9 +110,9 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 			"schema": "string"},
 	}
 
-	dir := filepath.Join("..", "out", "test-ds2")
+	dir := filepath.Join("../..", "out", "test-ds2")
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
-	err := files.createDataStructures([]DataStructure{ds1, ds2})
+	err := files.CreateDataStructures([]DataStructure{ds1, ds2})
 
 	if err != nil {
 		t.Fatalf("Can't create directory %s", err)

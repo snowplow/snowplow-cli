@@ -1,6 +1,8 @@
-package cmd
+package changes
 
 import (
+	. "github.com/snowplow-product/snowplow-cli/internal/console"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"testing"
 )
 
@@ -17,13 +19,13 @@ func Test_GetChangesCreate(t *testing.T) {
 			"schema": "string"},
 	}
 
-	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{}, "DEV")
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
 	}
 
-	if len(res.toCreate) != 1 || len(res.toUpdateMeta) != 0 || len(res.toUpdatePatch) != 0 || len(res.toUpdateNewVersion) != 0 {
+	if len(res.ToCreate) != 1 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting one data structre to be created, got %+v", res)
 	}
 
@@ -62,7 +64,7 @@ func Test_GetChangesUpdateAndMeta(t *testing.T) {
 		t.Fatalf("Can't calcuate changes %s", err)
 	}
 
-	if len(res.toCreate) != 0 || len(res.toUpdateMeta) != 1 || len(res.toUpdatePatch) != 0 || len(res.toUpdateNewVersion) != 1 {
+	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 1 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 1 {
 		t.Fatalf("Unexpected result, expecting one data structre to update metadata and new version, got %+v", res)
 	}
 
@@ -95,13 +97,13 @@ func Test_GetChangesPatch(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
 	}
 
-	if len(res.toCreate) != 0 || len(res.toUpdateMeta) != 0 || len(res.toUpdatePatch) != 1 || len(res.toUpdateNewVersion) != 0 {
+	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 1 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting one data structre to update patch, got %+v", res)
 	}
 
@@ -134,13 +136,13 @@ func Test_GetChangesNoChange(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
 	}
 
-	if len(res.toCreate) != 0 || len(res.toUpdateMeta) != 0 || len(res.toUpdatePatch) != 0 || len(res.toUpdateNewVersion) != 0 {
+	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting no changes, got %+v", res)
 	}
 
@@ -173,13 +175,13 @@ func Test_GetChangesProdDeploy(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "PROD")
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "PROD")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)
 	}
 
-	if len(res.toCreate) != 0 || len(res.toUpdateMeta) != 0 || len(res.toUpdatePatch) != 0 || len(res.toUpdateNewVersion) != 1 {
+	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 1 {
 		t.Fatalf("Unexpected result, expecting one data structre to update, got %+v", res)
 	}
 

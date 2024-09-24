@@ -1,4 +1,4 @@
-package cmd
+package config
 
 import (
 	"os"
@@ -28,7 +28,7 @@ func build() *cobra.Command {
 func Test_ConfigFromFile(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
 
-	os.Args = []string{"xxx", "--config", "testdata/config/config.yml"}
+	os.Args = []string{"xxx", "--config", "../testdata/config/config.yml"}
 
 	testCmd := build()
 
@@ -58,7 +58,7 @@ func Test_ConfigFromFile(t *testing.T) {
 func Test_ConfigEnvOveride(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
 
-	os.Args = []string{"xxx", "--config", "testdata/config/config.yml"}
+	os.Args = []string{"xxx", "--config", "../testdata/config/config.yml"}
 
 	t.Setenv("SNOWPLOW_CONSOLE_HOST", "a real url this time")
 	t.Setenv("SNOWPLOW_CONSOLE_API_KEY_SECRET", "but not a secret")

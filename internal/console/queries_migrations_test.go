@@ -1,8 +1,9 @@
-package cmd
+package console
 
 import (
 	"context"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"net/http"
 	"net/http/httptest"

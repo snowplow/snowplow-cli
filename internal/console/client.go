@@ -1,4 +1,4 @@
-package cmd
+package console
 
 import (
 	"context"
@@ -22,8 +22,8 @@ type tokenResponse struct {
 	AccessToken string
 }
 
-type loggingRoundTripper struct{
-	Transport   http.RoundTripper
+type loggingRoundTripper struct {
+	Transport http.RoundTripper
 }
 
 func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

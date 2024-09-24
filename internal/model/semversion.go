@@ -1,4 +1,4 @@
-package cmd
+package model
 
 import (
 	"fmt"
@@ -6,13 +6,13 @@ import (
 	"strings"
 )
 
-type semVersion struct {
+type SemVersion struct {
 	Major    uint64
 	Revision uint64
 	Addition uint64
 }
 
-func parseSemVer(v string) (*semVersion, error) {
+func ParseSemVer(v string) (*SemVersion, error) {
 	version := strings.Split(v, "-")
 
 	var err error
@@ -30,23 +30,23 @@ func parseSemVer(v string) (*semVersion, error) {
 		return nil, err
 	}
 
-	return &semVersion{major, revision, addition}, nil
+	return &SemVersion{major, revision, addition}, nil
 }
 
-func semNextVer(v semVersion, upgradeType string) semVersion {
+func SemNextVer(v SemVersion, upgradeType string) SemVersion {
 	switch upgradeType {
 	case "major":
-		return semVersion{v.Major + 1, 0, 0}
+		return SemVersion{v.Major + 1, 0, 0}
 	case "revision":
-		return semVersion{v.Major, v.Revision + 1, 0}
+		return SemVersion{v.Major, v.Revision + 1, 0}
 	case "minor":
-		return semVersion{v.Major, v.Revision, v.Addition + 1}
+		return SemVersion{v.Major, v.Revision, v.Addition + 1}
 	}
 
-	return semVersion{v.Major, v.Revision, v.Addition}
+	return SemVersion{v.Major, v.Revision, v.Addition}
 }
 
-func semVerCmp(x semVersion, y semVersion) int {
+func SemVerCmp(x SemVersion, y SemVersion) int {
 	if x.Major > y.Major {
 		return 1
 	}
@@ -69,6 +69,6 @@ func semVerCmp(x semVersion, y semVersion) int {
 	return 0
 }
 
-func (v *semVersion) String() string {
+func (v *SemVersion) String() string {
 	return fmt.Sprintf("%d-%d-%d", v.Major, v.Revision, v.Addition)
 }

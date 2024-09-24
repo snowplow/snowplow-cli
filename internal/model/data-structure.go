@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
-package cmd
+package model
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ type DataStructure struct {
 	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
 }
 
-func (ds DataStructure) getContentHash() (string, error) {
+func (ds DataStructure) GetContentHash() (string, error) {
 	byteBuffer := new(bytes.Buffer)
 	e := json.NewEncoder(byteBuffer)
 	e.SetEscapeHTML(false)
@@ -49,7 +49,7 @@ func (ds DataStructure) getContentHash() (string, error) {
 	return fmt.Sprintf("%x", hash), nil
 }
 
-func (d DataStructure) parseData() (DataStrucutreData, error) {
+func (d DataStructure) ParseData() (DataStrucutreData, error) {
 	var data DataStrucutreData
 	err := mapstructure.Decode(d.Data, &data)
 	return data, err
@@ -67,3 +67,12 @@ type DataStrucutreData struct {
 	Schema string            `mapstructure:"$schema" json:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`
 }
+
+type DSChangeContext struct {
+	DS                DataStructure
+	FileName          string
+	RemoteVersion     string
+	LocalContentHash  string
+	RemoteContentHash string
+}
+

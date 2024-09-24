@@ -1,8 +1,9 @@
-package cmd
+package validation
 
 import (
 	"encoding/json"
 	"errors"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"strings"
 	"testing"
 )
@@ -146,7 +147,7 @@ func Test_FailWithWrongSchemaType(t *testing.T) {
 	}
 
 	e := errs[0].Error()
-	if !strings.Contains(e, "dataStructure.meta.schemaType")||!strings.Contains(e, "event, entity") {
+	if !strings.Contains(e, "dataStructure.meta.schemaType") || !strings.Contains(e, "event, entity") {
 		t.Fatalf("Error message does not complain about incorrect schemaType %s", e)
 	}
 }
@@ -185,7 +186,7 @@ func Test_FailWithWrongApiVersion(t *testing.T) {
 	}
 
 	e := errs[0].Error()
-	if !strings.Contains(e, "dataStructure.apiVersion")||!strings.Contains(e, "v1") {
+	if !strings.Contains(e, "dataStructure.apiVersion") || !strings.Contains(e, "v1") {
 		t.Fatalf("Error message does not complain about incorrect apiVersion %s", e)
 	}
 
@@ -223,9 +224,8 @@ func Test_WithoutFullSelf(t *testing.T) {
 		t.Fatalf("No errors raised if schemaType have incorrect value")
 	}
 	e := errs[0].Error()
-	if !strings.Contains(e, "dataStructure.data.self.version"){
+	if !strings.Contains(e, "dataStructure.data.self.version") {
 		t.Fatalf("Error message does not complain about missing version %s", e)
 	}
 
 }
-

@@ -1,8 +1,9 @@
-package cmd
+package io
 
 import (
 	"encoding/json"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -15,10 +16,10 @@ type Files struct {
 	ExtentionPreference    string
 }
 
-func (f Files) createDataStructures(dss []DataStructure) error {
+func (f Files) CreateDataStructures(dss []DataStructure) error {
 	dataStrucutresPath := filepath.Join(".", f.DataStructuresLocation)
 	for _, ds := range dss {
-		data, err := ds.parseData()
+		data, err := ds.ParseData()
 		if err != nil {
 			return err
 		}
@@ -27,7 +28,7 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
-		err = writeSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		err = WriteSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
 		if err != nil {
 			return err
 		}
@@ -36,7 +37,7 @@ func (f Files) createDataStructures(dss []DataStructure) error {
 	return nil
 }
 
-func writeSerializableToFile(body any, dir string, name string, ext string) error {
+func WriteSerializableToFile(body any, dir string, name string, ext string) error {
 	var bytes []byte
 	var err error
 
