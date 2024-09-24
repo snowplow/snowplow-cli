@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -17,28 +19,49 @@ var (
 )
 
 var generateCmd = &cobra.Command{
-	Use:     "generate --name login_click --vendor com.example",
+	Use:     "generate login_click {directory ./data-structures}",
 	Aliases: []string{"gen"},
+	Args:    cobra.RangeArgs(1, 2),
 	Short:   "Generate a new data structure locally",
-	Long:    `Uses a default template to build a minimal but valid data structure ready to be built into something useful.`,
+	Long: `Will write a new data structure to file based on the arguments provided.
+
+Example:
+  $ snowplow-cli ds gen login_click --vendor com.example
+  Will result in a new data structure getting written to './data-structures/com.example/login_click.yaml'
+  The directory 'com.example' will be created automatically.
+
+  $ snowplow-cli ds gen login_click
+  Will result in a new data structure getting written to './data-structures/login_click.yaml' with
+  an empty vendor field. Note that vendor is a required field and will cause a validation error if not completed.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		name, _ := cmd.Flags().GetString("name")
 		vendor, _ := cmd.Flags().GetString("vendor")
 		outFmt, _ := cmd.Flags().GetString("output-format")
-		outFile, _ := cmd.Flags().GetString("output-file")
 		event, _ := cmd.Flags().GetBool("event")
 		entity, _ := cmd.Flags().GetBool("entity")
+
+		name := args[0]
 
 		if ok := nameRegexp.Match([]byte(name)); !ok {
 			LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
 		}
 
-		if ok := vendorRegexp.Match([]byte(vendor)); !ok {
+		if ok := vendorRegexp.Match([]byte(vendor)); vendor != "" && !ok {
 			LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
 		}
 
 		if ok := outFmt == "json" || outFmt == "yaml"; !ok {
 			LogFatal(errors.New("unsupported output format. Was not yaml or json"))
+		}
+
+		outDir := filepath.Join(DataStructuresFolder, vendor)
+		if len(args) > 1 {
+			outDir = filepath.Join(args[1], vendor)
+		}
+
+		outFile := filepath.Join(outDir, name+"."+outFmt)
+		if _, err := os.Stat(outFile); !os.IsNotExist(err) {
+			LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
 		}
 
 		var schemaType string
@@ -66,15 +89,16 @@ var generateCmd = &cobra.Command{
 			output = string(jsonOut)
 		}
 
-		if outFile == "" {
-			fmt.Print(output)
-		} else {
-			err = os.WriteFile(outFile, []byte(output), 0644)
-			if err != nil {
-				LogFatal(err)
-			}
+		err = os.Mkdir(outDir, os.ModePerm)
+		if err != nil {
+			LogFatal(err)
+		}
+		err = os.WriteFile(outFile, []byte(output), 0644)
+		if err != nil {
+			LogFatal(err)
 		}
 
+		slog.Info("generate", "wrote", outFile)
 	},
 }
 
@@ -102,20 +126,10 @@ data:
 func init() {
 	dataStructuresCmd.AddCommand(generateCmd)
 
-	generateCmd.Flags().String("name", "", `A name for the data structure.
-Must conform to the regex pattern [a-zA-Z0-9-_]+`)
-	if err := generateCmd.MarkFlagRequired("name"); err != nil {
-		panic(err)
-	}
-
 	generateCmd.Flags().String("vendor", "", `A vendor for the data structure.
 Must conform to the regex pattern [a-zA-Z0-9-_.]+`)
-	if err := generateCmd.MarkFlagRequired("vendor"); err != nil {
-		panic(err)
-	}
 
 	generateCmd.Flags().String("output-format", "yaml", "Format for the file (yaml|json)")
-	generateCmd.Flags().String("output-file", "", "Location to write the file defaults to stdout")
 
 	generateCmd.Flags().Bool("event", true, "Generate data structure as an event")
 	generateCmd.Flags().Bool("entity", false, "Generate data structure as an entity")
