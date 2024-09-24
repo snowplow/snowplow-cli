@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/snowplow-product/snowplow-cli/internal/io"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -46,15 +46,15 @@ Example:
 		name := args[0]
 
 		if ok := nameRegexp.Match([]byte(name)); !ok {
-			io.LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
+			LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
 		}
 
 		if ok := vendorRegexp.Match([]byte(vendor)); vendor != "" && !ok {
-			io.LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
+			LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
 		}
 
 		if ok := outFmt == "json" || outFmt == "yaml"; !ok {
-			io.LogFatal(errors.New("unsupported output format. Was not yaml or json"))
+			LogFatal(errors.New("unsupported output format. Was not yaml or json"))
 		}
 
 		outDir := filepath.Join(util.DataStructuresFolder, vendor)
@@ -64,7 +64,7 @@ Example:
 
 		outFile := filepath.Join(outDir, name+"."+outFmt)
 		if _, err := os.Stat(outFile); !os.IsNotExist(err) {
-			io.LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
+			LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
 		}
 
 		var schemaType string
@@ -80,25 +80,25 @@ Example:
 		ds := model.DataStructure{}
 		err := yaml.Unmarshal([]byte(yamlOut), &ds)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		output := yamlOut
 		if outFmt == "json" {
 			jsonOut, err := json.MarshalIndent(ds, "", "  ")
 			if err != nil {
-				io.LogFatal(err)
+				LogFatal(err)
 			}
 			output = string(jsonOut)
 		}
 
 		err = os.Mkdir(outDir, os.ModePerm)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 		err = os.WriteFile(outFile, []byte(output), 0644)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		slog.Info("generate", "wrote", outFile)

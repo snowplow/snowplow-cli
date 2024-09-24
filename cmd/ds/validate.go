@@ -7,7 +7,7 @@ import (
 
 	changesPkg "github.com/snowplow-product/snowplow-cli/internal/changes"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/io"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/snowplow-product/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
@@ -33,39 +33,39 @@ var validateCmd = &cobra.Command{
 		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 		slog.Info("validating from", "paths", dataStructureFolders)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
-			io.LogFatalMultiple(errs)
+			LogFatalMultiple(errs)
 		}
 
 		cnx := context.Background()
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		err = changesPkg.PrintChangeset(changes)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		vr, err := validation.ValidateChanges(cnx, c, changes)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		vr.Slog()
@@ -75,7 +75,7 @@ var validateCmd = &cobra.Command{
 		}
 
 		if !vr.Valid {
-			io.LogFatal(errors.New(vr.Message))
+			LogFatal(errors.New(vr.Message))
 		}
 	},
 }

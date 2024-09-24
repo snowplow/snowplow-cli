@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/snowplow-product/snowplow-cli/internal/config"
-	"github.com/snowplow-product/snowplow-cli/internal/io"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +14,7 @@ var DataStructuresCmd = &cobra.Command{
 	Aliases: []string{"ds"},
 	Short:   "Work with Snowplow data structures",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := io.InitLogging(cmd); err != nil {
+		if err := InitLogging(cmd); err != nil {
 			return err
 		}
 

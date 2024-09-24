@@ -58,7 +58,7 @@ func Test_GetChangesUpdateAndMeta(t *testing.T) {
 		},
 	}
 
-	res, err := getChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
 
 	if err != nil {
 		t.Fatalf("Can't calcuate changes %s", err)

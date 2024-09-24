@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/io"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +24,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 			dataStructuresFolder = args[0]
 		}
 		format, _ := cmd.Flags().GetString("format")
-		files := io.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
+		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
@@ -35,17 +35,17 @@ If no directory is provided then defaults to 'data-structures' in the current di
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			io.LogFatalMsg("client creation fail", err)
+			LogFatalMsg("client creation fail", err)
 		}
 
 		dss, err := console.GetAllDataStructures(cnx, c)
 		if err != nil {
-			io.LogFatalMsg("data structure fetch failed", err)
+			LogFatalMsg("data structure fetch failed", err)
 		}
 
 		err = files.CreateDataStructures(dss)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		slog.Info("wrote data structures", "count", len(dss))

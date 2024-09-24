@@ -7,7 +7,7 @@ import (
 
 	changesPkg "github.com/snowplow-product/snowplow-cli/internal/changes"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/io"
+	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/snowplow-product/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
@@ -50,12 +50,12 @@ Changes to it will be published by this command.
 		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
-			io.LogFatalMultiple(errs)
+			LogFatalMultiple(errs)
 		}
 
 		slog.Info("publishing to dev from", "paths", dataStructureFolders)
@@ -64,27 +64,27 @@ Changes to it will be published by this command.
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		err = changesPkg.PrintChangeset(changes)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		vr, err := validation.ValidateChanges(cnx, c, changes)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		vr.Slog()
@@ -94,13 +94,13 @@ Changes to it will be published by this command.
 		}
 
 		if !vr.Valid {
-			io.LogFatal(errors.New(vr.Message))
+			LogFatal(errors.New(vr.Message))
 		}
 
 		if !dryRun {
 			err = changesPkg.PerformChangesDev(cnx, c, changes, managedFrom)
 			if err != nil {
-				io.LogFatal(err)
+				LogFatal(err)
 			}
 			slog.Info("all done!")
 		}
@@ -131,12 +131,12 @@ environment will be published to your production environment.
 
 		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
-			io.LogFatalMultiple(errs)
+			LogFatalMultiple(errs)
 		}
 
 		slog.Info("publishing to prod from", "paths", dataStructureFolders)
@@ -145,27 +145,27 @@ environment will be published to your production environment.
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "PROD")
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 
 		err = changesPkg.PrintChangeset(changes)
 		if err != nil {
-			io.LogFatal(err)
+			LogFatal(err)
 		}
 		if !dryRun {
 			err = changesPkg.PerformChangesProd(cnx, c, changes, managedFrom)
 			if err != nil {
-				io.LogFatal(err)
+				LogFatal(err)
 			}
 			slog.Info("all done!")
 		}
