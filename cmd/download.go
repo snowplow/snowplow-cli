@@ -52,5 +52,5 @@ If no directory is provided then defaults to 'data-structures' in the current di
 func init() {
 	dataStructuresCmd.AddCommand(downloadCmd)
 
-	downloadCmd.PersistentFlags().StringP("format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
+	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 }
