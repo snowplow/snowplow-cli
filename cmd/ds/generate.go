@@ -93,7 +93,7 @@ Example:
 		}
 
 		err = os.Mkdir(outDir, os.ModePerm)
-		if err != nil {
+		if err != nil && !os.IsExist(err) {
 			LogFatal(err)
 		}
 		err = os.WriteFile(outFile, []byte(output), 0644)
