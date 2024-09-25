@@ -22,6 +22,10 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Version={{.Version}}"
+      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Os={{.Os}}"
+      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Arch={{.Arch}}"
 
 archives:
   - format: binary
