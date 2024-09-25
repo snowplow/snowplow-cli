@@ -17,11 +17,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 type msgResponse struct {
@@ -87,6 +89,7 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/validation-requests", client.BaseUrl), bytes.NewBuffer(body))
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	if err != nil {
 		return nil, err
@@ -161,6 +164,7 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/deployment-requests", client.BaseUrl), bytes.NewBuffer(body))
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 	if isPatch {
 		q := req.URL.Query()
 		q.Add("patch", "true")
@@ -216,6 +220,7 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	if err != nil {
 		return nil, err
@@ -247,6 +252,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	if err != nil {
 		return nil, err
@@ -265,6 +271,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
 				auth := fmt.Sprintf("Bearer %s", client.Jwt)
 				req.Header.Add("authorization", auth)
+				req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 				slog.Info("fetching data structure", "uri", fmt.Sprintf("iglu:%s/%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version))
 
 				if err != nil {
@@ -346,6 +353,7 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *DataStructureSelf, fu
 	req, err := http.NewRequestWithContext(cnx, "PATCH", url, bytes.NewBuffer(body))
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	if err != nil {
 		return err

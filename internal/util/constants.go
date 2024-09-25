@@ -11,3 +11,4 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package util
 
 const DataStructuresFolder = "data-structures"
+const Version = "0.1.0"
