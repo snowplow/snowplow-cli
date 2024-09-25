@@ -42,11 +42,9 @@ var devCmd = &cobra.Command{
 The 'meta' section of a data structure is not versioned within BDP Console.
 Changes to it will be published by this command.
 	`,
-	Example: `
-	$ snowplow-cli ds publish dev
-	$ snowplow-cli ds publish dev --dry-run
-	$ snowplow-cli ds publish dev --dry-run ./my-data-structures ./my-other-data-structures
-	`,
+	Example: `  $ snowplow-cli ds publish dev
+  $ snowplow-cli ds publish dev --dry-run
+  $ snowplow-cli ds publish dev --dry-run ./my-data-structures ./my-other-data-structures`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
