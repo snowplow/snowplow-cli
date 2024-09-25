@@ -13,15 +13,17 @@ package cmd
 import (
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/snowplow-product/snowplow-cli/cmd/ds"
+	"github.com/spf13/cobra"
 )
 
 var RootCmd = &cobra.Command{
 	Use:   "snowplow-cli",
-	Short: "Command line tool to work with Snowplow",
-	Long: `
-	data-structures - manage data-structures as yaml/json files: download, edit, publish, author
+	Short: "Snowplow CLI",
+	Long:  `Work with Snowplow from the command line`,
+	Example: `
+	$ snowplow-cli data-structure download
+	$ snowplow-cli data-structure validate
 	`,
 }
 
