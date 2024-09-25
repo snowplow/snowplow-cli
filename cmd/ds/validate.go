@@ -28,6 +28,8 @@ var validateCmd = &cobra.Command{
 	Short: "Validate data structures with BDP Console",
 	Args:  cobra.ArbitraryArgs,
 	Long:  `Sends all data structures from <path> for validation by BDP Console.`,
+	Example: `  $ snowplow-cli ds validate
+  $ snowplow-cli ds validate ./my-data-structures ./my-other-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")

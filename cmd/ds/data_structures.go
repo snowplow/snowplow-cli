@@ -23,6 +23,9 @@ var DataStructuresCmd = &cobra.Command{
 	Use:     "data-structures",
 	Aliases: []string{"ds"},
 	Short:   "Work with Snowplow data structures",
+	Example: `  $ snowplow-cli data-structures generate my_new_data_structure
+  $ snowplow-cli ds validate
+  $ snowplow-cli ds publish dev`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := InitLogging(cmd); err != nil {
 			return err

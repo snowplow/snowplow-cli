@@ -13,19 +13,18 @@ package cmd
 import (
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/snowplow-product/snowplow-cli/cmd/ds"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/spf13/cobra"
 )
 
 var RootCmd = &cobra.Command{
 	Use:   "snowplow-cli",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Snowplow CLI",
+	Long:  `Work with Snowplow from the command line`,
+	Example: `  $ snowplow-cli data-structure download
+  $ snowplow-cli ds validate`,
+	Version: util.Version,
 }
 
 func Execute() {

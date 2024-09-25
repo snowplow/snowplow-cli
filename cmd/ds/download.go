@@ -28,6 +28,8 @@ var downloadCmd = &cobra.Command{
 
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.`,
+	Example: `  $ snowplow-cli ds download
+  $ snowplow-cli ds download --output-format json ./my-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dataStructuresFolder := util.DataStructuresFolder
 		if len(args) > 0 {
