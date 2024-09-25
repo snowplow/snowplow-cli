@@ -33,7 +33,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 		if len(args) > 0 {
 			dataStructuresFolder = args[0]
 		}
-		format, _ := cmd.Flags().GetString("format")
+		format, _ := cmd.Flags().GetString("output-format")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")

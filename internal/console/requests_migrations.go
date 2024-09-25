@@ -16,9 +16,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"io"
 	"net/http"
+
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 type destination struct {
@@ -69,6 +71,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	resp, err := client.Http.Do(req)
 	if err != nil {
@@ -102,6 +105,7 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/destinations/v3", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 
 	if err != nil {
 		return nil, err

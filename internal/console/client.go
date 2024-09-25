@@ -19,6 +19,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 type ApiClient struct {
@@ -68,6 +70,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	}
 	req.Header.Add("X-API-KEY-ID", apiKeyId)
 	req.Header.Add("X-API-KEY", apiKeySecret)
+	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
 	resp, err := h.Do(req)
 	if err != nil {
 		return nil, err
