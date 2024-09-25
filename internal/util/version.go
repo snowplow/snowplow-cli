@@ -10,4 +10,11 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 
 package util
 
-const DataStructuresFolder = "data-structures"
+import "fmt"
+
+// Set in .goreleaser file using ldflags
+var Version = "dev"
+var Os = "unknown"
+var Arch = "unknown"
+
+var VersionInfo = fmt.Sprintf("%s-%s-%s", Version, Os, Arch)

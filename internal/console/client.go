@@ -70,7 +70,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	}
 	req.Header.Add("X-API-KEY-ID", apiKeyId)
 	req.Header.Add("X-API-KEY", apiKeySecret)
-	req.Header.Add("X-SNOWPLOW-CLI", util.Version)
+	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
 	resp, err := h.Do(req)
 	if err != nil {
 		return nil, err
