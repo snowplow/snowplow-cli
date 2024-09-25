@@ -47,6 +47,10 @@ Example:
   Will result in a new data structure getting written to './data-structures/login_click.yaml' with
   an empty vendor field. Note that vendor is a required field and will cause a validation error if not completed.
 `,
+	Example: `
+	$ snowplow-cli ds generate my-ds
+	$ snowplow-cli ds generate my-ds ./my-data-structures
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		vendor, _ := cmd.Flags().GetString("vendor")
 		outFmt, _ := cmd.Flags().GetString("output-format")
