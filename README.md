@@ -6,7 +6,7 @@
 
 Snowplow CLI is available for [BDP Enterprise](https://docs.snowplow.io/docs/getting-started-on-bdp/private-managed-cloud/) and [BDP Cloud](https://docs.snowplow.io/docs/getting-started-on-bdp/cloud/) clients
 
-## Documentation
+<!-- ## Documentation -->
 <!-- TODO: Add docs link-->
 
 ## Installation
