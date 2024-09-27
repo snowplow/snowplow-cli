@@ -10,7 +10,14 @@ Snowplow CLI is available for [BDP Enterprise](https://docs.snowplow.io/docs/get
 <!-- TODO: Add docs link-->
 
 ## Installation
-<!-- TODO: Add curl install-->
+Binaries for most popular platforms and architectures are available in the [releases](https://github.com/snowplow-product/snowplow-cli/releases)
+
+Example installation for `darwin_amd64`.
+
+```bash
+curl -L -o snowplow-cli https://github.com/snowplow-product/snowplow-cli/releases/latest/download/snowplow-cli_darwin_amd64
+chmod u+x snowplow-cli
+```
 
 ## Configuration
 Snowplow CLI requires a configuration, to use most of its functionality
