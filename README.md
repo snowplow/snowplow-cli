@@ -33,7 +33,7 @@ You can find the instructions on how to get the API key and secret in the [docum
 Your `snowplow.yml` content should look like following
 ```yaml
 console:
-  org-id: 3072e60a-40e3-4eb5-9823-d55e48e224e4
-  api-key-id: 8c923b4b-4520-4403-a713-92e46e1389a3
-  api-key-secret: a3492c08-c32e-4e63-8f3f-6e744dd7209d
+  org-id: ********-****-****-****-************
+  api-key-id: ********-****-****-****-************
+  api-key-secret: ********-****-****-****-************
 ```
