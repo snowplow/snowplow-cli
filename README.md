@@ -24,7 +24,7 @@ Snowplow CLI requires a configuration, to use most of its functionality
 
 ### Create a config file
 - Unix/Darwin: `mkdir -p ~/.config/snowplow && touch $HOME/.config/snowplow/snowplow.yml`
-- Windows: `mkdir -p %AppData%\snowplow && touch %AppData%\snowplow\snowplow.yml`
+<!-- TODO: Windows -->
 
 ### Minimal configuration
 You will need to provide the console organization id, API key and API secret.
