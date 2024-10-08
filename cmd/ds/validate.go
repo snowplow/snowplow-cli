@@ -32,7 +32,7 @@ var validateCmd = &cobra.Command{
   $ snowplow-cli ds validate ./my-data-structures ./my-other-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
