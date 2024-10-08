@@ -35,5 +35,5 @@ Your `snowplow.yml` content should look like following
 console:
   org-id: ********-****-****-****-************
   api-key-id: ********-****-****-****-************
-  api-key-secret: ********-****-****-****-************
+  api-key: ********-****-****-****-************
 ```

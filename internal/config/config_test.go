@@ -53,7 +53,7 @@ func Test_ConfigFromFile(t *testing.T) {
 	}{
 		{"host", "totally a url"},
 		{"api-key-id", "00000000-0c00-000b-aa00-000000a00000"},
-		{"api-key-secret", "00beb000-0b0c-00ed-b0ad-000b00a00000"},
+		{"api-key", "00beb000-0b0c-00ed-b0ad-000b00a00000"},
 		{"org-id", "0000a0aa-aaba-0fda-a00e-0e0ab0c00b00"},
 	}
 
@@ -86,7 +86,7 @@ func Test_ConfigEnvOveride(t *testing.T) {
 	}{
 		{"host", "a real url this time"},
 		{"api-key-id", "00000000-0c00-000b-aa00-000000a00000"},
-		{"api-key-secret", "but not a secret"},
+		{"api-key", "but not a secret"},
 		{"org-id", "0000a0aa-aaba-0fda-a00e-0e0ab0c00b00"},
 	}
 

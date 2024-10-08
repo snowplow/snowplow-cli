@@ -39,7 +39,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 

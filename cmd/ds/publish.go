@@ -48,7 +48,7 @@ Changes to it will be published by this command.
 
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -136,7 +136,7 @@ environment will be published to your production environment.
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key-secret")
+		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
