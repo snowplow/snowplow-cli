@@ -71,7 +71,7 @@ func Test_ConfigEnvOveride(t *testing.T) {
 	os.Args = []string{"xxx", "--config", "../testdata/config/config.yml"}
 
 	t.Setenv("SNOWPLOW_CONSOLE_HOST", "a real url this time")
-	t.Setenv("SNOWPLOW_CONSOLE_API_KEY_SECRET", "but not a secret")
+	t.Setenv("SNOWPLOW_CONSOLE_API_KEY", "but not a secret")
 
 	testCmd := build()
 

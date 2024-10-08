@@ -24,7 +24,7 @@ import (
 
 func InitConsoleFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringP("api-key-id", "a", "", "BDP console api key id")
-	cmd.PersistentFlags().StringP("api-key", "S", "", "BDP console api key secret")
+	cmd.PersistentFlags().StringP("api-key", "S", "", "BDP console api key")
 	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "BDP console host")
 	cmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
 	cmd.PersistentFlags().StringP("managed-from", "m", "", "Link to a github repo where the data structure is managed")
