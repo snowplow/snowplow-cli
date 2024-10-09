@@ -92,12 +92,25 @@ func ValidateLocalDs(dss map[string]DataStructure) []error {
 		return field.Tag.Get("json")
 	})
 	allErrors := []error{}
+	counts := make(map[string][]string)
 	for fileName, ds := range dss {
 		errs := validateDs(validate, ds)
 		if errs != nil {
 			error := errors.Join(fmt.Errorf("Validation failed for %s", fileName), errs)
 			allErrors = append(allErrors, error)
 		}
+		data, err := ds.ParseData()
+		if err != nil {
+			allErrors = append(allErrors, err)
+		}
+		key := fmt.Sprintf("%s/%s", data.Self.Vendor, data.Self.Name)
+		counts[key] = append(counts[key], fileName)
 	}
+	for key, files := range counts {
+		if len(files) > 1 {
+			allErrors = append(allErrors, fmt.Errorf("The mapping between data structures and files should be unique. Files %s describe the same data structure %s.", files, key))
+		}
+	}
+
 	return allErrors
 }
