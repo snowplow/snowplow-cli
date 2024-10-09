@@ -239,3 +239,42 @@ func Test_WithoutFullSelf(t *testing.T) {
 	}
 
 }
+
+func Test_DuplicateFile(t *testing.T) {
+	jsonString := string(`{
+      "apiVersion": "v1",
+      "resourceType": "data-structure",
+      "meta": {
+        "hidden": true,
+        "schemaType": "entity",
+        "customData": {
+          "additionalProp1": "string",
+          "additionalProp2": "string",
+          "additionalProp3": "string"
+        }
+      },
+      "data": {
+        "self": {
+          "vendor": "example",
+          "name": "example",
+          "format": "jsonschema",
+          "version": "1-0-1"
+        },
+        "$schema": "string"
+      }
+    }`)
+	res := DataStructure{}
+	err := json.Unmarshal([]byte(jsonString), &res)
+	if err != nil {
+		t.Fatalf("Cant' parse json %s\n parsed ", err)
+	}
+	errs := ValidateLocalDs(map[string]DataStructure{"test": res, "test2": res})
+	if len(errs) == 0 {
+		t.Fatalf("No errors raised when ds is duplicated in files")
+	}
+	e := errs[0].Error()
+	if !strings.Contains(e, "unique") {
+		t.Fatalf("Error message does not complain about duplicate files %s", e)
+	}
+
+}
