@@ -21,14 +21,9 @@ import (
 
 type SchemaType string
 
-const (
-	Event  SchemaType = "event"
-	Entity SchemaType = "entity"
-)
-
 type DataStructureMeta struct {
 	Hidden     bool              `yaml:"hidden" json:"hidden"`
-	SchemaType SchemaType        `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
+	SchemaType string            `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
 	CustomData map[string]string `yaml:"customData" json:"customData" validate:"required"`
 }
 
@@ -82,4 +77,3 @@ type DSChangeContext struct {
 	LocalContentHash  string
 	RemoteContentHash string
 }
-
