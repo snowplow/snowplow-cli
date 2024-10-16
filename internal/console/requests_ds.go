@@ -74,7 +74,7 @@ type publishRequest struct {
 
 type fullMeta struct {
 	Hidden      *bool              `json:"hidden,omitempty"`
-	SchemaType  SchemaType         `json:"schemaType,omitempty"`
+	SchemaType  string             `json:"schemaType,omitempty"`
 	CustomData  *map[string]string `json:"customData,omitempty"`
 	LockStatus  string             `json:"lockStatus,omitempty"`
 	ManagedFrom string             `json:"managedFrom,omitempty"`
