@@ -70,7 +70,10 @@ var validateCmd = &cobra.Command{
 
 		slog.Debug("validating from", "paths", searchPaths, "files", possibleFiles)
 
-		lookup.SlogValidations(basePath)
+		err = lookup.SlogValidations(basePath)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
 
 		if ghOut {
 			err := lookup.GhAnnotateValidations(basePath)
