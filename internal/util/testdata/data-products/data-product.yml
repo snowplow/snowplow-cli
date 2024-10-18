@@ -1,0 +1,18 @@
+apiVersion: v1
+resourceType: data-product
+resourceName: d066a9a7-e6c4-4d72-9a93-1418746f5279
+data:
+  name: Data Product number 1
+  sourceApplications:
+    - $ref: ./source-application.yml
+  domain: Data Products
+  description: This Data Product describes a data product
+  eventSpecifications:
+    - resourceName: e066a9a7-e6c4-4d72-9a93-1418746f5278
+      sourceApplications:
+        - $ref: ./source-application.yml
+      name: event spec 1
+      triggers:
+        - description: number 1 trigger
+      event:
+        source: iglu:io.snowplow/button_click_custom/jsonschema/1-1-0

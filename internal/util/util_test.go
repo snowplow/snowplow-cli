@@ -12,6 +12,8 @@ package util
 
 import (
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,4 +58,31 @@ func Test_DataStructuresFromPathsFailNotASchema(t *testing.T) {
 	if err == nil {
 		t.Fatal(err)
 	}
+}
+
+func Test_MaybeResourcesfromPaths(t *testing.T) {
+	saPath, _ := filepath.Abs(filepath.Join("testdata", "data-products", "source-application.yml"))
+	dp1Path, _ := filepath.Abs(filepath.Join("testdata", "data-products", "data-product.yml"))
+	dp2Path, _ := filepath.Abs(filepath.Join("testdata", "data-products", "sub-dir-dp", "data-product.yml"))
+
+	paths := []string{
+		filepath.Join("testdata", "data-products"),
+	}
+
+	dps, err := MaybeResourcesfromPaths(paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys := []string{}
+	for k := range dps {
+		keys = append(keys, k)
+	}
+
+	for _, p := range []string{ saPath, dp1Path, dp2Path } {
+		if !slices.Contains(keys, p) {
+			t.Fatal("missing path", p)
+		}
+	}
+
 }
