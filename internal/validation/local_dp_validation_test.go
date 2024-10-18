@@ -160,7 +160,7 @@ func Test_DPLookup_Ignored(t *testing.T) {
 		t.Fatal("validation success?")
 	}
 
-	if len(v.Errors) != 1 {
-		t.Fatal("no error?")
+	if len(v.Debug) != 1 {
+		t.Fatal("no debug?")
 	}
 }

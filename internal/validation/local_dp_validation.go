@@ -46,7 +46,7 @@ func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 		v := DPValidations{}
 
 		if apiV, ok := maybeDp["apiVersion"]; !ok || apiV != "v1" {
-			v.Info = append(v.Info, fmt.Sprintf("ignoring, unknown or missing apiVersion: %s", apiV))
+			v.Errors = append(v.Errors, fmt.Sprintf("ignoring, unknown or missing apiVersion: %s", apiV))
 			continue
 		}
 
@@ -67,7 +67,7 @@ func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %e", err))
 				}
 			default:
-				v.Errors = append(v.Errors, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
+				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
 			}
 		} else {
 			v.Errors = append(v.Errors, "missing resourceType")

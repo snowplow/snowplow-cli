@@ -11,7 +11,6 @@
 package dp
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -39,11 +38,12 @@ var validateCmd = &cobra.Command{
 		*/
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
-		if len(args) == 0 {
-			snplog.LogFatal(errors.New("no source directories supplied"))
-		}
-
 		searchPaths := []string{}
+
+		if len(args) == 0 {
+			searchPaths = append(searchPaths, "data-products")
+			slog.Debug("validation", "msg", "no path provided, using default (./data-products)")
+		}
 
 		searchPaths = append(searchPaths, args...)
 
@@ -68,7 +68,7 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		slog.Debug("validating from", "paths", searchPaths, "files", possibleFiles)
+		slog.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
 
 		err = lookup.SlogValidations(basePath)
 		if err != nil {
