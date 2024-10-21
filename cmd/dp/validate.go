@@ -11,11 +11,13 @@
 package dp
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 
+	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/snowplow-product/snowplow-cli/internal/validation"
@@ -30,12 +32,10 @@ var validateCmd = &cobra.Command{
 	Example: `  $ snowplow-cli dp validate ./data-products ./source-applications
   $ snowplow-cli dp validate ./src`,
 	Run: func(cmd *cobra.Command, args []string) {
-		/*
 			apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 			apiKeySecret, _ := cmd.Flags().GetString("api-key")
 			host, _ := cmd.Flags().GetString("host")
 			org, _ := cmd.Flags().GetString("org-id")
-		*/
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
 		searchPaths := []string{}
@@ -63,7 +63,19 @@ var validateCmd = &cobra.Command{
 		}
 		basePath := filepath.Dir(arg0)
 
-		lookup, err := validation.NewDPLookup(files)
+		cnx := context.Background()
+
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
+
+		schemaResolver, err := console.NewSchemaDeployChecker(cnx, c)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
+
+		lookup, err := validation.NewDPLookup(schemaResolver, files)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 )
@@ -43,7 +44,7 @@ func (v *DPValidations) concat(r DPValidations) {
 	v.Debug = append(v.Debug, r.Debug...)
 }
 
-func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
+func NewDPLookup(sdc console.SchemaDeployChecker, dp map[string]map[string]any) (*DPLookup, error) {
 
 	probablyDps := map[string]model.DataProduct{}
 	probablySap := map[string]model.SourceApp{}
@@ -78,6 +79,7 @@ func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 				v.concat(ValidateSAEntitiesCardinalities(sa))
 				v.concat(ValidateSAEntitiesSources(sa))
 				v.concat(ValidateSAEntitiesHaveNoRules(sa))
+				v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
 			default:
 				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
 			}

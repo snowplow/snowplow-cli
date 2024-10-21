@@ -169,3 +169,42 @@ func Test_ValidateSAEntitesHaveNoRules(t *testing.T) {
 		t.Fatal("unexpected errors", result)
 	}
 }
+
+
+type mockSdc struct {
+	deployed []string
+}
+
+func (mi *mockSdc) IsDSDeployed(uri string) (bool, []string, error) {
+	return slices.Contains(mi.deployed, uri), nil, nil
+}
+
+func Test_ValidateSAEntitiesSchemaDeployed(t *testing.T) {
+	sa := model.SourceApp{
+		Data: model.SourceAppData{
+			Entities: &model.EntitiesDef{
+				Tracked: []model.SchemaRef{
+					{Source: "iglu:vendor/name/format/2-0-0"},
+					{Source: "iglu:invalid/***/format/2-0-0"},
+					{Source: "iglu:vendor/name/format/1-0-0"},
+				},
+				Enriched: []model.SchemaRef{
+					{Source: "iglu:vendor/name/format/1-0-0"},
+				},
+			},
+		},
+	}
+
+	sdc := &mockSdc{[]string{"iglu:vendor/name/format/1-0-0"}}
+
+	result := ValidateSAEntitiesSchemaDeployed(sdc, sa).Errors
+
+	expected := []string{
+		"data.entities.tracked[0].source could not find deployment of iglu:vendor/name/format/2-0-0",
+		"data.entities.tracked[1].source invalid iglu uri should follow the format iglu:vendor/name/format/version, eg: iglu:io.snowplow/login/jsonschema/1-0-0",
+	}
+
+	if !slices.Equal(result, expected) {
+		t.Fatal("unexpected errors", result)
+	}
+}

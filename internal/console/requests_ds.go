@@ -216,6 +216,35 @@ type ListResponse struct {
 	Deployments []Deployment      `json:"deployments"`
 }
 
+func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, error) {
+	req, err := http.NewRequestWithContext(cnx, "GET", "https://com-iglucentral-eu1-prod.iglu.snplow.net/api/schemas", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var list []string
+	err = json.Unmarshal(rbody, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+
+	return list, err
+}
+
 func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
@@ -245,6 +274,39 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 	}
 	return listResp, nil
+}
+
+func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash string) ([]Deployment, error) {
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var deploys []Deployment
+	err = json.Unmarshal(rbody, &deploys)
+	if err != nil {
+		return nil, err
+	}
+
+	return deploys, nil
 }
 
 func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructure, error) {

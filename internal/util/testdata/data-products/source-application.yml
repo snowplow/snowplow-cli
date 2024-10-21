@@ -9,10 +9,12 @@ data:
   - app-qa
   entities:
     tracked:
-    - source: iglu:io.snowplow/frontend_version/jsonschema/1-0-0
-      minCardinality: 1
-    - source: iglu:io.snowplow/organization/jsonschema/1-0-0
-    - source: iglu:io.snowplow/user/jsonschema/1-0-1
-      minCardinality: 1
-      maxCardinality: 1
+      #    - source: iglu:io.snowplow/frontend_version/jsonschema/1-0-0
+      #   minCardinality: 1
+      # - source: iglu:io.snowplow/organization/jsonschema/1-0-0
+      # - source: iglu:io.snowplow/user/jsonschema/1-0-1
+      #  minCardinality: 1
+      #  maxCardinality: 1
+    - source: iglu:com.snowplowanalytics.console/frontend_version/jsonschema/1-0-1
+    - source: iglu:com.snowplowanalytics.monitoring.batch/load_succeeded/jsonschema/3-0-0
     enriched: []
