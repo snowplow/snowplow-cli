@@ -36,6 +36,13 @@ type DPValidations struct {
 	Debug    []string
 }
 
+func (v *DPValidations) concat(r DPValidations) {
+	v.Errors = append(v.Errors, r.Errors...)
+	v.Warnings = append(v.Warnings, r.Warnings...)
+	v.Info = append(v.Info, r.Info...)
+	v.Debug = append(v.Debug, r.Debug...)
+}
+
 func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 
 	probablyDps := map[string]model.DataProduct{}
@@ -66,6 +73,11 @@ func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 				} else {
 					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %e", err))
 				}
+				v.concat(ValidateSAMinimum(sa))
+				v.concat(ValidateSAAppIds(sa))
+				v.concat(ValidateSAEntitiesCardinalities(sa))
+				v.concat(ValidateSAEntitiesSources(sa))
+				v.concat(ValidateSAEntitiesHaveNoRules(sa))
 			default:
 				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
 			}
