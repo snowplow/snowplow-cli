@@ -11,6 +11,7 @@
 package console
 
 import (
+	"errors"
 	"slices"
 	"testing"
 )
@@ -128,5 +129,29 @@ func Test_IsDeployed_ConsoleAlternatives(t *testing.T) {
 
 	if !slices.Equal(expected, alts) {
 		t.Fatal("bad alternatives", expected, alts)
+	}
+}
+
+func Test_IsDeployed_ConsoleAlternativesFail(t *testing.T) {
+	uri := "iglu:vendor/name/format/1-0-10"
+
+	mock := &schemaDeployCheckProvider{
+		[]string{},
+		[]ListResponse{{
+			Hash:        "hash",
+			Vendor:      "vendor",
+			Name:        "name",
+			Format:      "format",
+			Deployments: []Deployment{},
+		}},
+		func(h string) ([]Deployment, error) {
+			return nil, errors.New("fail")
+		},
+	}
+
+	_, _, err := mock.IsDSDeployed(uri)
+
+	if err == nil || err.Error() != "fail" {
+		t.Fatal("should have errored")
 	}
 }
