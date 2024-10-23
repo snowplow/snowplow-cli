@@ -24,7 +24,7 @@ var builtInSchema = []string{
 }
 
 type SchemaDeployChecker interface {
-	IsDSDeployed(uri string) (bool, []string, error)
+	IsDSDeployed(uri string) (found bool, deployedVersions []string, err error)
 }
 
 type schemaDeployCheckProvider struct {
@@ -92,7 +92,7 @@ func (sdc *schemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, depl
 				foundVersions = append(foundVersions, v)
 			}
 
-			return false, foundVersions, nil 
+			return false, foundVersions, nil
 		}
 	}
 
