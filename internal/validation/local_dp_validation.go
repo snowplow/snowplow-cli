@@ -44,7 +44,7 @@ func (v *DPValidations) concat(r DPValidations) {
 	v.Debug = append(v.Debug, r.Debug...)
 }
 
-func NewDPLookup(sdc console.SchemaDeployChecker, dp map[string]map[string]any) (*DPLookup, error) {
+func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any) (*DPLookup, error) {
 
 	probablyDps := map[string]model.DataProduct{}
 	probablySap := map[string]model.SourceApp{}
@@ -65,14 +65,15 @@ func NewDPLookup(sdc console.SchemaDeployChecker, dp map[string]map[string]any) 
 				if err := mapstructure.Decode(maybeDp, &dp); err == nil {
 					probablyDps[f] = dp
 				} else {
-					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode data product %e", err))
+					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode data product %s", err))
 				}
+				v.concat(ValidateDPEventSpecCompat(cc, dp))
 			case "source-application":
 				var sa model.SourceApp
 				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
 					probablySap[f] = sa
 				} else {
-					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %e", err))
+					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %s", err))
 				}
 				v.concat(ValidateSAMinimum(sa))
 				v.concat(ValidateSAAppIds(sa))

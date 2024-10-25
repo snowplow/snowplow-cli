@@ -75,7 +75,11 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		lookup, err := validation.NewDPLookup(schemaResolver, files)
+		compatChecker := func (event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+			return console.CompatCheck(cnx, c, event, entities)
+		}
+
+		lookup, err := validation.NewDPLookup(compatChecker, schemaResolver, files)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
