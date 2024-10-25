@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 )
@@ -36,7 +37,14 @@ type DPValidations struct {
 	Debug    []string
 }
 
-func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
+func (v *DPValidations) concat(r DPValidations) {
+	v.Errors = append(v.Errors, r.Errors...)
+	v.Warnings = append(v.Warnings, r.Warnings...)
+	v.Info = append(v.Info, r.Info...)
+	v.Debug = append(v.Debug, r.Debug...)
+}
+
+func NewDPLookup(sdc console.SchemaDeployChecker, dp map[string]map[string]any) (*DPLookup, error) {
 
 	probablyDps := map[string]model.DataProduct{}
 	probablySap := map[string]model.SourceApp{}
@@ -66,6 +74,12 @@ func NewDPLookup(dp map[string]map[string]any) (*DPLookup, error) {
 				} else {
 					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %e", err))
 				}
+				v.concat(ValidateSAMinimum(sa))
+				v.concat(ValidateSAAppIds(sa))
+				v.concat(ValidateSAEntitiesCardinalities(sa))
+				v.concat(ValidateSAEntitiesSources(sa))
+				v.concat(ValidateSAEntitiesHaveNoRules(sa))
+				v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
 			default:
 				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
 			}
