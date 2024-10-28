@@ -13,10 +13,12 @@ package model
 type EventSpec struct {
 	ResourceName       string
 	SourceApplications []map[string]string
+	Event              SchemaRef
+	Entities           EntitiesDef
 }
 
 type DataProductData struct {
-	Name string
+	Name                string
 	SourceApplications  []map[string]string
 	EventSpecifications []EventSpec
 }
@@ -32,24 +34,24 @@ type SourceApp struct {
 	ResourceType string
 	ApiVersion   string
 	ResourceName string
-	Data SourceAppData
+	Data         SourceAppData
 }
 
 type SourceAppData struct {
-	Name string
+	Name        string
 	Description string
-	AppIds []string
-	Entities *EntitiesDef
+	AppIds      []string
+	Entities    *EntitiesDef
 }
 
 type EntitiesDef struct {
-	Tracked []SchemaRef
+	Tracked  []SchemaRef
 	Enriched []SchemaRef
 }
 
 type SchemaRef struct {
-	Source string
+	Source         string
 	MinCardinality *int
 	MaxCardinality *int
-	Schema map[string]any
+	Schema         map[string]any
 }

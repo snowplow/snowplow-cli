@@ -11,11 +11,14 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package console
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 type DataProductsAndRelatedResources struct {
@@ -115,4 +118,81 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		sourceApps.Includes.SourceApplications,
 	}
 	return &res, nil
+}
+
+type CompatStatus = string
+
+const (
+	CompatCompatible   CompatStatus = "compatible"
+	CompatUndecidable  CompatStatus = "undecidable"
+	CompatIncompatible CompatStatus = "incompatible"
+)
+
+type CompatSource struct {
+	Source     string
+	Status     CompatStatus
+	Properties map[string]string
+}
+
+type CompatResult struct {
+	Status  string
+	Sources []CompatSource
+	Message string
+}
+
+type CompatCheckable struct {
+	Source string         `json:"source"`
+	Schema map[string]any `json:"schema"`
+}
+
+type CompatChecker = func(event CompatCheckable, entities []CompatCheckable) (*CompatResult, error)
+
+func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, entities []CompatCheckable) (*CompatResult, error) {
+	realArgs := map[string]any{
+		"spec": map[string]any{
+			"event": event,
+			"entities": map[string]any{
+				"tracked": entities,
+			},
+			// this uuid does not reference any existing event spec, I made it up
+			"id":      "312d3987-4874-498d-af6c-162ce0da39d7",
+			"name":    "cli-compat-check",
+			"status":  "draft",
+			"version": "0",
+		},
+	}
+
+	body, err := json.Marshal(realArgs)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/event-specs/v1/compatibility", client.BaseUrl), bytes.NewBuffer(body))
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var cresp CompatResult
+	err = json.Unmarshal(rbody, &cresp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad response got status: %d with message: %s", resp.StatusCode, cresp.Message)
+	}
+
+	return &cresp, nil
 }

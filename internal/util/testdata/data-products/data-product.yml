@@ -15,4 +15,33 @@ data:
       triggers:
         - description: number 1 trigger
       event:
-        source: iglu:io.snowplow/button_click_custom/jsonschema/1-1-0
+        source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+    - resourceName: 03546c69-9e1d-4eef-b8ca-f8e70ce1a761
+      name: event spec 1
+      triggers:
+        - description: number 1 trigger
+      event:
+        source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+        comment: something here you can add?
+        schema:
+          type: object
+          $schema: http://json-schema.org/draft-04/schema#
+          additionalProperties: false
+          properties:
+            label:
+              type: number
+              enum: [login]
+              description: This needs to be login
+      entities:
+        tracked:
+          - source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+            schema:
+              type: object
+              $schema: http://json-schema.org/draft-04/schema#
+              required: [label]
+              additionalProperties: false
+              properties:
+                label:
+                  enum: [login]
+                  description: This needs to be login
+
