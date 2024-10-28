@@ -11,127 +11,62 @@
 package validation
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 )
 
-func ValidateSAMinimum(sa model.SourceApp) DPValidations {
-	errors := []string{}
+//go:embed schema/source-application.json
+var saSchema string
 
-	_, err := uuid.Parse(sa.ResourceName)
-	if err != nil {
-		errors = append(errors, "resourceName must be a valid uuid")
-	}
-
-	if len(sa.Data.Name) == 0 {
-		errors = append(errors, "data.name required")
-	}
-
-	return DPValidations{errors, []string{}, []string{}, []string{}}
+func ValidateSAShape(sa map[string]any) (validations DPValidations, ok bool) {
+	sch := jsonschema.MustCompileString("data://source-application.json", saSchema)
+	return validateWithSchema(sch, sa)
 }
 
-func ValidateSAAppIds(sa model.SourceApp) DPValidations {
-	errors := []string{}
-
-	for i, a := range sa.Data.AppIds {
-		if len(a) == 0 {
-			errors = append(errors, fmt.Sprintf("data.appIds[%d] can't be empty", i))
-		}
-	}
-
-	return DPValidations{errors, []string{}, []string{}, []string{}}
-}
-
-func ValidateSAEntitiesSources(sa model.SourceApp) DPValidations {
-	errors := []string{}
-
-	if sa.Data.Entities == nil {
-		return DPValidations{}
-	}
-
-	for i, e := range sa.Data.Entities.Tracked {
-		if len(e.Source) == 0 {
-			errors = append(errors, fmt.Sprintf("data.entities.tracked[%d].source required", i))
-		}
-	}
-
-	for i, e := range sa.Data.Entities.Enriched {
-		if len(e.Source) == 0 {
-			errors = append(errors, fmt.Sprintf("data.entities.enriched[%d].source required", i))
-		}
-	}
-
-	return DPValidations{errors, []string{}, []string{}, []string{}}
-}
-
-func cardinalityCheck(key string, i int, s model.SchemaRef) []string {
-	errors := []string{}
+func cardinalityCheck(key string, i int, s model.SchemaRef) DPValidations {
+	errors := map[string][]string{}
 	if s.MinCardinality != nil {
 		if *s.MinCardinality < 0 {
-			errors = append(errors, fmt.Sprintf("data.entities.%s[%d].minCardinality must be > 0", key, i))
+			path := fmt.Sprintf("/data/entities/%s/%d/minCardinality", key, i)
+			errors[path] = append(errors[path], "must be > 0")
 		}
 		if s.MaxCardinality != nil {
 			if *s.MaxCardinality < *s.MinCardinality {
-				errors = append(errors, fmt.Sprintf("data.entities.%s[%d].maxCardinality must be > minCardinality: %d", key, i, *s.MinCardinality))
+				path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
+				errors[path] = append(errors[path], fmt.Sprintf("must be > minCardinality: %d", *s.MinCardinality))
 			}
 		}
 	} else {
 		if s.MaxCardinality != nil {
-			errors = append(errors, fmt.Sprintf("data.entities.%s[%d].maxCardinality without minCardinality", key, i))
+			path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
+			errors[path] = append(errors[path], "without minCardinality")
 		}
 	}
-	return errors
+	return DPValidations{ErrorsWithPaths: errors}
 }
 
 func ValidateSAEntitiesCardinalities(sa model.SourceApp) DPValidations {
-	errors := []string{}
+	result := DPValidations{}
 
 	if sa.Data.Entities == nil {
-		return DPValidations{}
+		return result
 	}
 
 	for i, e := range sa.Data.Entities.Tracked {
-		errors = append(errors, cardinalityCheck("tracked", i, e)...)
+		result.concat(cardinalityCheck("tracked", i, e))
 	}
 
 	for i, e := range sa.Data.Entities.Enriched {
-		errors = append(errors, cardinalityCheck("enriched", i, e)...)
+		result.concat(cardinalityCheck("enriched", i, e))
 	}
 
-	return DPValidations{errors, []string{}, []string{}, []string{}}
-}
-
-func ValidateSAEntitiesHaveNoRules(sa model.SourceApp) DPValidations {
-	errors := []string{}
-
-	if sa.Data.Entities == nil {
-		return DPValidations{}
-	}
-
-	for i, e := range sa.Data.Entities.Tracked {
-		if e.Schema != nil {
-			errors = append(
-				errors,
-				fmt.Sprintf("data.entities.tracked[%d].schema property rules unsupported for source applications", i),
-			)
-		}
-	}
-
-	for i, e := range sa.Data.Entities.Enriched {
-		if e.Schema != nil {
-			errors = append(
-				errors,
-				fmt.Sprintf("data.entities.enriched[%d].schema property rules unsupported for source applications", i),
-			)
-		}
-	}
-
-	return DPValidations{errors, []string{}, []string{}, []string{}}
+	return result
 }
 
 func validIgluUri(uri string) bool {
@@ -139,13 +74,14 @@ func validIgluUri(uri string) bool {
 	return uriRegex.MatchString(uri)
 }
 
-func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri string) []string {
+func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri string) (path string, errors []string) {
 	result := []string{}
+	errorPath := fmt.Sprintf("/data/entities/%s/%d/source", key, i)
 
 	if !validIgluUri(uri) {
-		return append(
+		return errorPath, append(
 			result,
-			fmt.Sprintf("data.entities.%s[%d].source invalid iglu uri should follow the format iglu:vendor/name/format/version, eg: iglu:io.snowplow/login/jsonschema/1-0-0", key, i),
+			"invalid iglu uri should follow the format iglu:vendor/name/format/version, eg: iglu:io.snowplow/login/jsonschema/1-0-0",
 		)
 	}
 
@@ -153,7 +89,7 @@ func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri
 	if err != nil {
 		result = append(
 			result,
-			fmt.Sprintf("data.entities.%s[%d].source error while resolving %s", key, i, err.Error()),
+			fmt.Sprintf("error while resolving %s", err.Error()),
 		)
 	}
 	if !found {
@@ -166,33 +102,39 @@ func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri
 			}
 			result = append(
 				result,
-				fmt.Sprintf("data.entities.%s[%d].source could not find deployment of %s, available versions (%s)", key, i, uri, available),
+				fmt.Sprintf("could not find deployment of %s, available versions (%s)", uri, available),
 			)
 		} else {
 			result = append(
 				result,
-				fmt.Sprintf("data.entities.%s[%d].source could not find deployment of %s", key, i, uri),
+				fmt.Sprintf("could not find deployment of %s", uri),
 			)
 		}
 	}
 
-	return result
+	return errorPath, result
 }
 
 func ValidateSAEntitiesSchemaDeployed(sdc console.SchemaDeployChecker, sa model.SourceApp) DPValidations {
-	errors := []string{}
+	errors := map[string][]string{}
 
 	if sa.Data.Entities == nil {
 		return DPValidations{}
 	}
 
 	for i, e := range sa.Data.Entities.Tracked {
-		errors = append(errors, checkSchemaDeployed(sdc, i, "tracked", e.Source)...)
+		path, err := checkSchemaDeployed(sdc, i, "tracked", e.Source)
+		if len(err) > 0 {
+			errors[path] = err
+		}
 	}
 
 	for i, e := range sa.Data.Entities.Enriched {
-		errors = append(errors, checkSchemaDeployed(sdc, i, "enriched", e.Source)...)
+		path, err := checkSchemaDeployed(sdc, i, "enriched", e.Source)
+		if len(err) > 0 {
+			errors[path] = err
+		}
 	}
 
-	return DPValidations{errors, []string{}, []string{}, []string{}}
+	return DPValidations{ErrorsWithPaths: errors}
 }

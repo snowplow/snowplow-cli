@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "resourceType", "resourceName", "data"],
+  "properties": {
+    "apiVersion": { "enum": ["v1"] },
+    "resourceType": { "enum": ["data-product"] },
+    "resourceName": { "type": "string", "format": "uuid" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "domain": { "type": "string" },
+        "description": { "type": "string" },
+        "sourceApplications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["$ref"],
+            "properties": {
+              "$ref": { "type": "string" }
+            }
+          }
+        },
+        "eventSpecifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["resourceName", "name"],
+            "properties": {
+              "resourceName": { "type": "string", "format": "uuid" },
+              "sourceApplications": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["$ref"],
+                  "properties": { "$ref": { "type": "string" } }
+                }
+              },
+              "name": { "type": "string", "minLength": 1 },
+              "triggers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": { "description": { "type": "string" } }
+                }
+              },
+              "event": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["source"],
+                "properties": {
+                  "source": { "$ref": "#/$defs/igluUri" },
+                  "comment": { "type": "string" },
+                  "schema": {
+                    "$ref": "#/$defs/schema"
+                  }
+                }
+              },
+              "entities": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "tracked": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["source"],
+                      "properties": {
+                        "source": { "$ref": "#/$defs/igluUri" },
+                        "comment": { "type": "string" },
+                        "minCardinality": { "type": "number" },
+                        "maxCardinality": { "type": "number" },
+                        "schema": {
+                          "$ref": "#/$defs/schema"
+                        }
+                      }
+                    }
+                  },
+                  "enriched": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["source"],
+                      "properties": {
+                        "source": { "$ref": "#/$defs/igluUri" },
+                        "comment": { "type": "string" },
+                        "minCardinality": { "type": "number" },
+                        "maxCardinality": { "type": "number" },
+                        "schema": {
+                          "$ref": "#/$defs/schema"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "igluUri": {
+      "type": "string",
+      "pattern": "^iglu:[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_]+/[a-zA-Z0-9-_]+/[0-9]+-[0-9]+-[0-9]+$"
+    },
+    "schema": {
+      "allOf": [
+        {
+          "$ref": "http://json-schema.org/draft-04/schema#"
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["properties", "type", "additionalProperties"],
+          "properties": {
+            "type": { "enum": ["object"] },
+            "additionalProperties": { "enum": [false] }
+          }
+        }
+      ]
+    }
+  }
+}

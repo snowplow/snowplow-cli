@@ -18,16 +18,19 @@ import (
 )
 
 func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) DPValidations {
+	pathErrors := map[string][]string{}
+	pathWarnings := map[string][]string{}
+
 	errors := []string{}
-	warnings := []string{}
 
 	for i, spec := range dp.Data.EventSpecifications {
 		var event *console.CompatCheckable
 		entities := []console.CompatCheckable{}
 		pathLookup := map[string]string{}
+		haveEntitySchemaToCheck := false
 
 		if len(spec.Event.Schema) > 0 {
-			pathLookup[spec.Event.Source] = fmt.Sprintf("data.eventSpecifications[%d].event.schema", i)
+			pathLookup[spec.Event.Source] = fmt.Sprintf("/data/eventSpecifications/%d/event/schema", i)
 			event = &console.CompatCheckable{
 				Source: spec.Event.Source,
 				Schema: spec.Event.Schema,
@@ -35,7 +38,8 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 		}
 		for j, ent := range spec.Entities.Tracked {
 			if len(ent.Schema) > 0 {
-				pathLookup[ent.Source] = fmt.Sprintf("data.eventSpecifications[%d].entities.tracked[%d].schema", i, j)
+				haveEntitySchemaToCheck = true
+				pathLookup[ent.Source] = fmt.Sprintf("/data/eventSpecifications/%d/entities/tracked/%d/schema", i, j)
 				entities = append(entities, console.CompatCheckable{
 					Source: ent.Source,
 					Schema: ent.Schema,
@@ -44,7 +48,8 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 		}
 		for j, ent := range spec.Entities.Enriched {
 			if len(ent.Schema) > 0 {
-				pathLookup[ent.Source] = fmt.Sprintf("data.eventSpecifications[%d].entities.enriched[%d].schema", i, j)
+				haveEntitySchemaToCheck = true
+				pathLookup[ent.Source] = fmt.Sprintf("/data/eventSpecifications/%d/entities/enriched/%d/schema", i, j)
 				entities = append(entities, console.CompatCheckable{
 					Source: ent.Source,
 					Schema: ent.Schema,
@@ -53,10 +58,13 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 		}
 
 		if event == nil {
-			warnings = append(
-				warnings,
-				fmt.Sprintf("data.eventSpecifications[%d] will not run compatibility check without an event defined", i),
-			)
+			if haveEntitySchemaToCheck {
+				path := fmt.Sprintf("/data/eventSpecifications/%d", i)
+				pathWarnings[path] = append(
+					pathWarnings[path],
+					"will not run compatibility checks on entities without an event defined",
+				)
+			}
 			continue
 		}
 
@@ -71,17 +79,31 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 
 		for _, s := range result.Sources {
 			if path, ok := pathLookup[s.Source]; ok {
+				if s.Status == console.CompatIncompatible {
+					pathErrors[path] = append(
+						pathErrors[path],
+						fmt.Sprintf("definition incompatible with source data structure (%s)", s.Source),
+					)
+				}
+				if s.Status == console.CompatUndecidable {
+					pathErrors[path] = append(
+						pathErrors[path],
+						fmt.Sprintf("definition has unknown compatibility with source data structure (%s)", s.Source),
+					)
+				}
 				for k, v := range s.Properties {
 					if v == console.CompatIncompatible {
-						errors = append(
-							errors,
-							fmt.Sprintf("%s.%s definition incompatible with .%s in source data structure (%s)", path, k, k, s.Source),
+						lp := fmt.Sprintf("%s/%s", path, k)
+						pathErrors[lp] = append(
+							pathErrors[lp],
+							fmt.Sprintf("definition incompatible with .%s in source data structure (%s)", k, s.Source),
 						)
 					}
 					if v == console.CompatUndecidable {
-						warnings = append(
-							warnings,
-							fmt.Sprintf("%s.%s definition has unknown compatibility with .%s in source data structure (%s)", path, k, k, s.Source),
+						lp := fmt.Sprintf("%s/%s", path, k)
+						pathWarnings[lp] = append(
+							pathWarnings[lp],
+							fmt.Sprintf("definition has unknown compatibility with .%s in source data structure (%s)", k, s.Source),
 						)
 					}
 				}
@@ -89,5 +111,5 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 		}
 	}
 
-	return DPValidations{errors, warnings, []string{}, []string{}}
+	return DPValidations{Errors: errors, ErrorsWithPaths: pathErrors, WarningsWithPaths: pathWarnings}
 }

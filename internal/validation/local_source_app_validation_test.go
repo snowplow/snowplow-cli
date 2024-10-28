@@ -14,99 +14,117 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
+
+
 func Test_ValidateSAMinimum(t *testing.T) {
-	sa := model.SourceApp{}
+	mvSa := `
+apiVersion: v1
+resourceType: source-application
+resourceName: 1111-111
+data:
+  name:
+`
 
-	result := ValidateSAMinimum(sa).Errors
+	var sa map[string]any
+	_ = yaml.Unmarshal([]byte(mvSa), &sa)
 
-	if len(result) != 2 {
-		t.Fatal("!= 2 errors?")
+	result, ok := ValidateSAShape(sa)
+
+	if ok {
+		t.Fatal("valid but shouldn't be")
 	}
 
-	expected := []string{
-		"resourceName must be a valid uuid",
-		"data.name required",
+	if _, ok := result.ErrorsWithPaths["/data/name"]; !ok {
+		t.Fatal("expected errors at /data/name")
 	}
 
-	if !slices.Equal(result, expected) {
-		t.Fatal("unexpected errors", result)
-	}
-
-	sa = model.SourceApp{
-		ResourceName: uuid.New().String(),
-		Data: model.SourceAppData{
-			Name: "name",
-		},
-	}
-
-	result = ValidateSAMinimum(sa).Errors
-
-	if len(result) != 0 {
-		t.Fatal("!= 0 errors?")
+	if _, ok := result.ErrorsWithPaths["/resourceName"]; !ok {
+		t.Fatal("expected errors at /resourceName")
 	}
 }
 
 func Test_ValidateSAAppIds(t *testing.T) {
-	sa := model.SourceApp{
-		Data: model.SourceAppData{
-			AppIds: []string{"one", "two"},
-		},
+	mvSa := `
+apiVersion: v1
+resourceType: source-application
+resourceName: 791a4198-e1ca-4fcf-9c1f-bc882830a34f
+data:
+  name: name
+  appIds:
+  -
+  - two
+`
+
+	var sa map[string]any
+	_ = yaml.Unmarshal([]byte(mvSa), &sa)
+
+	result, ok := ValidateSAShape(sa)
+
+	t.Log(result)
+
+	if ok {
+		t.Fatal("valid but shouldn't be")
 	}
 
-	result := ValidateSAAppIds(sa).Errors
-
-	if len(result) != 0 {
-		t.Error("should be valid, isnt")
-	}
-
-	sa.Data.AppIds = append(sa.Data.AppIds, "")
-
-	result = ValidateSAAppIds(sa).Errors
-
-	expected := []string{"data.appIds[2] can't be empty"}
-
-	if !slices.Equal(result, expected) {
-		t.Fatal("shouldn't let empty in", result)
+	if _, ok := result.ErrorsWithPaths["/data/appIds/0"]; !ok {
+		t.Fatal("expected errors at /data/name")
 	}
 }
 
-func Test_ValidateSAEntitesSources(t *testing.T) {
-	sa := model.SourceApp{
-		Data: model.SourceAppData{
-			Entities: &model.EntitiesDef{
-				Tracked: []model.SchemaRef{
-					{Source: "something"},
-				},
-			},
-		},
+
+func Test_ValidateSAEntitesSourcesOk(t *testing.T) {
+	mvSa := `
+apiVersion: v1
+resourceType: source-application
+resourceName: 791a4198-e1ca-4fcf-9c1f-bc882830a34f
+data:
+  name: name
+  entities:
+    tracked:
+    - source: iglu:vendor/name/format/1-0-0
+`
+
+	var sa map[string]any
+	_ = yaml.Unmarshal([]byte(mvSa), &sa)
+
+	result, ok := ValidateSAShape(sa)
+
+	t.Log(result)
+
+	if !ok {
+		t.Fatal("should be valid")
+	}
+}
+
+func Test_ValidateSAEntitesSourcesBad(t *testing.T) {
+	mvSa := `
+apiVersion: v1
+resourceType: source-application
+resourceName: 791a4198-e1ca-4fcf-9c1f-bc882830a34f
+data:
+  name: name
+  entities:
+    tracked:
+    - source:
+`
+
+	var sa map[string]any
+	_ = yaml.Unmarshal([]byte(mvSa), &sa)
+
+	result, ok := ValidateSAShape(sa)
+
+	t.Log(result)
+
+	if ok {
+		t.Fatal("should be invalid")
 	}
 
-	result := ValidateSAEntitiesSources(sa).Errors
-
-	if len(result) > 0 {
-		t.Fatal("errors when there shouldn't be", result)
-	}
-
-	sa.Data.Entities.Tracked = append(sa.Data.Entities.Tracked, model.SchemaRef{Source: ""})
-
-	result = ValidateSAEntitiesSources(sa).Errors
-
-	expected := []string{"data.entities.tracked[1].source required"}
-
-	if !slices.Equal(result, expected) {
-		t.Fatal("source wasn't required?")
-	}
-
-	sa.Data.Entities = nil
-
-	result = ValidateSAEntitiesSources(sa).Errors
-
-	if len(result) > 0 {
-		t.Fatal("errors when there shouldn't be", result)
+	if _, ok := result.ErrorsWithPaths["/data/entities/tracked/0/source"]; !ok {
+		t.Fatal("expected errors at /data/entities/tracked/0/source")
 	}
 }
 
@@ -129,47 +147,25 @@ func Test_ValidateSAEntitesCardinalities(t *testing.T) {
 		},
 	}
 
-	result := ValidateSAEntitiesCardinalities(sa).Errors
+	result := ValidateSAEntitiesCardinalities(sa).ErrorsWithPaths
 
-	expected := []string{
-		"data.entities.tracked[0].minCardinality must be > 0",
-		"data.entities.tracked[1].maxCardinality must be > minCardinality: 0",
-		"data.entities.tracked[2].maxCardinality must be > minCardinality: 1",
-		"data.entities.tracked[3].maxCardinality without minCardinality",
+	expected := map[string][]string{
+		"/data/entities/tracked/0/minCardinality": {"must be > 0"},
+		"/data/entities/tracked/1/maxCardinality": {"must be > minCardinality: 0"},
+		"/data/entities/tracked/2/maxCardinality": {"must be > minCardinality: 1"},
+		"/data/entities/tracked/3/maxCardinality": {"without minCardinality"},
 	}
 
-	if !slices.Equal(result, expected) {
-		t.Fatal("unexpected errors", result)
-	}
-}
-
-func Test_ValidateSAEntitesHaveNoRules(t *testing.T) {
-	sa := model.SourceApp{
-		Data: model.SourceAppData{
-			Entities: &model.EntitiesDef{
-				Tracked: []model.SchemaRef{
-					{Source: "something0"},
-					{Source: "something1", Schema: map[string]any{"$schema": "anything"}},
-				},
-				Enriched: []model.SchemaRef{
-					{Source: "something1", Schema: map[string]any{"$schema": "anything"}},
-				},
-			},
-		},
-	}
-
-	result := ValidateSAEntitiesHaveNoRules(sa).Errors
-
-	expected := []string{
-		"data.entities.tracked[1].schema property rules unsupported for source applications",
-		"data.entities.enriched[0].schema property rules unsupported for source applications",
-	}
-
-	if !slices.Equal(result, expected) {
-		t.Fatal("unexpected errors", result)
+	for k, v := range expected {
+		if errs, ok := result[k]; ok {
+			if !slices.Equal(errs, v) {
+				t.Fatalf("unexpected got: %#v want %#v", errs, v)
+			}
+		} else {
+			t.Fatalf("missing err at path %s", k)
+		}
 	}
 }
-
 
 type mockSdc struct {
 	deployed []string
@@ -197,14 +193,16 @@ func Test_ValidateSAEntitiesSchemaDeployed(t *testing.T) {
 
 	sdc := &mockSdc{[]string{"iglu:vendor/name/format/1-0-0"}}
 
-	result := ValidateSAEntitiesSchemaDeployed(sdc, sa).Errors
+	result := ValidateSAEntitiesSchemaDeployed(sdc, sa).ErrorsWithPaths
 
-	expected := []string{
-		"data.entities.tracked[0].source could not find deployment of iglu:vendor/name/format/2-0-0",
-		"data.entities.tracked[1].source invalid iglu uri should follow the format iglu:vendor/name/format/version, eg: iglu:io.snowplow/login/jsonschema/1-0-0",
-	}
+	expectedOne := "/data/entities/tracked/0/source"
+	expectedTwo := "/data/entities/tracked/1/source"
 
-	if !slices.Equal(result, expected) {
-		t.Fatal("unexpected errors", result)
+	t.Log(result)
+
+	for _, p := range []string{ expectedOne, expectedTwo } {
+		if _, ok := result[p]; !ok {
+			t.Fatalf("expected errors at %s", p)
+		}
 	}
 }
