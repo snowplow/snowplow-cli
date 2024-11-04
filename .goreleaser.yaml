@@ -44,3 +44,12 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+brews:
+  - name: snowplow-cli
+    description: Work with Snowplow from the command line
+    homepage: https://github.com/snowplow-product/snowplow-cli
+
+    repository:
+      owner: snowplow-product
+      name: homebrew-taps
+      token: "{{ .Env.HOMEBREW_TAPS_GITHUB_TOKEN }}"
