@@ -28,3 +28,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAPS_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAPS_GITHUB_TOKEN }}
