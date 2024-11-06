@@ -62,13 +62,12 @@ func Test_ValidateDPEventSpecCompatMissingEvent(t *testing.T) {
 	dp := newValidDPForCompatTesting()
 	dp.Data.EventSpecifications[0].Event = model.SchemaRef{}
 
-	result := ValidateDPEventSpecCompat(nil, dp).Warnings
+	result := ValidateDPEventSpecCompat(nil, dp).WarningsWithPaths
 
-	expected := []string{
-		"data.eventSpecifications[0] will not run compatibility check without an event defined",
-	}
+	expectPath := "/data/eventSpecifications/0"
+	expectValue := []string{"will not run compatibility check without an event defined"}
 
-	if !slices.Equal(result, expected) {
+	if resultValue, ok := result[expectPath]; !ok || slices.Equal(expectValue, resultValue) {
 		t.Fatal("unexpected")
 	}
 }
@@ -101,20 +100,21 @@ func Test_ValidateDPEventSpecCompatFail(t *testing.T) {
 
 	result := ValidateDPEventSpecCompat(cc, dp)
 
-	expectedErrors := []string{
-		"data.eventSpecifications[0].event.schema.key definition incompatible with .key in source data structure (iglu:vendor/event/format/version)",
-		"data.eventSpecifications[0].entities.tracked[0].schema.key definition incompatible with .key in source data structure (iglu:vendor/entity/format/version)",
+	expectedErrorPaths := []string{
+		"/data/eventSpecifications/0/event/schema/key",
+		"/data/eventSpecifications/0/entities/tracked/0/schema/key",
 	}
 
-	if !slices.Equal(result.Errors, expectedErrors) {
-		t.Fatalf("unexpected %v != %v", result, expectedErrors)
+	for _, path := range expectedErrorPaths {
+		if _, ok := result.ErrorsWithPaths[path]; !ok {
+			t.Fatalf("missing error at: %s", path)
+		}
 	}
 
-	expectedWarnings := []string{
-		"data.eventSpecifications[0].entities.tracked[0].schema.otherKey definition has unknown compatibility with .otherKey in source data structure (iglu:vendor/entity/format/version)",
-	}
+	expectedWarningsPath := "/data/eventSpecifications/0/entities/tracked/0/schema/otherKey"
 
-	if !slices.Equal(result.Warnings, expectedWarnings) {
-		t.Fatalf("unexpected %v != %v", result, expectedWarnings)
+	if _, ok := result.WarningsWithPaths[expectedWarningsPath]; !ok {
+		t.Log(result.WarningsWithPaths)
+		t.Fatalf("missing warning at: %s", expectedWarningsPath)
 	}
 }

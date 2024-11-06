@@ -35,6 +35,9 @@ type DPValidations struct {
 	Warnings []string
 	Info     []string
 	Debug    []string
+
+	ErrorsWithPaths map[string][]string
+	WarningsWithPaths map[string][]string
 }
 
 func (v *DPValidations) concat(r DPValidations) {
@@ -42,6 +45,22 @@ func (v *DPValidations) concat(r DPValidations) {
 	v.Warnings = append(v.Warnings, r.Warnings...)
 	v.Info = append(v.Info, r.Info...)
 	v.Debug = append(v.Debug, r.Debug...)
+
+	if v.ErrorsWithPaths == nil {
+		v.ErrorsWithPaths = make(map[string][]string)
+	}
+
+	if v.WarningsWithPaths == nil {
+		v.WarningsWithPaths = make(map[string][]string)
+	}
+
+	for k, rv := range r.ErrorsWithPaths {
+		v.ErrorsWithPaths[k] = append(v.ErrorsWithPaths[k], rv...)
+	}
+
+	for k, rv := range r.WarningsWithPaths {
+		v.WarningsWithPaths[k] = append(v.WarningsWithPaths[k], rv...)
+	}
 }
 
 func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any) (*DPLookup, error) {
@@ -67,7 +86,11 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				} else {
 					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode data product %s", err))
 				}
-				v.concat(ValidateDPEventSpecCompat(cc, dp))
+				shapeValidations, ok := ValidateDPShape(maybeDp)
+				v.concat(shapeValidations)
+				if ok {
+					v.concat(ValidateDPEventSpecCompat(cc, dp))
+				} 
 			case "source-application":
 				var sa model.SourceApp
 				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
@@ -75,12 +98,12 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				} else {
 					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %s", err))
 				}
-				v.concat(ValidateSAMinimum(sa))
-				v.concat(ValidateSAAppIds(sa))
+				shapeValidations, ok := ValidateSAShape(maybeDp)
+				v.concat(shapeValidations)
 				v.concat(ValidateSAEntitiesCardinalities(sa))
-				v.concat(ValidateSAEntitiesSources(sa))
-				v.concat(ValidateSAEntitiesHaveNoRules(sa))
-				v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
+				if ok {
+					v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
+				}
 			default:
 				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
 			}
@@ -195,8 +218,14 @@ func (lookup *DPLookup) SlogValidations(basePath string) error {
 		for _, m := range v.Warnings {
 			slog.Warn("validating", "file", rp, "msg", m)
 		}
+		for k, se := range v.WarningsWithPaths {
+			slog.Warn("validating", "file", rp, "path", k, "warnings", strings.Join(se, "\n") + "\n")
+		}
 		for _, m := range v.Errors {
 			slog.Error("validating", "file", rp, "msg", m)
+		}
+		for k, se := range v.ErrorsWithPaths {
+			slog.Error("validating", "file", rp, "path", k, "errors", strings.Join(se, "\n") + "\n")
 		}
 	}
 
@@ -216,8 +245,14 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 		if len(v.Warnings) > 0 {
 			fmt.Printf("::warn file=%s::%s\n", rp, strings.Join(v.Warnings, "%0A"))
 		}
+		for k, se := range v.WarningsWithPaths {
+			fmt.Printf("::warn file=%s::%s%%0A%s\n", rp, k, strings.Join(se, "%0A"))
+		}
 		if len(v.Errors) > 0 {
 			fmt.Printf("::error file=%s::%s\n", rp, strings.Join(v.Errors, "%0A"))
+		}
+		for k, se := range v.ErrorsWithPaths {
+			fmt.Printf("::error file=%s::%s%%0A%s\n", rp, k, strings.Join(se, "%0A"))
 		}
 	}
 
@@ -227,7 +262,7 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 func (lookup *DPLookup) ValidationErrorCount() int {
 	count := 0
 	for _, v := range lookup.Validations {
-		count += len(v.Errors)
+		count += len(v.Errors) + len(v.ErrorsWithPaths)
 	}
 	return count
 }
