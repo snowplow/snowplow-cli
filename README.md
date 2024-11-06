@@ -6,17 +6,24 @@
 
 Snowplow CLI is available for [Snowplow BDP](https://docs.snowplow.io/docs/feature-comparison/) clients
 
-<!-- ## Documentation -->
-<!-- TODO: Add docs link-->
+## Documentation 
+Documentation for snowplow-cli is available over [here](https://docs.snowplow.io/docs/understanding-tracking-design/managing-your-data-structures/cli/)
 
 ## Installation
-Binaries for most popular platforms and architectures are available in the [releases](https://github.com/snowplow-product/snowplow-cli/releases)
+snowplow-cli can be installed with [homebrew](https://brew.sh/)
+```
+brew install snowplow-product/taps/snowplow-cli
+snowplow-cli --help
+```
 
-Example installation for `darwin_amd64`.
+For systems where homebrew is not available binaries for multiple platforms can be found in [releases](https://github.com/snowplow-product/snowplow-cli/releases)
+
+Example installation for `linux_x86_64` using `curl`
 
 ```bash
-curl -L -o snowplow-cli https://github.com/snowplow-product/snowplow-cli/releases/latest/download/snowplow-cli_darwin_amd64
+curl -L -o snowplow-cli https://github.com/snowplow-product/snowplow-cli/releases/latest/download/snowplow-cli_linux_x86_64
 chmod u+x snowplow-cli
+./snowplow-cli --help
 ```
 
 ## Configuration
