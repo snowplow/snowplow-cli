@@ -41,8 +41,8 @@ var validateCmd = &cobra.Command{
 		searchPaths := []string{}
 
 		if len(args) == 0 {
-			searchPaths = append(searchPaths, "data-products")
-			slog.Debug("validation", "msg", "no path provided, using default (./data-products)")
+			searchPaths = append(searchPaths, util.DataProductsFolder)
+			slog.Debug("validation", "msg", fmt.Sprintf("no path provided, using default (./%s)", util.DataProductsFolder))
 		}
 
 		searchPaths = append(searchPaths, args...)
@@ -75,7 +75,7 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		compatChecker := func (event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+		compatChecker := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
 			return console.CompatCheck(cnx, c, event, entities)
 		}
 

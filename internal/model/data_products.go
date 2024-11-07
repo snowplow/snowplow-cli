@@ -13,35 +13,42 @@ package model
 type EventSpec struct {
 	ResourceName       string
 	SourceApplications []map[string]string
+	Name               string
 	Event              SchemaRef
 	Entities           EntitiesDef
 }
 
 type DataProductData struct {
+	ResourceName        string
 	Name                string
 	SourceApplications  []map[string]string
+	Domain              string
+	Owner               string
+	Description         string
 	EventSpecifications []EventSpec
 }
 
 type DataProduct struct {
+	ApiVersion   string
 	ResourceType string
 	ResourceName string
-	ApiVersion   string
 	Data         DataProductData
 }
 
 type SourceApp struct {
-	ResourceType string
 	ApiVersion   string
+	ResourceType string
 	ResourceName string
 	Data         SourceAppData
 }
 
 type SourceAppData struct {
-	Name        string
-	Description string
-	AppIds      []string
-	Entities    *EntitiesDef
+	ResourceName string `yaml:"-" json:"-"`
+	Name         string
+	Description  string
+	Owner        string
+	AppIds       []string `yaml:"appIds" json:"appIds"`
+	Entities     *EntitiesDef
 }
 
 type EntitiesDef struct {
@@ -50,8 +57,30 @@ type EntitiesDef struct {
 }
 
 type SchemaRef struct {
-	Source         string
-	MinCardinality *int
-	MaxCardinality *int
-	Schema         map[string]any
+	Source         string         `yaml:"source,omitempty" json:"source,omitempty"`
+	MinCardinality *int           `yaml:"minCardinality,omitempty" json:"minCardinality,omitempty"`
+	MaxCardinality *int           `yaml:"maxCardinality,omitempty" json:"maxCardinality,omitempty"`
+	Schema         map[string]any `yaml:"schema,omitempty" json:"schema,omitempty"`
+}
+
+type DataProductCanonicalData struct {
+	ResourceName        string `yaml:"-" json:"-"`
+	Name                string
+	SourceApplications  []Ref `yaml:"sourceApplications" json:"sourceApplications"`
+	Domain              string
+	Owner               string
+	Description         string
+	EventSpecifications []EventSpecCanonical `yaml:"eventSpecifications" json:"eventSpecifications"`
+}
+
+type EventSpecCanonical struct {
+	ResourceName       string `yaml:"resourceName" json:"resourceName"`
+	SourceApplications []Ref  `yaml:"sourceApplications" json:"sourceApplications"`
+	Name               string
+	Event              SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
+	Entities           EntitiesDef
+}
+
+type Ref struct {
+	Ref string `yaml:"$ref" json:"$ref"`
 }

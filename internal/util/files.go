@@ -23,6 +23,8 @@ import (
 
 type Files struct {
 	DataStructuresLocation string
+	DataProductsLocation   string
+	SourceAppsLocation     string
 	ExtentionPreference    string
 }
 
@@ -38,7 +40,7 @@ func (f Files) CreateDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
-		err = WriteSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		_, err = WriteSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
 		if err != nil {
 			return err
 		}
@@ -47,29 +49,69 @@ func (f Files) CreateDataStructures(dss []DataStructure) error {
 	return nil
 }
 
-func WriteSerializableToFile(body any, dir string, name string, ext string) error {
+func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]CliResource[SourceAppData], error) {
+	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
+	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var res = make(map[string]CliResource[SourceAppData])
+
+	for _, sa := range sas {
+		abs, err := WriteSerializableToFile(sa, sourceAppsPath, sa.Data.Name, f.ExtentionPreference)
+		if err != nil {
+			return nil, err
+		}
+		res[abs] = sa
+	}
+	return res, nil
+}
+
+func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (map[string]CliResource[DataProductCanonicalData], error) {
+	dataProductsPath := filepath.Join(".", f.DataProductsLocation)
+	err := os.MkdirAll(dataProductsPath, os.ModePerm)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var res = make(map[string]CliResource[DataProductCanonicalData])
+
+	for _, dp := range dps {
+		abs, err := WriteSerializableToFile(dp, dataProductsPath, dp.Data.Name, f.ExtentionPreference)
+		if err != nil {
+			return nil, err
+		}
+		res[abs] = dp
+	}
+	return res, nil
+}
+
+func WriteSerializableToFile(body any, dir string, name string, ext string) (string, error) {
 	var bytes []byte
 	var err error
 
 	if ext == "yaml" {
 		bytes, err = yaml.Marshal(body)
 		if err != nil {
-			return err
+			return "", err
 		}
 	} else {
 		bytes, err = json.MarshalIndent(body, "", "  ")
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	filePath := filepath.Join(dir, fmt.Sprintf("%s.%s", name, ext))
 	err = os.WriteFile(filePath, bytes, 0644)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	slog.Debug("wrote", "file", filePath)
 
-	return err
+	return filePath, err
 }

@@ -17,7 +17,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
+	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
@@ -28,65 +30,156 @@ type DataProductsAndRelatedResources struct {
 }
 
 type RemoteDataProduct struct {
-	ResourceName        string               `yaml:"resourceName" json:"id" validate:"required"`
-	Name                string               `yaml:"name" json:"name" validate:"required"`
-	SourceApplications  []string             `yaml:"sourceApplications" json:"sourceApplications"`
-	Domain              string               `yaml:"domain" json:"domain"`
-	Owner               string               `yaml:"owner" json:"owner"`
-	Description         string               `yaml:"description" json:"description"`
-	EventSpecifications []eventSpecReference `yaml:"eventSpecifications" json:"trackingScenarios"`
+	Id                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	SourceApplicationIds []string             `json:"sourceApplications"`
+	Domain               string               `json:"domain"`
+	Owner                string               `json:"owner"`
+	Description          string               `json:"description"`
+	EventSpecifications  []eventSpecReference `json:"trackingScenarios"`
+}
+
+func (remoteDp RemoteDataProduct) ToCanonical(sourceAppIdToPath map[string]string, eventSpecIdToRes map[string]RemoteEventSpec, dpFolder string) model.DataProductCanonicalData {
+	var sourceApps []model.Ref
+	for _, saId := range remoteDp.SourceApplicationIds {
+		ref := sourceAppIdToPath[saId]
+		sourceApps = append(sourceApps, model.Ref{Ref: fmt.Sprintf(".%s", strings.TrimPrefix(ref, dpFolder))})
+	}
+
+	var eventSpecs []model.EventSpecCanonical
+	for _, esId := range remoteDp.EventSpecifications {
+		fmt.Printf("%+v",esId)
+		es := eventSpecIdToRes[esId.Id]
+		fmt.Printf("%+v",es)
+		eventSpecs = append(eventSpecs, es.ToCanonical(sourceAppIdToPath, dpFolder))
+
+	}
+	return model.DataProductCanonicalData{
+		ResourceName:        remoteDp.Id,
+		Name:                remoteDp.Name,
+		SourceApplications:  sourceApps,
+		Domain:              remoteDp.Domain,
+		Owner:               remoteDp.Owner,
+		Description:         remoteDp.Description,
+		EventSpecifications: eventSpecs,
+	}
 }
 
 type eventSpecReference struct {
-	Id string `yaml:"id" json:"id" validate:"required"`
+	Id string `json:"id"`
 }
 
 type RemoteEventSpec struct {
-	ResourceName       string    `yaml:"resourceName" json:"id"`
-	SourceApplications []string  `yaml:"sourceApplications" json:"sourceApplications"`
-	Name               string    `yaml:"name" json:"name"`
-	Triggers           []trigger `yaml:"triggers" json:"triggers"`
-	Event              event     `yaml:"event" json:"event"`
-	Entities           entities  `yaml:"entities" json:"entities"`
+	Id                   string    `json:"id"`
+	SourceApplicationIds []string  `json:"sourceApplications"`
+	Name                 string    `json:"name"`
+	Triggers             []trigger `json:"triggers"`
+	Event                event     `json:"event"`
+	Entities             entities  `json:"entities"`
+}
+
+func (remoteEs RemoteEventSpec) ToCanonical(sourceAppIdToPath map[string]string, dpFolder string) model.EventSpecCanonical {
+	var sourceApps []model.Ref
+	for _, saId := range remoteEs.SourceApplicationIds {
+		ref := sourceAppIdToPath[saId]
+		//TODO: change the relative path only once
+		sourceApps = append(sourceApps, model.Ref{Ref: fmt.Sprintf(".%s", strings.TrimPrefix(ref, dpFolder))})
+	}
+
+	event := model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}
+	var trackedEntities []model.SchemaRef
+	for _, te := range remoteEs.Entities.Tracked {
+		trackedEntities = append(trackedEntities, model.SchemaRef{Source: te.Source, MinCardinality: te.MinCardinality, MaxCardinality: te.MaxCardinality, Schema: te.Schema})
+	}
+	var enrichedEntities []model.SchemaRef
+	for _, ee := range remoteEs.Entities.Enriched {
+		enrichedEntities = append(enrichedEntities, model.SchemaRef{Source: ee.Source, MinCardinality: ee.MinCardinality, MaxCardinality: ee.MaxCardinality, Schema: ee.Schema})
+	}
+
+	entities := model.EntitiesDef{Tracked: trackedEntities, Enriched: enrichedEntities}
+	return model.EventSpecCanonical{
+		ResourceName:       remoteEs.Id,
+		SourceApplications: sourceApps,
+		Name:               remoteEs.Name,
+		Event:              event,
+		Entities:           entities,
+	}
 }
 
 type event struct {
-	Source string         `yaml:"source" json:"source"`
-	Schema map[string]any `yaml:"schema" json:"schema"`
+	Source string         `json:"source"`
+	Schema map[string]any `json:"schema"`
 }
 
 type trigger struct {
-	Description string `yaml:"description" json:"description"`
+	Description string `json:"description"`
 }
 
 type dataProductsResponse struct {
-	Data     []RemoteDataProduct `yaml:"data" json:"data"`
-	Includes includes            `yaml:"includes" json:"includes"`
+	Data     []RemoteDataProduct `json:"data"`
+	Includes includes            `json:"includes"`
 }
 
 type includes struct {
-	TrackingScenarios  []RemoteEventSpec         `yaml:"trackingScenarios" json:"trackingScenarios"`
-	SourceApplications []RemoteSourceApplication `yaml:"sourceApplications" json:"sourceApplications"`
+	TrackingScenarios  []RemoteEventSpec         `json:"trackingScenarios"`
+	SourceApplications []RemoteSourceApplication `json:"sourceApplications"`
 }
 
 type RemoteSourceApplication struct {
-	ResourceName string   `yaml:"id" json:"id" validate:"required"`
-	Name         string   `yaml:"name" json:"name" validate:"required"`
-	Description  string   `yaml:"description" json:"description"`
-	Owner        string   `yaml:"owner" json:"owner"`
-	AppIds       []string `yaml:"appIds" json:"appIds"`
-	Entities     entities `yaml:"entities" json:"entities"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Owner       string   `json:"owner"`
+	AppIds      []string `json:"appIds"`
+	Entities    entities `json:"entities"`
+}
+
+func (remoteSa RemoteSourceApplication) ToCanonical() model.SourceAppData {
+	var trackedEntites []model.SchemaRef
+	for _, te := range remoteSa.Entities.Tracked {
+		trackedEntites = append(trackedEntites,
+			model.SchemaRef{
+				Source:         te.Source,
+				MinCardinality: te.MinCardinality,
+				MaxCardinality: te.MaxCardinality,
+				Schema:         te.Schema,
+			},
+		)
+	}
+
+	var enrichedEntities []model.SchemaRef
+	for _, ee := range remoteSa.Entities.Enriched {
+		enrichedEntities = append(enrichedEntities,
+			model.SchemaRef{
+				Source:         ee.Source,
+				MinCardinality: ee.MinCardinality,
+				MaxCardinality: ee.MaxCardinality,
+				Schema:         ee.Schema,
+			},
+		)
+	}
+
+	entities := model.EntitiesDef{Tracked: trackedEntites, Enriched: enrichedEntities}
+
+	return model.SourceAppData{
+		ResourceName: remoteSa.Id,
+		Name:         remoteSa.Name,
+		Description:  remoteSa.Description,
+		Owner:        remoteSa.Owner,
+		AppIds:       remoteSa.AppIds,
+		Entities:     &entities,
+	}
 }
 
 type entities struct {
-	Tracked  []entity `yaml:"tracked" json:"tracked"`
-	Enriched []entity `yaml:"enriched" json:"enriched"`
+	Tracked  []entity `json:"tracked"`
+	Enriched []entity `json:"enriched"`
 }
 
 type entity struct {
-	Source         string `yaml:"source" json:"source" validate:"required"`
-	MinCardinality int    `yaml:"minCardinality" json:"minCardinality"`
-	MaxCardinality int    `yaml:"maxCardinality" json:"maxCardinality"`
+	Source         string `json:"source"`
+	MinCardinality *int   `json:"minCardinality"`
+	MaxCardinality *int   `json:"maxCardinality"`
 	Schema         map[string]any
 }
 
@@ -102,8 +195,8 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 
-	var sourceApps dataProductsResponse
-	err = json.Unmarshal(rbody, &sourceApps)
+	var dpResponse dataProductsResponse
+	err = json.Unmarshal(rbody, &dpResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +206,9 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 	}
 
 	res := DataProductsAndRelatedResources{
-		sourceApps.Data,
-		sourceApps.Includes.TrackingScenarios,
-		sourceApps.Includes.SourceApplications,
+		dpResponse.Data,
+		dpResponse.Includes.TrackingScenarios,
+		dpResponse.Includes.SourceApplications,
 	}
 	return &res, nil
 }

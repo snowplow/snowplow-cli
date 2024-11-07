@@ -15,6 +15,7 @@
         "name": { "type": "string" },
         "domain": { "type": "string" },
         "description": { "type": "string" },
+        "owner": { "type": "string", "format": "email"},
         "sourceApplications": {
           "type": "array",
           "items": {
