@@ -18,7 +18,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
@@ -35,34 +34,10 @@ type RemoteDataProduct struct {
 	Domain               string               `json:"domain"`
 	Owner                string               `json:"owner"`
 	Description          string               `json:"description"`
-	EventSpecifications  []eventSpecReference `json:"trackingScenarios"`
+	EventSpecifications  []EventSpecReference `json:"trackingScenarios"`
 }
 
-func (remoteDp RemoteDataProduct) ToCanonical(saIdToRef map[string]model.Ref, eventSpecIdToRes map[string]RemoteEventSpec) model.DataProductCanonicalData {
-	var sourceApps []model.Ref
-	for _, saId := range remoteDp.SourceApplicationIds {
-		ref := saIdToRef[saId]
-		sourceApps = append(sourceApps, ref)
-	}
-
-	var eventSpecs []model.EventSpecCanonical
-	for _, esId := range remoteDp.EventSpecifications {
-		es := eventSpecIdToRes[esId.Id]
-		eventSpecs = append(eventSpecs, es.ToCanonical(saIdToRef))
-
-	}
-	return model.DataProductCanonicalData{
-		ResourceName:        remoteDp.Id,
-		Name:                remoteDp.Name,
-		SourceApplications:  sourceApps,
-		Domain:              remoteDp.Domain,
-		Owner:               remoteDp.Owner,
-		Description:         remoteDp.Description,
-		EventSpecifications: eventSpecs,
-	}
-}
-
-type eventSpecReference struct {
+type EventSpecReference struct {
 	Id string `json:"id"`
 }
 
@@ -70,44 +45,17 @@ type RemoteEventSpec struct {
 	Id                   string    `json:"id"`
 	SourceApplicationIds []string  `json:"sourceApplications"`
 	Name                 string    `json:"name"`
-	Triggers             []trigger `json:"triggers"`
-	Event                event     `json:"event"`
-	Entities             entities  `json:"entities"`
+	Triggers             []Trigger `json:"triggers"`
+	Event                Event     `json:"event"`
+	Entities             Entities  `json:"entities"`
 }
 
-func (remoteEs RemoteEventSpec) ToCanonical(saIdToRef map[string]model.Ref) model.EventSpecCanonical {
-	var sourceApps []model.Ref
-	for _, saId := range remoteEs.SourceApplicationIds {
-		ref := saIdToRef[saId]
-		sourceApps = append(sourceApps, ref)
-	}
-
-	event := model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}
-	var trackedEntities []model.SchemaRef
-	for _, te := range remoteEs.Entities.Tracked {
-		trackedEntities = append(trackedEntities, model.SchemaRef{Source: te.Source, MinCardinality: te.MinCardinality, MaxCardinality: te.MaxCardinality, Schema: te.Schema})
-	}
-	var enrichedEntities []model.SchemaRef
-	for _, ee := range remoteEs.Entities.Enriched {
-		enrichedEntities = append(enrichedEntities, model.SchemaRef{Source: ee.Source, MinCardinality: ee.MinCardinality, MaxCardinality: ee.MaxCardinality, Schema: ee.Schema})
-	}
-
-	entities := model.EntitiesDef{Tracked: trackedEntities, Enriched: enrichedEntities}
-	return model.EventSpecCanonical{
-		ResourceName:       remoteEs.Id,
-		SourceApplications: sourceApps,
-		Name:               remoteEs.Name,
-		Event:              event,
-		Entities:           entities,
-	}
-}
-
-type event struct {
+type Event struct {
 	Source string         `json:"source"`
 	Schema map[string]any `json:"schema"`
 }
 
-type trigger struct {
+type Trigger struct {
 	Description string `json:"description"`
 }
 
@@ -127,52 +75,15 @@ type RemoteSourceApplication struct {
 	Description string   `json:"description"`
 	Owner       string   `json:"owner"`
 	AppIds      []string `json:"appIds"`
-	Entities    entities `json:"entities"`
+	Entities    Entities `json:"entities"`
 }
 
-func (remoteSa RemoteSourceApplication) ToCanonical() model.SourceAppData {
-	var trackedEntites []model.SchemaRef
-	for _, te := range remoteSa.Entities.Tracked {
-		trackedEntites = append(trackedEntites,
-			model.SchemaRef{
-				Source:         te.Source,
-				MinCardinality: te.MinCardinality,
-				MaxCardinality: te.MaxCardinality,
-				Schema:         te.Schema,
-			},
-		)
-	}
-
-	var enrichedEntities []model.SchemaRef
-	for _, ee := range remoteSa.Entities.Enriched {
-		enrichedEntities = append(enrichedEntities,
-			model.SchemaRef{
-				Source:         ee.Source,
-				MinCardinality: ee.MinCardinality,
-				MaxCardinality: ee.MaxCardinality,
-				Schema:         ee.Schema,
-			},
-		)
-	}
-
-	entities := model.EntitiesDef{Tracked: trackedEntites, Enriched: enrichedEntities}
-
-	return model.SourceAppData{
-		ResourceName: remoteSa.Id,
-		Name:         remoteSa.Name,
-		Description:  remoteSa.Description,
-		Owner:        remoteSa.Owner,
-		AppIds:       remoteSa.AppIds,
-		Entities:     &entities,
-	}
+type Entities struct {
+	Tracked  []Entity `json:"tracked"`
+	Enriched []Entity `json:"enriched"`
 }
 
-type entities struct {
-	Tracked  []entity `json:"tracked"`
-	Enriched []entity `json:"enriched"`
-}
-
-type entity struct {
+type Entity struct {
 	Source         string `json:"source"`
 	MinCardinality *int   `json:"minCardinality"`
 	MaxCardinality *int   `json:"maxCardinality"`

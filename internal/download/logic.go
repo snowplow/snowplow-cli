@@ -22,7 +22,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 		return err
 	}
 
-	sas := RemoteSasToLocalResources(res.SourceApplication)
+	sas := remoteSasToLocalResources(res.SourceApplication)
 
 	fileNameToSa, err := files.CreateSourceApps(sas)
 	if err != nil {
@@ -31,11 +31,11 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	slog.Info("wrote source applications", "count", len(sas))
 
-	saIdToRef := LocalSasToRefs(fileNameToSa, files.DataProductsLocation)
+	saIdToRef := localSasToRefs(fileNameToSa, files.DataProductsLocation)
 
-	esIdToRes := GroupRemoteEsById(res.TrackingScenarios)
+	esIdToRes := groupRemoteEsById(res.TrackingScenarios)
 
-	dps := RemoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes)
+	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes)
 
 	_, err = files.CreateDataProducts(dps)
 	if err != nil {

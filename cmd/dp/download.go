@@ -22,7 +22,7 @@ import (
 
 var downloadCommand = &cobra.Command{
 	Use:   "download {directory ./data-structures}",
-	Short: "Donwload all data products, event specs and source apps from BDP Console",
+	Short: "Download all data products, event specs and source apps from BDP Console",
 	Args:  cobra.MaximumNArgs(1),
 	Long: `Downloads the latest versions of all data products, event specs and source apps from BDP Console.
 
