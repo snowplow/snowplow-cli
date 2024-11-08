@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
@@ -39,19 +38,17 @@ type RemoteDataProduct struct {
 	EventSpecifications  []eventSpecReference `json:"trackingScenarios"`
 }
 
-func (remoteDp RemoteDataProduct) ToCanonical(sourceAppIdToPath map[string]string, eventSpecIdToRes map[string]RemoteEventSpec, dpFolder string) model.DataProductCanonicalData {
+func (remoteDp RemoteDataProduct) ToCanonical(saIdToRef map[string]model.Ref, eventSpecIdToRes map[string]RemoteEventSpec) model.DataProductCanonicalData {
 	var sourceApps []model.Ref
 	for _, saId := range remoteDp.SourceApplicationIds {
-		ref := sourceAppIdToPath[saId]
-		sourceApps = append(sourceApps, model.Ref{Ref: fmt.Sprintf(".%s", strings.TrimPrefix(ref, dpFolder))})
+		ref := saIdToRef[saId]
+		sourceApps = append(sourceApps, ref)
 	}
 
 	var eventSpecs []model.EventSpecCanonical
 	for _, esId := range remoteDp.EventSpecifications {
-		fmt.Printf("%+v",esId)
 		es := eventSpecIdToRes[esId.Id]
-		fmt.Printf("%+v",es)
-		eventSpecs = append(eventSpecs, es.ToCanonical(sourceAppIdToPath, dpFolder))
+		eventSpecs = append(eventSpecs, es.ToCanonical(saIdToRef))
 
 	}
 	return model.DataProductCanonicalData{
@@ -78,12 +75,11 @@ type RemoteEventSpec struct {
 	Entities             entities  `json:"entities"`
 }
 
-func (remoteEs RemoteEventSpec) ToCanonical(sourceAppIdToPath map[string]string, dpFolder string) model.EventSpecCanonical {
+func (remoteEs RemoteEventSpec) ToCanonical(saIdToRef map[string]model.Ref) model.EventSpecCanonical {
 	var sourceApps []model.Ref
 	for _, saId := range remoteEs.SourceApplicationIds {
-		ref := sourceAppIdToPath[saId]
-		//TODO: change the relative path only once
-		sourceApps = append(sourceApps, model.Ref{Ref: fmt.Sprintf(".%s", strings.TrimPrefix(ref, dpFolder))})
+		ref := saIdToRef[saId]
+		sourceApps = append(sourceApps, ref)
 	}
 
 	event := model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}

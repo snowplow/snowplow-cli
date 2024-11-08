@@ -13,11 +13,9 @@ package dp
 import (
 	"context"
 
-	"log/slog"
-
 	"github.com/snowplow-product/snowplow-cli/internal/console"
+	"github.com/snowplow-product/snowplow-cli/internal/download"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -52,56 +50,10 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		res, err := console.GetDataProductsAndRelatedResources(cnx, c)
+		err = download.DownloadDataProductsAndRelatedResources(files, cnx, c)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
-
-		var sas []model.CliResource[model.SourceAppData]
-		for _, sa := range res.SourceApplication {
-			model := model.CliResource[model.SourceAppData]{
-				ResourceType: "source-application",
-				ApiVersion:   "v1",
-				ResourceName: sa.Id,
-				Data:         sa.ToCanonical(),
-			}
-			sas = append(sas, model)
-		}
-
-		fileNameToSa, err := files.CreateSourceApps(sas)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
-
-		slog.Info("wrote source applications", "count", len(sas))
-
-		var saIdToPath = make(map[string]string)
-		for path, sa := range fileNameToSa {
-			saIdToPath[sa.ResourceName] = path
-		}
-
-		var esIdToRes = make(map[string]console.RemoteEventSpec)
-		for _, sa := range res.TrackingScenarios {
-			esIdToRes[sa.Id] = sa
-		}
-
-		var dps []model.CliResource[model.DataProductCanonicalData]
-		for _, dp := range res.DataProducts {
-			model := model.CliResource[model.DataProductCanonicalData]{
-				ResourceType: "data-product",
-				ApiVersion:   "v1",
-				ResourceName: dp.Id,
-				Data:         dp.ToCanonical(saIdToPath, esIdToRes , files.DataProductsLocation),
-			}
-			dps = append(dps, model)
-		}
-
-		_, err = files.CreateDataProducts(dps)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
-
-		slog.Info("wrote data products", "count", len(dps))
 
 	},
 }
