@@ -51,8 +51,8 @@ func (ds DataStructure) GetContentHash() (string, error) {
 	return fmt.Sprintf("%x", hash), nil
 }
 
-func (d DataStructure) ParseData() (DataStrucutreData, error) {
-	var data DataStrucutreData
+func (d DataStructure) ParseData() (DataStructureData, error) {
+	var data DataStructureData
 	err := mapstructure.Decode(d.Data, &data)
 	return data, err
 }
@@ -64,7 +64,7 @@ type DataStructureSelf struct {
 	Version string `mapstructure:"version" json:"version" validate:"required"`
 }
 
-type DataStrucutreData struct {
+type DataStructureData struct {
 	Self   DataStructureSelf `mapstructure:"self" json:"self" validate:"required"`
 	Schema string            `mapstructure:"$schema" json:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`

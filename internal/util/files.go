@@ -27,13 +27,13 @@ type Files struct {
 }
 
 func (f Files) CreateDataStructures(dss []DataStructure) error {
-	dataStrucutresPath := filepath.Join(".", f.DataStructuresLocation)
+	dataStructuresPath := filepath.Join(".", f.DataStructuresLocation)
 	for _, ds := range dss {
 		data, err := ds.ParseData()
 		if err != nil {
 			return err
 		}
-		vendorPath := filepath.Join(dataStrucutresPath, data.Self.Vendor)
+		vendorPath := filepath.Join(dataStructuresPath, data.Self.Vendor)
 		err = os.MkdirAll(vendorPath, os.ModePerm)
 		if err != nil {
 			return err
