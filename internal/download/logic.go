@@ -29,7 +29,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 		return err
 	}
 
-	slog.Info("wrote source applications", "count", len(sas))
+	slog.Info("download", "msg", "wrote source applications", "count", len(sas))
 
 	saIdToRef := localSasToRefs(fileNameToSa, files.DataProductsLocation)
 
@@ -42,6 +42,6 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 		return err
 	}
 
-	slog.Info("wrote data products", "count", len(dps))
+	slog.Info("download", "msg", "wrote data products", "count", len(dps))
 	return nil
 }

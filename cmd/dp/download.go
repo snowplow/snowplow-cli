@@ -21,14 +21,14 @@ import (
 )
 
 var downloadCommand = &cobra.Command{
-	Use:   "download {directory ./data-structures}",
+	Use:   "download {directory ./data-products}",
 	Short: "Download all data products, event specs and source apps from BDP Console",
 	Args:  cobra.MaximumNArgs(1),
 	Long: `Downloads the latest versions of all data products, event specs and source apps from BDP Console.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp download
-  $ snowplow-cli dp download./my-data-products`,
+  $ snowplow-cli dp download ./my-data-products`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key")
