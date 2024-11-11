@@ -154,7 +154,7 @@ func TestParseDataParses(t *testing.T) {
 			"$schema":                "string",
 			"additionalPropperties": false},
 	}
-	expected := DataStrucutreData{
+	expected := DataStructureData{
 		Self: DataStructureSelf{
 			Vendor:  "string",
 			Name:    "string",

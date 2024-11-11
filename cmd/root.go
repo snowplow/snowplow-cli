@@ -23,7 +23,7 @@ var RootCmd = &cobra.Command{
 	Use:   "snowplow-cli",
 	Short: "Snowplow CLI",
 	Long:  `Work with Snowplow from the command line`,
-	Example: `  $ snowplow-cli data-structure download
+	Example: `  $ snowplow-cli data-structures download
   $ snowplow-cli ds validate`,
 	Version: util.Version,
 }

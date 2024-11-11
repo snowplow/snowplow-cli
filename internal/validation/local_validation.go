@@ -48,7 +48,7 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 
 	if errsData != nil {
 		for _, e := range errsData.(validator.ValidationErrors) {
-			path := "dataStructure.data." + strings.TrimPrefix(e.Namespace(), "DataStrucutreData.")
+			path := "dataStructure.data." + strings.TrimPrefix(e.Namespace(), "DataStructureData.")
 			println(e.Namespace())
 			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
