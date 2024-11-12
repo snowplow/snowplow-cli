@@ -15,6 +15,7 @@ import (
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 func remoteSaToLocal(remoteSa console.RemoteSourceApplication) model.SourceAppData {
@@ -68,11 +69,14 @@ func remoteSasToLocalResources(remoteSas []console.RemoteSourceApplication) []mo
 	return res
 }
 
-func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]model.Ref) model.EventSpecCanonical {
-	var sourceApps []model.Ref
-	for _, saId := range remoteEs.SourceApplicationIds {
+func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]model.Ref, dataProductSourceAppIds []string) model.EventSpecCanonical {
+	var excludedSourceApps []model.Ref
+
+	excludedIds := util.SetMinus(dataProductSourceAppIds, remoteEs.SourceApplicationIds)
+
+	for _, saId := range excludedIds {
 		ref := saIdToRef[saId]
-		sourceApps = append(sourceApps, ref)
+		excludedSourceApps = append(excludedSourceApps, ref)
 	}
 
 	event := model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}
@@ -87,11 +91,11 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 
 	entities := model.EntitiesDef{Tracked: trackedEntities, Enriched: enrichedEntities}
 	return model.EventSpecCanonical{
-		ResourceName:       remoteEs.Id,
-		SourceApplications: sourceApps,
-		Name:               remoteEs.Name,
-		Event:              event,
-		Entities:           entities,
+		ResourceName:               remoteEs.Id,
+		ExcludedSourceApplications: excludedSourceApps,
+		Name:                       remoteEs.Name,
+		Event:                      event,
+		Entities:                   entities,
 	}
 }
 
@@ -105,7 +109,7 @@ func remoteDpToLocal(remoteDp console.RemoteDataProduct, saIdToRef map[string]mo
 	var eventSpecs []model.EventSpecCanonical
 	for _, esId := range remoteDp.EventSpecifications {
 		es := eventSpecIdToRes[esId.Id]
-		eventSpecs = append(eventSpecs, remoteEsToLocal(es, saIdToRef))
+		eventSpecs = append(eventSpecs, remoteEsToLocal(es, saIdToRef, remoteDp.SourceApplicationIds))
 
 	}
 	return model.DataProductCanonicalData{

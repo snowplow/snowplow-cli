@@ -35,7 +35,7 @@
             "required": ["resourceName", "name"],
             "properties": {
               "resourceName": { "type": "string", "format": "uuid" },
-              "sourceApplications": {
+              "excludedSourceApplications": {
                 "type": "array",
                 "items": {
                   "type": "object",

@@ -13,10 +13,10 @@ package util
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
-
 )
 
 func Test_DataStructuresFromPaths(t *testing.T) {
@@ -109,4 +109,32 @@ func Test_ResourceNameToFileName(t *testing.T) {
 		t.Fatalf("result not as expected, expected: %s, actual: %s", input3, expected3)
 	}
 
+}
+
+func Test_setMinus_OK(t *testing.T) {
+	set1 := []string{"1", "2", "3"}
+	set2 := []string{"1", "2", "3"}
+	set3 := []string{"1"}
+	set4 := []string{"1", "4"}
+
+	expected2 := []string{"2", "3"}
+
+	res1 := SetMinus(set1, set2)
+	res2 := SetMinus(set1, set3)
+	res3 := SetMinus(set1, set4)
+
+	slices.Sort(res2)
+	slices.Sort(res3)
+
+	if len(res1) != 0{
+		t.Fatalf("result not as expected, expected: [], actual: %s", res1)
+	}
+
+	if !reflect.DeepEqual(res2, expected2) {
+		t.Fatalf("result not as expected, expected: %v, actual: %v", expected2, res2)
+	}
+
+	if !reflect.DeepEqual(res3, expected2) {
+		t.Fatalf("result not as expected, expected: %s, actual: %s", expected2, res3)
+	}
 }

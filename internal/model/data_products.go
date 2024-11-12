@@ -74,11 +74,11 @@ type DataProductCanonicalData struct {
 }
 
 type EventSpecCanonical struct {
-	ResourceName       string `yaml:"resourceName" json:"resourceName"`
-	SourceApplications []Ref  `yaml:"sourceApplications" json:"sourceApplications"`
-	Name               string
-	Event              SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
-	Entities           EntitiesDef
+	ResourceName               string `yaml:"resourceName" json:"resourceName"`
+	ExcludedSourceApplications []Ref  `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
+	Name                       string
+	Event                      SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
+	Entities                   EntitiesDef
 }
 
 type Ref struct {

@@ -159,3 +159,23 @@ func ResourceNameToFileName(s string) string {
 	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
 	return res
 }
+
+func SetMinus(s1, s2 []string) []string {
+	diff := make(map[string]bool, len(s1))
+	for _, v1 := range s1 {
+		diff[v1] = true
+	}
+	for _, v2 := range s2 {
+		if _, ok := diff[v2]; ok {
+			diff[v2] = false
+		}
+	}
+
+	var result []string
+	for value, ok := range diff {
+		if ok {
+			result = append(result, value)
+		}
+	}
+	return result
+}
