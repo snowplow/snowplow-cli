@@ -155,7 +155,6 @@ func MaybeResourcesfromPaths(paths []string) (map[string]map[string]any, error) 
 func ResourceNameToFileName(s string) string {
 	allPrintableAsciiNegates := regexp.MustCompile("[^ -~]")
 	t := allPrintableAsciiNegates.ReplaceAllLiteralString(s, "")
-	strings.ReplaceAll(t, " ", "_")
 	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
 	return res
 }

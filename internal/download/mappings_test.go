@@ -169,9 +169,9 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 			Owner:              sampleRemoteDp.Owner,
 			Description:        sampleRemoteDp.Description,
 			EventSpecifications: []model.EventSpecCanonical{{
-				ResourceName:       sampleRemoteEs.Id,
-				SourceApplications: []model.Ref{sampleSaRef},
-				Name:               sampleRemoteEs.Name,
+				ResourceName:               sampleRemoteEs.Id,
+				ExcludedSourceApplications: nil,
+				Name:                       sampleRemoteEs.Name,
 				Event: model.SchemaRef{
 					Source:         sampleRemoteEs.Event.Source,
 					MinCardinality: nil,
