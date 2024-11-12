@@ -13,10 +13,12 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 
 	"gopkg.in/yaml.v3"
 )
@@ -49,6 +51,35 @@ func (f Files) CreateDataStructures(dss []DataStructure) error {
 	return nil
 }
 
+type idFileName struct {
+	Id       string
+	FileName string
+}
+
+func createUniqueNames(idsToFileNames []idFileName) []idFileName {
+	//sort to map conflicting names to suffixes consistently between runs
+	sort.Slice(idsToFileNames, func(i, j int) bool {
+		return idsToFileNames[i].Id < idsToFileNames[j].Id
+	})
+	normalizedNameToIds := make(map[string][]string)
+	for _, originalName := range idsToFileNames {
+		normalizedName := ResourceNameToFileName(originalName.FileName)
+		normalizedNameToIds[normalizedName] = append(normalizedNameToIds[normalizedName], originalName.Id)
+	}
+	var idToUniqueName []idFileName
+	for name, ids := range normalizedNameToIds {
+		if len(ids) > 1 {
+			for idx, id := range ids {
+				uniqueName := fmt.Sprintf("%s-%d", name, idx+1)
+				idToUniqueName = append(idToUniqueName, idFileName{Id: id, FileName: uniqueName})
+			}
+		} else {
+			idToUniqueName = append(idToUniqueName, idFileName{Id: ids[0], FileName: name})
+		}
+	}
+	return idToUniqueName
+}
+
 func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]CliResource[SourceAppData], error) {
 	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
 	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
@@ -57,15 +88,26 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 		return nil, err
 	}
 
+	var idToFileName []idFileName
+	idToSa := make(map[string]CliResource[SourceAppData])
+	for _, sa := range sas {
+		idToSa[sa.ResourceName] = sa
+		idToFileName = append(idToFileName, idFileName{Id: sa.ResourceName, FileName: sa.Data.Name})
+	}
+
+	uniqueNames := createUniqueNames(idToFileName)
+
 	var res = make(map[string]CliResource[SourceAppData])
 
-	for _, sa := range sas {
-		abs, err := WriteSerializableToFile(sa, sourceAppsPath, sa.Data.Name, f.ExtentionPreference)
+	for _, idToName := range uniqueNames {
+		sa := idToSa[idToName.Id]
+		abs, err := WriteSerializableToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference)
 		if err != nil {
 			return nil, err
 		}
 		res[abs] = sa
 	}
+
 	return res, nil
 }
 
@@ -77,15 +119,26 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 		return nil, err
 	}
 
+	var idToFileName []idFileName
+	idToDp := make(map[string]CliResource[DataProductCanonicalData])
+	for _, dp := range dps {
+		idToDp[dp.ResourceName] = dp
+		idToFileName = append(idToFileName, idFileName{Id: dp.ResourceName, FileName: dp.Data.Name})
+	}
+
+	uniqueNames := createUniqueNames(idToFileName)
+
 	var res = make(map[string]CliResource[DataProductCanonicalData])
 
-	for _, dp := range dps {
-		abs, err := WriteSerializableToFile(dp, dataProductsPath, dp.Data.Name, f.ExtentionPreference)
+	for _, idToName := range uniqueNames {
+		dp := idToDp[idToName.Id]
+		abs, err := WriteSerializableToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference)
 		if err != nil {
 			return nil, err
 		}
 		res[abs] = dp
 	}
+
 	return res, nil
 }
 
