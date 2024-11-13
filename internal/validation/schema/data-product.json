@@ -15,6 +15,7 @@
         "name": { "type": "string" },
         "domain": { "type": "string" },
         "description": { "type": "string" },
+        "owner": { "type": "string", "format": "email"},
         "sourceApplications": {
           "type": "array",
           "items": {
@@ -34,7 +35,7 @@
             "required": ["resourceName", "name"],
             "properties": {
               "resourceName": { "type": "string", "format": "uuid" },
-              "sourceApplications": {
+              "excludedSourceApplications": {
                 "type": "array",
                 "items": {
                   "type": "object",

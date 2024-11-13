@@ -28,65 +28,65 @@ type DataProductsAndRelatedResources struct {
 }
 
 type RemoteDataProduct struct {
-	ResourceName        string               `yaml:"resourceName" json:"id" validate:"required"`
-	Name                string               `yaml:"name" json:"name" validate:"required"`
-	SourceApplications  []string             `yaml:"sourceApplications" json:"sourceApplications"`
-	Domain              string               `yaml:"domain" json:"domain"`
-	Owner               string               `yaml:"owner" json:"owner"`
-	Description         string               `yaml:"description" json:"description"`
-	EventSpecifications []eventSpecReference `yaml:"eventSpecifications" json:"trackingScenarios"`
+	Id                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	SourceApplicationIds []string             `json:"sourceApplications"`
+	Domain               string               `json:"domain"`
+	Owner                string               `json:"owner"`
+	Description          string               `json:"description"`
+	EventSpecifications  []EventSpecReference `json:"trackingScenarios"`
 }
 
-type eventSpecReference struct {
-	Id string `yaml:"id" json:"id" validate:"required"`
+type EventSpecReference struct {
+	Id string `json:"id"`
 }
 
 type RemoteEventSpec struct {
-	ResourceName       string    `yaml:"resourceName" json:"id"`
-	SourceApplications []string  `yaml:"sourceApplications" json:"sourceApplications"`
-	Name               string    `yaml:"name" json:"name"`
-	Triggers           []trigger `yaml:"triggers" json:"triggers"`
-	Event              event     `yaml:"event" json:"event"`
-	Entities           entities  `yaml:"entities" json:"entities"`
+	Id                   string    `json:"id"`
+	SourceApplicationIds []string  `json:"sourceApplications"`
+	Name                 string    `json:"name"`
+	Triggers             []Trigger `json:"triggers"`
+	Event                Event     `json:"event"`
+	Entities             Entities  `json:"entities"`
 }
 
-type event struct {
-	Source string         `yaml:"source" json:"source"`
-	Schema map[string]any `yaml:"schema" json:"schema"`
+type Event struct {
+	Source string         `json:"source"`
+	Schema map[string]any `json:"schema"`
 }
 
-type trigger struct {
-	Description string `yaml:"description" json:"description"`
+type Trigger struct {
+	Description string `json:"description"`
 }
 
 type dataProductsResponse struct {
-	Data     []RemoteDataProduct `yaml:"data" json:"data"`
-	Includes includes            `yaml:"includes" json:"includes"`
+	Data     []RemoteDataProduct `json:"data"`
+	Includes includes            `json:"includes"`
 }
 
 type includes struct {
-	TrackingScenarios  []RemoteEventSpec         `yaml:"trackingScenarios" json:"trackingScenarios"`
-	SourceApplications []RemoteSourceApplication `yaml:"sourceApplications" json:"sourceApplications"`
+	TrackingScenarios  []RemoteEventSpec         `json:"trackingScenarios"`
+	SourceApplications []RemoteSourceApplication `json:"sourceApplications"`
 }
 
 type RemoteSourceApplication struct {
-	ResourceName string   `yaml:"id" json:"id" validate:"required"`
-	Name         string   `yaml:"name" json:"name" validate:"required"`
-	Description  string   `yaml:"description" json:"description"`
-	Owner        string   `yaml:"owner" json:"owner"`
-	AppIds       []string `yaml:"appIds" json:"appIds"`
-	Entities     entities `yaml:"entities" json:"entities"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Owner       string   `json:"owner"`
+	AppIds      []string `json:"appIds"`
+	Entities    Entities `json:"entities"`
 }
 
-type entities struct {
-	Tracked  []entity `yaml:"tracked" json:"tracked"`
-	Enriched []entity `yaml:"enriched" json:"enriched"`
+type Entities struct {
+	Tracked  []Entity `json:"tracked"`
+	Enriched []Entity `json:"enriched"`
 }
 
-type entity struct {
-	Source         string `yaml:"source" json:"source" validate:"required"`
-	MinCardinality int    `yaml:"minCardinality" json:"minCardinality"`
-	MaxCardinality int    `yaml:"maxCardinality" json:"maxCardinality"`
+type Entity struct {
+	Source         string `json:"source"`
+	MinCardinality *int   `json:"minCardinality"`
+	MaxCardinality *int   `json:"maxCardinality"`
 	Schema         map[string]any
 }
 
@@ -102,8 +102,8 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 
-	var sourceApps dataProductsResponse
-	err = json.Unmarshal(rbody, &sourceApps)
+	var dpResponse dataProductsResponse
+	err = json.Unmarshal(rbody, &dpResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +113,9 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 	}
 
 	res := DataProductsAndRelatedResources{
-		sourceApps.Data,
-		sourceApps.Includes.TrackingScenarios,
-		sourceApps.Includes.SourceApplications,
+		dpResponse.Data,
+		dpResponse.Includes.TrackingScenarios,
+		dpResponse.Includes.SourceApplications,
 	}
 	return &res, nil
 }

@@ -30,7 +30,7 @@ data:
   description: This Data Product describes a data product
   eventSpecifications:
     - resourceName: e066a9a7-e6c4-4d72-9a93-1418746f5278
-      sourceApplications:
+      excludedSourceApplications:
         - $ref: ./source-application.yml
       name: event spec 1
       triggers:

@@ -13,6 +13,7 @@ package console
 import (
 	"errors"
 	"slices"
+	"sort"
 	"testing"
 )
 
@@ -126,6 +127,8 @@ func Test_IsDeployed_ConsoleAlternatives(t *testing.T) {
 	}
 
 	expected := []string{"2-0-0", "1-0-0"}
+	sort.Strings(expected)
+	sort.Strings(alts)
 
 	if !slices.Equal(expected, alts) {
 		t.Fatal("bad alternatives", expected, alts)

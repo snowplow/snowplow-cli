@@ -13,6 +13,7 @@ package util
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -79,10 +80,61 @@ func Test_MaybeResourcesfromPaths(t *testing.T) {
 		keys = append(keys, k)
 	}
 
-	for _, p := range []string{ saPath, dp1Path, dp2Path } {
+	for _, p := range []string{saPath, dp1Path, dp2Path} {
 		if !slices.Contains(keys, p) {
 			t.Fatal("missing path", p)
 		}
 	}
 
+}
+
+func Test_ResourceNameToFileName(t *testing.T) {
+	input1 := "cool_name"
+	input2 := "Normal data product name"
+	expected2 := "normal-data-product-name"
+	input3 := "/щ💡test"
+	expected3 := "/test"
+
+	res1 := ResourceNameToFileName(input1)
+	res2 := ResourceNameToFileName(input2)
+	res3 := ResourceNameToFileName(input3)
+
+	if res1 != input1 {
+		t.Fatalf("result not as expected, expected: %s, actual: %s", input1, res1)
+	}
+	if res2 != expected2 {
+		t.Fatalf("result not as expected, expected: %s, actual: %s", input2, expected2)
+	}
+	if res3 != expected3 {
+		t.Fatalf("result not as expected, expected: %s, actual: %s", input3, expected3)
+	}
+
+}
+
+func Test_setMinus_OK(t *testing.T) {
+	set1 := []string{"1", "2", "3"}
+	set2 := []string{"1", "2", "3"}
+	set3 := []string{"1"}
+	set4 := []string{"1", "4"}
+
+	expected2 := []string{"2", "3"}
+
+	res1 := SetMinus(set1, set2)
+	res2 := SetMinus(set1, set3)
+	res3 := SetMinus(set1, set4)
+
+	slices.Sort(res2)
+	slices.Sort(res3)
+
+	if len(res1) != 0{
+		t.Fatalf("result not as expected, expected: [], actual: %s", res1)
+	}
+
+	if !reflect.DeepEqual(res2, expected2) {
+		t.Fatalf("result not as expected, expected: %v, actual: %v", expected2, res2)
+	}
+
+	if !reflect.DeepEqual(res3, expected2) {
+		t.Fatalf("result not as expected, expected: %s, actual: %s", expected2, res3)
+	}
 }

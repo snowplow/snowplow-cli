@@ -31,5 +31,6 @@ go.work.sum
 # goreleaser
 dist/
 
-# default donwload folder
+# default download folder
 data-structures/
+data-products/

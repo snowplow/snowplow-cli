@@ -14,14 +14,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
-	"gopkg.in/yaml.v3"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
 func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
@@ -150,3 +152,29 @@ func MaybeResourcesfromPaths(paths []string) (map[string]map[string]any, error) 
 	return files, nil
 }
 
+func ResourceNameToFileName(s string) string {
+	allPrintableAsciiNegates := regexp.MustCompile("[^ -~]")
+	t := allPrintableAsciiNegates.ReplaceAllLiteralString(s, "")
+	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
+	return res
+}
+
+func SetMinus(s1, s2 []string) []string {
+	diff := make(map[string]bool, len(s1))
+	for _, v1 := range s1 {
+		diff[v1] = true
+	}
+	for _, v2 := range s2 {
+		if _, ok := diff[v2]; ok {
+			diff[v2] = false
+		}
+	}
+
+	var result []string
+	for value, ok := range diff {
+		if ok {
+			result = append(result, value)
+		}
+	}
+	return result
+}
