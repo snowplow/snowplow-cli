@@ -68,8 +68,7 @@ type dataProductsResponse struct {
 }
 
 type includes struct {
-	EventSpecs         []RemoteEventSpec         `json:"eventSpecs"`
-	SourceApplications []RemoteSourceApplication `json:"sourceApplications"`
+	EventSpecs []RemoteEventSpec `json:"eventSpecs"`
 }
 
 type RemoteSourceApplication struct {
@@ -102,6 +101,10 @@ type esData struct {
 	Data []RemoteEventSpec `json:"data"`
 }
 
+type saData struct {
+	Data []RemoteSourceApplication `json:"data"`
+}
+
 func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) (*DataProductsAndRelatedResources, error) {
 
 	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/data-products/v2", client.BaseUrl), client, cnx, nil)
@@ -124,10 +127,30 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 	}
 
+	saResp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/source-apps/v1", client.BaseUrl), client, cnx, nil)
+	if err != nil {
+		return nil, err
+	}
+	sarbody, err := io.ReadAll(saResp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var saResponse saData
+	err = json.Unmarshal(sarbody, &saResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+
 	res := DataProductsAndRelatedResources{
 		dpResponse.Data,
 		dpResponse.Includes.EventSpecs,
-		dpResponse.Includes.SourceApplications,
+		saResponse.Data,
 	}
 	return &res, nil
 }
