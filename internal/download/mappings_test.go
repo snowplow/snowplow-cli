@@ -128,7 +128,7 @@ var sampleRemoteDp = console.RemoteDataProduct{
 	Domain:               "testing",
 	Owner:                "me@me.me",
 	Description:          "this is a test",
-	EventSpecifications:  []console.EventSpecReference{{Id: sampleRemoteEss[0].Id}},
+	EventSpecs:           []console.EventSpecReference{{Id: sampleRemoteEss[0].Id}},
 }
 
 var sampleRemoteDps = []console.RemoteDataProduct{sampleRemoteDp}

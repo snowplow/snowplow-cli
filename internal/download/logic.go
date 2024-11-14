@@ -33,7 +33,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	saIdToRef := localSasToRefs(fileNameToSa, files.DataProductsLocation)
 
-	esIdToRes := groupRemoteEsById(res.TrackingScenarios)
+	esIdToRes := groupRemoteEsById(res.EventSpecs)
 
 	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes)
 

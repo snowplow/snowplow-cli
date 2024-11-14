@@ -107,7 +107,7 @@ func remoteDpToLocal(remoteDp console.RemoteDataProduct, saIdToRef map[string]mo
 	}
 
 	var eventSpecs []model.EventSpecCanonical
-	for _, esId := range remoteDp.EventSpecifications {
+	for _, esId := range remoteDp.EventSpecs {
 		es := eventSpecIdToRes[esId.Id]
 		eventSpecs = append(eventSpecs, remoteEsToLocal(es, saIdToRef, remoteDp.SourceApplicationIds))
 
