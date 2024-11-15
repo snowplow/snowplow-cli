@@ -19,9 +19,73 @@ import (
 	"testing"
 )
 
+func intPtr(i int) *int {
+	return &i
+}
+
+var sampleEntity1 = Entity{
+	Source:         "iglu:com.snplow.msc.aws/data-product-auto/jsonschema/1-0-0",
+	MinCardinality: intPtr(0),
+	MaxCardinality: intPtr(5),
+	Schema:         map[string]any{},
+}
+
+var sampleEntity2 = Entity{
+	Source:         "iglu:com.snplow.msc.aws/spo_zod_2/jsonschema/1-0-0",
+	MinCardinality: intPtr(0),
+	MaxCardinality: nil,
+	Schema:         map[string]any{},
+}
+
+var sampleSa1 = RemoteSourceApplication{
+	Id:          "6b1146d6-7b23-4dbb-b069-f568458dda8f",
+	Name:        "cli test update 2",
+	Description: "cli test update 2",
+	Owner:       "me2@me.com",
+	AppIds:      []string{"ios2", "android3"},
+	Entities:    Entities{Tracked: []Entity{sampleEntity1, sampleEntity2}, Enriched: []Entity{}},
+}
+
+var sampleRemoteEs = RemoteEventSpec{
+	Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
+	SourceApplicationIds: []string{},
+	Name:                 "test ES 3",
+	DataProductId:        "46d47289-f3d5-4ef8-a82c-b19597e6e503",
+	Triggers:             []Trigger{},
+	Event: Event{
+		Source: "iglu:com.snplow.msc.aws/spo__ds_test_bug/jsonschema/4-0-0",
+		Schema: nil,
+	},
+	Entities: Entities{Tracked: []Entity{
+		{
+			Source:         sampleEntity1.Source,
+			MinCardinality: sampleEntity1.MinCardinality,
+			MaxCardinality: sampleEntity1.MaxCardinality,
+			Schema:         nil,
+		},
+		{
+			Source:         sampleEntity2.Source,
+			MinCardinality: sampleEntity2.MinCardinality,
+			MaxCardinality: sampleEntity2.MaxCardinality,
+			Schema:         nil,
+		},
+	},
+		Enriched: []Entity{},
+	},
+}
+
+var sampleRemoteDp = RemoteDataProduct{
+	Id:                   "46d47289-f3d5-4ef8-a82c-b19597e6e503",
+	Name:                 "test form cli 2",
+	SourceApplicationIds: []string{},
+	Domain:               "testing cli",
+	Owner:                "me2@me.me",
+	Description:          "this is a test 2",
+}
+
 func Test_GetDataProductsEventSpecs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v1" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2" {
 			if r.Header.Get("authorization") != "Bearer token" {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
 			}
@@ -36,7 +100,7 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
             "owner": "test@example.com",
             "description": "This Data Product contains all the tracking of Standard Events. Note: the event volume counts are calculated differently for this Data Product. They are counts of any page_ping/page_view events sent for App Id's of this data product",
             "status": "draft",
-            "trackingScenarios": [
+            "eventSpecs": [
                 {
                     "id": "3a867d9e-59c5-4707-a1fb-fa988c713aaa",
                     "url": "https://test.example.com/api/msc/v1/organizations/af3b1e5a-4396-4b0f-9be9-86171d94c478/tracking-scenarios/v2/3a867d9e-59c5-4707-a1fb-fa988c713aaa"
@@ -57,7 +121,7 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
     ],
     "includes": {
         "owners": [],
-        "trackingScenarios": [
+        "eventSpecs": [
             {
                 "id": "3a867d9e-59c5-4707-a1fb-fa988c713aaa",
                 "version": 0,
@@ -152,12 +216,192 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
 		t.Errorf("Unexpected number of data products, expected 1, got: %d", len(res.DataProducts))
 	}
 
-	if len(res.TrackingScenarios) != 2 {
-		t.Errorf("Unexpected number of event specs, expected 2, got: %d", len(res.TrackingScenarios))
+	if len(res.EventSpecs) != 2 {
+		t.Errorf("Unexpected number of event specs, expected 2, got: %d", len(res.EventSpecs))
 	}
 
 	if len(res.SourceApplication) != 1 {
 		t.Errorf("Unexpected number of source apps, expected 1, got: %d", len(res.SourceApplication))
+	}
+
+}
+
+func Test_CreateSourceApp(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1" && r.Method == "POST" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := CreateSourceApp(cnx, client, sampleSa1)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func Test_UpdateSourceApp(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/source-apps/v1/%s", sampleSa1.Id) && r.Method == "PUT" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := UpdateSourceApp(cnx, client, sampleSa1)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func Test_CreateDataProduct(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2" && r.Method == "POST" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := CreateDataProduct(cnx, client, sampleRemoteDp)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func Test_UpdateDataProduct(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/data-products/v2/%s", sampleRemoteDp.Id) && r.Method == "PUT" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := UpdateDataProduct(cnx, client, sampleRemoteDp)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func Test_CreateEventSpec(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == "POST" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := CreateEventSpec(cnx, client, sampleRemoteEs)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
+
+func Test_UpdateEventSpec(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "GET" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			// we only need this for version
+			resp := `{"data": [{"version": 2}]}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := UpdateEventSpec(cnx, client, sampleRemoteEs)
+
+	if err != nil {
+		t.Error(err)
 	}
 
 }

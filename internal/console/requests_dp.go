@@ -14,27 +14,27 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
 type DataProductsAndRelatedResources struct {
 	DataProducts      []RemoteDataProduct
-	TrackingScenarios []RemoteEventSpec
+	EventSpecs        []RemoteEventSpec
 	SourceApplication []RemoteSourceApplication
 }
 
 type RemoteDataProduct struct {
 	Id                   string               `json:"id"`
 	Name                 string               `json:"name"`
+	Status               string               `json:"status"`
 	SourceApplicationIds []string             `json:"sourceApplications"`
 	Domain               string               `json:"domain"`
 	Owner                string               `json:"owner"`
 	Description          string               `json:"description"`
-	EventSpecifications  []EventSpecReference `json:"trackingScenarios"`
+	EventSpecs           []EventSpecReference `json:"eventSpecs"`
 }
 
 type EventSpecReference struct {
@@ -45,14 +45,17 @@ type RemoteEventSpec struct {
 	Id                   string    `json:"id"`
 	SourceApplicationIds []string  `json:"sourceApplications"`
 	Name                 string    `json:"name"`
+	Status               string    `json:"status"`
+	Version              int       `json:"version"`
 	Triggers             []Trigger `json:"triggers"`
 	Event                Event     `json:"event"`
 	Entities             Entities  `json:"entities"`
+	DataProductId        string    `json:"dataProductId"`
 }
 
 type Event struct {
 	Source string         `json:"source"`
-	Schema map[string]any `json:"schema"`
+	Schema map[string]any `json:"schema,omitempty"`
 }
 
 type Trigger struct {
@@ -65,7 +68,7 @@ type dataProductsResponse struct {
 }
 
 type includes struct {
-	TrackingScenarios  []RemoteEventSpec         `json:"trackingScenarios"`
+	EventSpecs         []RemoteEventSpec         `json:"eventSpecs"`
 	SourceApplications []RemoteSourceApplication `json:"sourceApplications"`
 }
 
@@ -84,15 +87,24 @@ type Entities struct {
 }
 
 type Entity struct {
-	Source         string `json:"source"`
-	MinCardinality *int   `json:"minCardinality"`
-	MaxCardinality *int   `json:"maxCardinality"`
-	Schema         map[string]any
+	Source         string         `json:"source"`
+	MinCardinality *int           `json:"minCardinality"`
+	MaxCardinality *int           `json:"maxCardinality"`
+	Schema         map[string]any `json:"schema,omitempty"`
+}
+
+type remoteEventSpecPost struct {
+	Spec    RemoteEventSpec `json:"spec"`
+	Message string          `json:"message"`
+}
+
+type esData struct {
+	Data []RemoteEventSpec `json:"data"`
 }
 
 func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) (*DataProductsAndRelatedResources, error) {
 
-	resp, err := ConsoleRequest("GET", fmt.Sprintf("%s/data-products/v1", client.BaseUrl), client, cnx)
+	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/data-products/v2", client.BaseUrl), client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +126,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 
 	res := DataProductsAndRelatedResources{
 		dpResponse.Data,
-		dpResponse.Includes.TrackingScenarios,
+		dpResponse.Includes.EventSpecs,
 		dpResponse.Includes.SourceApplications,
 	}
 	return &res, nil
@@ -166,15 +178,7 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/event-specs/v1/compatibility", client.BaseUrl), bytes.NewBuffer(body))
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
-	if err != nil {
-		return nil, err
-	}
-	resp, err := client.Http.Do(req)
+	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1/compatibility", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -195,4 +199,220 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 	}
 
 	return &cresp, nil
+}
+
+func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceApplication) error {
+	body, err := json.Marshal(sa)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/source-apps/v1", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp.Message)
+
+	}
+	return nil
+}
+
+func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceApplication) error {
+	body, err := json.Marshal(sa)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("PUT", fmt.Sprintf("%s/source-apps/v1/%s", client.BaseUrl, sa.Id), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp.Message)
+
+	}
+	return nil
+}
+
+func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProduct) error {
+	body, err := json.Marshal(dp)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/data-products/v2", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp.Message)
+
+	}
+	return nil
+}
+
+func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProduct) error {
+	dp.Status = "draft"
+	body, err := json.Marshal(dp)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("PUT", fmt.Sprintf("%s/data-products/v2/%s", client.BaseUrl, dp.Id), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp)
+
+	}
+	return nil
+}
+
+func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec) error {
+
+	esForm := remoteEventSpecPost{Spec: es, Message: ""}
+
+	body, err := json.Marshal(esForm)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		fmt.Printf("%q\n", rbody)
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp)
+
+	}
+	return nil
+}
+
+func getEventSpec(cnx context.Context, client *ApiClient, id string) (*RemoteEventSpec, error) {
+	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/event-specs/v1/%s", client.BaseUrl, id), client, cnx, nil)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var dpResponse esData
+	err = json.Unmarshal(rbody, &dpResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+
+	return &dpResponse.Data[0], nil
+
+}
+
+func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec) error {
+	existingEs, err := getEventSpec(cnx, client, es.Id)
+	if err != nil {
+		return err
+	}
+	newVersion := existingEs.Version + 1
+
+	es.Version = newVersion
+	es.Status = "draft"
+
+	esForm := remoteEventSpecPost{Spec: es, Message: ""}
+
+	body, err := json.Marshal(esForm)
+	if err != nil {
+		return err
+	}
+	resp, err := DoConsoleRequest("PUT", fmt.Sprintf("%s/event-specs/v1/%s", client.BaseUrl, es.Id), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		fmt.Printf("%q\n", rbody)
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp)
+
+	}
+	return nil
 }
