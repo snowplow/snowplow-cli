@@ -51,10 +51,10 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		possibleFiles := []string{}
-		for n := range files {
-			possibleFiles = append(possibleFiles, n)
-		}
+		// possibleFiles := []string{}
+		// for n := range files {
+		// 	possibleFiles = append(possibleFiles, n)
+		// }
 
 		cnx := context.Background()
 

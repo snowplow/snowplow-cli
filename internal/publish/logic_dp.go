@@ -13,7 +13,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"golang.org/x/net/context"
