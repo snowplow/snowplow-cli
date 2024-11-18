@@ -71,7 +71,7 @@ func Test_DPLookup_EventSpecBadSourceApp(t *testing.T) {
 				},
 				"eventSpecifications": []map[string]any{
 					{
-						"sourceApplications": []map[string]string{
+						"excludedSourceApplications": []map[string]string{
 							{"$ref": "file7.yml"},
 						},
 					},

@@ -36,7 +36,7 @@ type DPValidations struct {
 	Info     []string
 	Debug    []string
 
-	ErrorsWithPaths map[string][]string
+	ErrorsWithPaths   map[string][]string
 	WarningsWithPaths map[string][]string
 }
 
@@ -90,7 +90,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				v.concat(shapeValidations)
 				if ok {
 					v.concat(ValidateDPEventSpecCompat(cc, dp))
-				} 
+				}
 			case "source-application":
 				var sa model.SourceApp
 				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
@@ -167,7 +167,7 @@ func (lookup *DPLookup) resolveRefs() error {
 			}
 		}
 		for _, spec := range dp.Data.EventSpecifications {
-			for _, ref := range spec.SourceApplications {
+			for _, ref := range spec.ExcludedSourceApplications {
 				if saRef, ok := ref["$ref"]; ok {
 					absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
 					if err != nil {
@@ -219,13 +219,13 @@ func (lookup *DPLookup) SlogValidations(basePath string) error {
 			slog.Warn("validating", "file", rp, "msg", m)
 		}
 		for k, se := range v.WarningsWithPaths {
-			slog.Warn("validating", "file", rp, "path", k, "warnings", strings.Join(se, "\n") + "\n")
+			slog.Warn("validating", "file", rp, "path", k, "warnings", strings.Join(se, "\n")+"\n")
 		}
 		for _, m := range v.Errors {
 			slog.Error("validating", "file", rp, "msg", m)
 		}
 		for k, se := range v.ErrorsWithPaths {
-			slog.Error("validating", "file", rp, "path", k, "errors", strings.Join(se, "\n") + "\n")
+			slog.Error("validating", "file", rp, "path", k, "errors", strings.Join(se, "\n")+"\n")
 		}
 	}
 

@@ -12,9 +12,13 @@ package dp
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/publish"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -33,16 +37,33 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 
+		searchPaths := []string{}
+
+		if len(args) == 0 {
+			searchPaths = append(searchPaths, util.DataProductsFolder)
+			slog.Debug("validation", "msg", fmt.Sprintf("no path provided, using default (./%s)", util.DataProductsFolder))
+		}
+
+		searchPaths = append(searchPaths, args...)
+
+		files, err := util.MaybeResourcesfromPaths(searchPaths)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
+
+		possibleFiles := []string{}
+		for n := range files {
+			possibleFiles = append(possibleFiles, n)
+		}
+
 		cnx := context.Background()
-		// stub for future logic
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		_, err = console.GetDataProductsAndRelatedResources(cnx, c)
-
+		err = publish.Publish(cnx, c, files)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

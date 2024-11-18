@@ -31,9 +31,9 @@ type RemoteDataProduct struct {
 	Name                 string               `json:"name"`
 	Status               string               `json:"status"`
 	SourceApplicationIds []string             `json:"sourceApplications"`
-	Domain               string               `json:"domain"`
-	Owner                string               `json:"owner"`
-	Description          string               `json:"description"`
+	Domain               string               `json:"domain,omitempty"`
+	Owner                string               `json:"owner,omitempty"`
+	Description          string               `json:"description,omitempty"`
 	EventSpecs           []EventSpecReference `json:"eventSpecs"`
 }
 
@@ -42,24 +42,19 @@ type EventSpecReference struct {
 }
 
 type RemoteEventSpec struct {
-	Id                   string    `json:"id"`
-	SourceApplicationIds []string  `json:"sourceApplications"`
-	Name                 string    `json:"name"`
-	Status               string    `json:"status"`
-	Version              int       `json:"version"`
-	Triggers             []Trigger `json:"triggers"`
-	Event                Event     `json:"event"`
-	Entities             Entities  `json:"entities"`
-	DataProductId        string    `json:"dataProductId"`
+	Id                   string   `json:"id"`
+	SourceApplicationIds []string `json:"sourceApplications"`
+	Name                 string   `json:"name"`
+	Status               string   `json:"status"`
+	Version              int      `json:"version"`
+	Event                Event    `json:"event"`
+	Entities             Entities `json:"entities"`
+	DataProductId        string   `json:"dataProductId"`
 }
 
 type Event struct {
 	Source string         `json:"source"`
 	Schema map[string]any `json:"schema,omitempty"`
-}
-
-type Trigger struct {
-	Description string `json:"description"`
 }
 
 type dataProductsResponse struct {
@@ -75,7 +70,7 @@ type RemoteSourceApplication struct {
 	Id          string   `json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
-	Owner       string   `json:"owner"`
+	Owner       string   `json:"owner,omitempty"`
 	AppIds      []string `json:"appIds"`
 	Entities    Entities `json:"entities"`
 }
@@ -362,7 +357,6 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 		}
 
 		var dresp msgResponse
-		fmt.Printf("%q\n", rbody)
 		err = json.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
@@ -428,7 +422,6 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 		}
 
 		var dresp msgResponse
-		fmt.Printf("%q\n", rbody)
 		err = json.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
