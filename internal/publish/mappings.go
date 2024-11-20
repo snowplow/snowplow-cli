@@ -19,31 +19,34 @@ import (
 )
 
 func localSaToRemote(local model.SourceApp) console.RemoteSourceApplication {
-	trackedEntities := []console.Entity{}
-	for _, te := range local.Data.Entities.Tracked {
-		trackedEntities = append(trackedEntities,
-			console.Entity{
-				Source:         te.Source,
-				MinCardinality: te.MinCardinality,
-				MaxCardinality: te.MaxCardinality,
-				Schema:         te.Schema,
-			},
-		)
-	}
+	entities := console.Entities{}
+	if local.Data.Entities != nil {
+		trackedEntities := []console.Entity{}
+		for _, te := range local.Data.Entities.Tracked {
+			trackedEntities = append(trackedEntities,
+				console.Entity{
+					Source:         te.Source,
+					MinCardinality: te.MinCardinality,
+					MaxCardinality: te.MaxCardinality,
+					Schema:         te.Schema,
+				},
+			)
+		}
 
-	enrichedEntities := []console.Entity{}
-	for _, ee := range local.Data.Entities.Enriched {
-		enrichedEntities = append(enrichedEntities,
-			console.Entity{
-				Source:         ee.Source,
-				MinCardinality: ee.MinCardinality,
-				MaxCardinality: ee.MaxCardinality,
-				Schema:         ee.Schema,
-			},
-		)
-	}
+		enrichedEntities := []console.Entity{}
+		for _, ee := range local.Data.Entities.Enriched {
+			enrichedEntities = append(enrichedEntities,
+				console.Entity{
+					Source:         ee.Source,
+					MinCardinality: ee.MinCardinality,
+					MaxCardinality: ee.MaxCardinality,
+					Schema:         ee.Schema,
+				},
+			)
+		}
 
-	entities := console.Entities{Tracked: trackedEntities, Enriched: enrichedEntities}
+		entities = console.Entities{Tracked: trackedEntities, Enriched: enrichedEntities}
+	}
 
 	return console.RemoteSourceApplication{
 		Id:          local.ResourceName,

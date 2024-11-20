@@ -51,9 +51,10 @@ var sampleRemoteEs = RemoteEventSpec{
 	SourceApplicationIds: []string{},
 	Name:                 "test ES 3",
 	DataProductId:        "46d47289-f3d5-4ef8-a82c-b19597e6e503",
-	Event: Event{
+	Event: &EventWrapper{Event{
 		Source: "iglu:com.snplow.msc.aws/spo__ds_test_bug/jsonschema/4-0-0",
 		Schema: nil,
+	},
 	},
 	Entities: Entities{Tracked: []Entity{
 		{

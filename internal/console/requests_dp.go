@@ -81,7 +81,7 @@ type includes struct {
 type RemoteSourceApplication struct {
 	Id          string   `json:"id"`
 	Name        string   `json:"name"`
-	Description string   `json:"description"`
+	Description string   `json:"description,omitempty"`
 	Owner       string   `json:"owner,omitempty"`
 	AppIds      []string `json:"appIds"`
 	Entities    Entities `json:"entities"`
@@ -410,7 +410,6 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%+v\n", es)
 	newVersion := existingEs.Version + 1
 
 	es.Version = newVersion

@@ -34,6 +34,15 @@ type DataProductChangeSet struct {
 	esUpdate []console.RemoteEventSpec
 }
 
+func (cs DataProductChangeSet) isEmpty() bool {
+	return len(cs.saCreate) == 0 &&
+		len(cs.saUpdate) == 0 &&
+		len(cs.dpCreate) == 0 &&
+		len(cs.dpUpdate) == 0 &&
+		len(cs.esCreate) == 0 &&
+		len(cs.esUpdate) == 0
+}
+
 func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
 
 	probablyDps := []model.DataProduct{}
@@ -229,34 +238,37 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 }
 
 func PrintChangeset(changes DataProductChangeSet) {
+	if changes.isEmpty() {
+		slog.Info("publish", "msg", "no changes detected, nothing to apply")
+	}
 	if len(changes.saCreate) != 0 {
 		for _, sa := range changes.saCreate {
-			slog.Info("will create source apps", "name", sa.Name, "id", sa.Id)
+			slog.Info("publish", "msg", "will create source apps", "name", sa.Name, "id", sa.Id)
 		}
 	}
 	if len(changes.saUpdate) != 0 {
 		for _, sa := range changes.saUpdate {
-			slog.Info("will update source apps", "name", sa.Name, "id", sa.Id)
+			slog.Info("publish", "msg", "will update source apps", "name", sa.Name, "id", sa.Id)
 		}
 	}
 	if len(changes.dpCreate) != 0 {
 		for _, dp := range changes.dpCreate {
-			slog.Info("will create data product", "name", dp.Name, "id", dp.Id)
+			slog.Info("publish", "msg", "will create data product", "name", dp.Name, "id", dp.Id)
 		}
 	}
 	if len(changes.dpUpdate) != 0 {
 		for _, dp := range changes.dpUpdate {
-			slog.Info("will update data product", "name", dp.Name, "id", dp.Id)
+			slog.Info("publish", "msg", "will update data product", "name", dp.Name, "id", dp.Id)
 		}
 	}
 	if len(changes.esCreate) != 0 {
 		for _, es := range changes.esCreate {
-			slog.Info("will create event specifications", "name", es.Name, "id", es.Id)
+			slog.Info("publish", "msg", "will create event specifications", "name", es.Name, "id", es.Id)
 		}
 	}
 	if len(changes.esUpdate) != 0 {
 		for _, es := range changes.esUpdate {
-			slog.Info("will update event specifications", "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
+			slog.Info("publish", "msg", "will update event specifications", "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
 		}
 	}
 }
@@ -275,7 +287,7 @@ func Publish(cnx context.Context, client *console.ApiClient, dp map[string]map[s
 		return err
 	}
 	PrintChangeset(*changeSet)
-	if !dryRun {
+	if !dryRun && !changeSet.isEmpty() {
 		err = ApplyDpChanges(*changeSet, cnx, client)
 	}
 	return err
