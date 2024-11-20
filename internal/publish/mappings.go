@@ -113,7 +113,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 		Id:                   es.ResourceName,
 		SourceApplicationIds: sourceApps,
 		Name:                 es.Name,
-		Event:                &console.EventWrapper{event},
+		Event:                &console.EventWrapper{Event: event},
 		Entities:             entities,
 		DataProductId:        dpId,
 	}

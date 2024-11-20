@@ -62,7 +62,7 @@ type EventWrapper struct {
 }
 
 func (ew EventWrapper) MarshalJSON() ([]byte, error) {
-	if ew.Source == "" && (ew.Schema == nil || len(ew.Schema) == 0) {
+	if ew.Source == "" && (len(ew.Schema) == 0) {
 		return []byte("null"), nil
 	} else {
 		return json.Marshal(ew.Event)
