@@ -36,6 +36,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		searchPaths := []string{}
 
@@ -63,7 +64,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = publish.Publish(cnx, c, files)
+		err = publish.Publish(cnx, c, files, dryRun)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -73,4 +74,5 @@ If no directory is provided then defaults to 'data-products' in the current dire
 
 func init() {
 	DataProductsCmd.AddCommand(publishCommand)
+	publishCommand.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
 }

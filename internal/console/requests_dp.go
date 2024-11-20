@@ -42,19 +42,31 @@ type EventSpecReference struct {
 }
 
 type RemoteEventSpec struct {
-	Id                   string   `json:"id"`
-	SourceApplicationIds []string `json:"sourceApplications"`
-	Name                 string   `json:"name"`
-	Status               string   `json:"status"`
-	Version              int      `json:"version"`
-	Event                Event    `json:"event"`
-	Entities             Entities `json:"entities"`
-	DataProductId        string   `json:"dataProductId"`
+	Id                   string        `json:"id"`
+	SourceApplicationIds []string      `json:"sourceApplications"`
+	Name                 string        `json:"name"`
+	Status               string        `json:"status"`
+	Version              int           `json:"version"`
+	Event                *EventWrapper `json:"event,omitempty"`
+	Entities             Entities      `json:"entities"`
+	DataProductId        string        `json:"dataProductId"`
 }
 
 type Event struct {
-	Source string         `json:"source"`
+	Source string         `json:"source,omitempty"`
 	Schema map[string]any `json:"schema,omitempty"`
+}
+
+type EventWrapper struct {
+	Event
+}
+
+func (ew EventWrapper) MarshalJSON() ([]byte, error) {
+	if ew.Source == "" && (ew.Schema == nil || len(ew.Schema) == 0) {
+		return []byte("null"), nil
+	} else {
+		return json.Marshal(ew.Event)
+	}
 }
 
 type dataProductsResponse struct {
@@ -398,6 +410,7 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("%+v\n", es)
 	newVersion := existingEs.Version + 1
 
 	es.Version = newVersion

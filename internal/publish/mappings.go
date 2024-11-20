@@ -10,6 +10,8 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
+	"encoding/json"
+	"sort"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
@@ -75,6 +77,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 	for _, esa := range es.ExcludedSourceApplications {
 		excludedSourceAppIds = append(excludedSourceAppIds, esa["id"])
 	}
+
 	event := console.Event{
 		Source: es.Event.Source,
 		Schema: es.Event.Schema,
@@ -89,7 +92,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 		})
 	}
 	enrichedEntities := []console.Entity{}
-	for _, ee := range es.Entities.Tracked {
+	for _, ee := range es.Entities.Enriched {
 		enrichedEntities = append(enrichedEntities, console.Entity{
 			Source:         ee.Source,
 			MinCardinality: ee.MinCardinality,
@@ -107,8 +110,92 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 		Id:                   es.ResourceName,
 		SourceApplicationIds: sourceApps,
 		Name:                 es.Name,
-		Event:                event,
+		Event:                &console.EventWrapper{event},
 		Entities:             entities,
 		DataProductId:        dpId,
+	}
+}
+
+type RemoteEventSpecDiff struct {
+	SourceApplicationIds []string
+	Name                 string
+	Event                string
+	Entities             EntitiesDiff
+	DataProductId        string
+}
+
+type EventDiff struct {
+	Source string
+	Schema []byte
+}
+
+type EntitiesDiff struct {
+	Tracked  []string
+	Enriched []string
+}
+
+func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
+
+	tracked := []string{}
+	for _, te := range es.Entities.Tracked {
+		entityJson, err := json.Marshal(te)
+		if err != nil {
+			return nil, err
+		}
+		tracked = append(tracked, string(entityJson))
+	}
+
+	enriched := []string{}
+	for _, ee := range es.Entities.Enriched {
+		entityJson, err := json.Marshal(ee)
+		if err != nil {
+			return nil, err
+		}
+		enriched = append(enriched, string(entityJson))
+	}
+
+	var sourceApps []string
+	if es.SourceApplicationIds == nil {
+		sourceApps = []string{}
+	} else {
+		// the order is not kept during the inversion
+		sort.Strings(es.SourceApplicationIds)
+		sourceApps = es.SourceApplicationIds
+	}
+
+	// the local fiels are getting serialized by mapstructure
+	// while the remote ones are getting serialized by json
+	// this lead to different numeric types
+	// serializeing them back to json help the comparison
+	eventJson, err := json.Marshal(es.Event)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RemoteEventSpecDiff{
+		SourceApplicationIds: sourceApps,
+		Name:                 es.Name,
+		Event:                string(eventJson),
+		Entities:             EntitiesDiff{Tracked: tracked, Enriched: enriched},
+		DataProductId:        es.DataProductId,
+	}, nil
+}
+
+type RemoteDataProductDiff struct {
+	Name                 string
+	SourceApplicationIds []string
+	Domain               string
+	Owner                string
+	Description          string
+}
+
+func dpToDiff(dp console.RemoteDataProduct) RemoteDataProductDiff {
+	sort.Strings(dp.SourceApplicationIds)
+	return RemoteDataProductDiff{
+		Name:                 dp.Name,
+		SourceApplicationIds: dp.SourceApplicationIds,
+		Domain:               dp.Domain,
+		Owner:                dp.Owner,
+		Description:          dp.Description,
 	}
 }

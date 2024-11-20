@@ -79,7 +79,13 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 		excludedSourceApps = append(excludedSourceApps, ref)
 	}
 
-	event := model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}
+	var event model.SchemaRef
+	if remoteEs.Event != nil {
+		event = model.SchemaRef{Source: remoteEs.Event.Source, Schema: remoteEs.Event.Schema}
+	} else {
+		event = model.SchemaRef{}
+	}
+
 	var trackedEntities []model.SchemaRef
 	for _, te := range remoteEs.Entities.Tracked {
 		trackedEntities = append(trackedEntities, model.SchemaRef{Source: te.Source, MinCardinality: te.MinCardinality, MaxCardinality: te.MaxCardinality, Schema: te.Schema})
