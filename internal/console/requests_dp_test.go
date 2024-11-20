@@ -51,7 +51,6 @@ var sampleRemoteEs = RemoteEventSpec{
 	SourceApplicationIds: []string{},
 	Name:                 "test ES 3",
 	DataProductId:        "46d47289-f3d5-4ef8-a82c-b19597e6e503",
-	Triggers:             []Trigger{},
 	Event: Event{
 		Source: "iglu:com.snplow.msc.aws/spo__ds_test_bug/jsonschema/4-0-0",
 		Schema: nil,
@@ -199,6 +198,42 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
 			_, _ = io.WriteString(w, resp)
 			return
 		}
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			resp := `{
+    "data": [
+            {
+                "id": "18183ea7-0d6e-4698-b2f9-7164dc7f1be5",
+                "name": "Test Source Application",
+                "description": "Source application for www.snowplow.io website",
+                "owner": "example@example.com",
+                "appIds": [
+                    "website",
+                    "website-qa",
+                    "website-dev"
+                ],
+                "entities": {
+                    "tracked": [
+                        {
+                            "source": "iglu:com.snplow.msc.aws/data_product/jsonschema/3-0-0",
+                            "minCardinality": 0,
+                            "comment": "When Data Products are available"
+                        }
+                    ],
+                    "enriched": []
+                }
+            }
+        ]
+}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+
 		t.Errorf("Unexpected request, got: %s", r.URL.Path)
 	}))
 	defer server.Close()

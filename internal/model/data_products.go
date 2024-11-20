@@ -11,11 +11,11 @@
 package model
 
 type EventSpec struct {
-	ResourceName       string
-	SourceApplications []map[string]string
-	Name               string
-	Event              SchemaRef
-	Entities           EntitiesDef
+	ResourceName               string
+	ExcludedSourceApplications []map[string]string `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
+	Name                       string
+	Event                      SchemaRef
+	Entities                   EntitiesDef
 }
 
 type DataProductData struct {
