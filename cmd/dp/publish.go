@@ -14,11 +14,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/publish"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow-product/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +40,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
 		searchPaths := []string{}
 
@@ -52,10 +56,11 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		// possibleFiles := []string{}
-		// for n := range files {
-		// 	possibleFiles = append(possibleFiles, n)
-		// }
+		arg0, err := os.Executable()
+		if err != nil {
+			snplog.LogFatal(err)
+		}
+		basePath := filepath.Dir(arg0)
 
 		cnx := context.Background()
 
@@ -64,7 +69,14 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = publish.Publish(cnx, c, files, dryRun)
+		changes, err := publish.FindChanges(cnx, c, files)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
+
+		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName)
+
+		err = publish.Publish(cnx, c, changes, dryRun)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -74,5 +86,6 @@ If no directory is provided then defaults to 'data-products' in the current dire
 
 func init() {
 	DataProductsCmd.AddCommand(publishCommand)
+	publishCommand.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 	publishCommand.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
 }

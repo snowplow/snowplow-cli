@@ -23,15 +23,17 @@ import (
 type LocalFilesRefsResolved struct {
 	DataProudcts []model.DataProduct
 	SourceApps   []model.SourceApp
+	IdToFileName map[string]string
 }
 
 type DataProductChangeSet struct {
-	saCreate []console.RemoteSourceApplication
-	saUpdate []console.RemoteSourceApplication
-	dpCreate []console.RemoteDataProduct
-	dpUpdate []console.RemoteDataProduct
-	esCreate []console.RemoteEventSpec
-	esUpdate []console.RemoteEventSpec
+	saCreate     []console.RemoteSourceApplication
+	saUpdate     []console.RemoteSourceApplication
+	dpCreate     []console.RemoteDataProduct
+	dpUpdate     []console.RemoteDataProduct
+	esCreate     []console.RemoteEventSpec
+	esUpdate     []console.RemoteEventSpec
+	IdToFileName map[string]string
 }
 
 func (cs DataProductChangeSet) isEmpty() bool {
@@ -49,6 +51,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	probablySas := []model.SourceApp{}
 	filenameToSa := make(map[string]model.SourceApp)
 	filenameToDp := make(map[string]model.DataProduct)
+	idToFileName := make(map[string]string)
 
 	for f, maybeDp := range dp {
 		if resourceType, ok := maybeDp["resourceType"]; ok {
@@ -57,6 +60,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				var dp model.DataProduct
 				if err := mapstructure.Decode(maybeDp, &dp); err == nil {
 					filenameToDp[f] = dp
+					idToFileName[dp.ResourceName] = f
 				} else {
 					return nil, err
 				}
@@ -64,6 +68,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				var sa model.SourceApp
 				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
 					filenameToSa[f] = sa
+					idToFileName[sa.ResourceName] = f
 					probablySas = append(probablySas, sa)
 				} else {
 					return nil, err
@@ -101,6 +106,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				excludedSourceApps = append(excludedSourceApps, ids)
 			}
 			dp.Data.EventSpecifications[idx].ExcludedSourceApplications = excludedSourceApps
+			idToFileName[es.ResourceName] = dpFile
 		}
 		probablyDps = append(probablyDps, dp)
 	}
@@ -108,12 +114,14 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	res := LocalFilesRefsResolved{
 		DataProudcts: probablyDps,
 		SourceApps:   probablySas,
+		IdToFileName: idToFileName,
 	}
 	return &res, nil
 }
 
 func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources) (*DataProductChangeSet, error) {
 	saRemoteIds := make(map[string]console.RemoteSourceApplication)
+	idToFileName := make(map[string]string)
 	for _, remoteSa := range remote.SourceApplication {
 		saRemoteIds[remoteSa.Id] = remoteSa
 	}
@@ -127,9 +135,11 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			possibleUpdate := localSaToRemote(localSa)
 			if !reflect.DeepEqual(possibleUpdate, currentRemote) {
 				saUpdate = append(saUpdate, possibleUpdate)
+				idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
 			}
 		} else {
 			saCreate = append(saCreate, localSaToRemote(localSa))
+			idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
 		}
 	}
 
@@ -155,9 +165,11 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			possibleUpdate := LocalDpToRemote(localDp)
 			if !reflect.DeepEqual(dpToDiff(possibleUpdate), dpToDiff(remoteDp)) {
 				dpUpdate = append(dpUpdate, possibleUpdate)
+				idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
 			}
 		} else {
 			dpCreate = append(dpCreate, LocalDpToRemote(localDp))
+			idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
 		}
 		var dpSaIds []string
 		for _, sa := range localDp.Data.SourceApplications {
@@ -178,21 +190,23 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 				}
 				if !reflect.DeepEqual(*remoteDiff, *updateDiff) {
 					esUpdate = append(esUpdate, possibleUpdate)
+					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 				}
 			} else {
 				esCreate = append(esCreate, LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName))
+				idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 			}
-
 		}
 	}
 
 	return &DataProductChangeSet{
-		saCreate: saCreate,
-		saUpdate: saUpdate,
-		dpCreate: dpCreate,
-		dpUpdate: dpUpdate,
-		esCreate: esCreate,
-		esUpdate: esUpdate,
+		saCreate:     saCreate,
+		saUpdate:     saUpdate,
+		dpCreate:     dpCreate,
+		dpUpdate:     dpUpdate,
+		esCreate:     esCreate,
+		esUpdate:     esUpdate,
+		IdToFileName: idToFileName,
 	}, nil
 }
 
@@ -237,56 +251,61 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 	return nil
 }
 
-func PrintChangeset(changes DataProductChangeSet) {
+func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 	if changes.isEmpty() {
 		slog.Info("publish", "msg", "no changes detected, nothing to apply")
 	}
 	if len(changes.saCreate) != 0 {
 		for _, sa := range changes.saCreate {
-			slog.Info("publish", "msg", "will create source apps", "name", sa.Name, "id", sa.Id)
+			slog.Info("publish", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
 		}
 	}
 	if len(changes.saUpdate) != 0 {
 		for _, sa := range changes.saUpdate {
-			slog.Info("publish", "msg", "will update source apps", "name", sa.Name, "id", sa.Id)
+			slog.Info("publish", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
 		}
 	}
 	if len(changes.dpCreate) != 0 {
 		for _, dp := range changes.dpCreate {
-			slog.Info("publish", "msg", "will create data product", "name", dp.Name, "id", dp.Id)
+			slog.Info("publish", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
 		}
 	}
 	if len(changes.dpUpdate) != 0 {
 		for _, dp := range changes.dpUpdate {
-			slog.Info("publish", "msg", "will update data product", "name", dp.Name, "id", dp.Id)
+			slog.Info("publish", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
 		}
 	}
 	if len(changes.esCreate) != 0 {
 		for _, es := range changes.esCreate {
-			slog.Info("publish", "msg", "will create event specifications", "name", es.Name, "id", es.Id)
+			slog.Info("publish", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id)
 		}
 	}
 	if len(changes.esUpdate) != 0 {
 		for _, es := range changes.esUpdate {
-			slog.Info("publish", "msg", "will update event specifications", "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
+			slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
 		}
 	}
 }
 
-func Publish(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any, dryRun bool) error {
+func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any) (*DataProductChangeSet, error) {
 	localResolved, err := ReadLocalDataProducts(dp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	remote, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	changeSet, err := findChanges(*localResolved, *remote)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	PrintChangeset(*changeSet)
+	return changeSet, err
+}
+
+func Publish(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
+	PrintChangeset(*changeSet, changeSet.IdToFileName)
+	var err error
 	if !dryRun && !changeSet.isEmpty() {
 		err = ApplyDpChanges(*changeSet, cnx, client)
 	}

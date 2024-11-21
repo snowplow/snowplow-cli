@@ -19,6 +19,7 @@ import (
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/publish"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/snowplow-product/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
@@ -37,6 +38,7 @@ var validateCmd = &cobra.Command{
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
+		full, _ := cmd.Flags().GetBool("full")
 
 		searchPaths := []string{}
 
@@ -52,11 +54,6 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		possibleFiles := []string{}
-		for n := range files {
-			possibleFiles = append(possibleFiles, n)
-		}
-
 		arg0, err := os.Executable()
 		if err != nil {
 			snplog.LogFatal(err)
@@ -70,49 +67,12 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		schemaResolver, err := console.NewSchemaDeployChecker(cnx, c)
+		changes, err := publish.FindChanges(cnx, c, files)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		compatChecker := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
-			return console.CompatCheck(cnx, c, event, entities)
-		}
-
-		lookup, err := validation.NewDPLookup(compatChecker, schemaResolver, files)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
-
-		slog.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
-
-		err = lookup.SlogValidations(basePath)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
-
-		if ghOut {
-			err := lookup.GhAnnotateValidations(basePath)
-			if err != nil {
-				snplog.LogFatal(err)
-			}
-		}
-
-		numErrors := lookup.ValidationErrorCount()
-
-		if numErrors > 0 {
-			snplog.LogFatal(fmt.Errorf("validation failed %d errors", numErrors))
-		} else {
-			dpCount := 0
-			for range lookup.DataProducts {
-				dpCount++
-			}
-			saCount := 0
-			for range lookup.SourceApps {
-				saCount++
-			}
-			slog.Info("validation", "msg", "success", "data products found", dpCount, "source applications found", saCount)
-		}
+		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, full, changes.IdToFileName)
 	},
 }
 
@@ -120,4 +80,5 @@ func init() {
 	DataProductsCmd.AddCommand(validateCmd)
 
 	validateCmd.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
+	validateCmd.PersistentFlags().Bool("full", false, "Perform compatibility check on all files, not only the ones that were changed")
 }
