@@ -10,9 +10,11 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"reflect"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
@@ -287,6 +289,82 @@ func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 		}
 		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate), "source apps", len(changes.saCreate)+len(changes.saUpdate))
 	}
+}
+
+type DataProductPurger interface {
+	DeleteSourceApp (sa console.RemoteSourceApplication) error
+	DeleteDataProduct (dp console.RemoteDataProduct) error
+	FetchDataProduct () (*console.DataProductsAndRelatedResources, error)
+}
+
+func Purge(api DataProductPurger, dp map[string]map[string]any, commit bool) error {
+	localResolved, err := ReadLocalDataProducts(dp)
+	if err != nil {
+		return err
+	}
+	remote, err := api.FetchDataProduct()
+	if err != nil {
+		return err
+	}
+
+	purgeApps := map[string]console.RemoteSourceApplication{}
+	for _, r := range remote.SourceApplication {
+		purgeApps[r.Id] = r
+	}
+	for _, r := range localResolved.SourceApps {
+		delete(purgeApps, r.ResourceName)
+	}
+	saNames := []string{}
+	for _, r := range purgeApps {
+		saNames = append(saNames, r.Name)
+	}
+
+	purgeProds := map[string]console.RemoteDataProduct{}
+	for _, r := range remote.DataProducts {
+		purgeProds[r.Id] = r
+	}
+	for _, r := range localResolved.DataProudcts {
+		delete(purgeProds, r.ResourceName)
+	}
+	dpNames := []string{}
+	for _, r := range purgeProds {
+		dpNames = append(dpNames, r.Name)
+	}
+
+	slog.Info("purge",
+		"msg", fmt.Sprintf("%d source apps and %d data products", len(saNames), len(dpNames)),
+		"source apps", strings.Join(saNames, "\n"),
+		"data products", strings.Join(dpNames, "\n"),
+	)
+
+	if !commit {
+		slog.Info("purge", "msg", "re-run command with -y/--yes to commit changes")
+		return nil
+	}
+
+	for n, r := range purgeApps {
+		slog.Debug("purge", "msg", "deleting remote", "source app", n)
+		if err := api.DeleteSourceApp(r); err != nil {
+			slog.Error("purge", "msg", "failed", "source app", n)
+			return fmt.Errorf("purge failed: %w", err)
+		}
+
+		slog.Debug("purge", "msg", "deleted", "source app", n)
+	}
+
+	for n, r := range purgeProds {
+		slog.Debug("purge", "msg", "deleting remote", "data product", n)
+		if err := api.DeleteDataProduct(r); err != nil {
+			slog.Error("purge", "msg", "failed", "data product", n)
+			return fmt.Errorf("purge failed: %w", err)
+		}
+
+		slog.Debug("purge", "msg", "deleted", "data product", n)
+	}
+
+	slog.Info("purge", "msg", "complete")
+
+	return nil
 }
 
 func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any) (*DataProductChangeSet, error) {

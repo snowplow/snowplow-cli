@@ -289,6 +289,31 @@ func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 	return nil
 }
 
+func DeleteSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceApplication) error {
+	resp, err := DoConsoleRequest("DELETE", fmt.Sprintf("%s/source-apps/v1/%s", client.BaseUrl, sa.Id), client, cnx, nil)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp.Message)
+
+	}
+	return nil
+}
+
 func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProduct) error {
 	body, err := json.Marshal(dp)
 	if err != nil {
@@ -330,6 +355,31 @@ func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp)
+
+	}
+	return nil
+}
+
+func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProduct) error {
+	resp, err := DoConsoleRequest("DELETE", fmt.Sprintf("%s/data-products/v2/%s", client.BaseUrl, dp.Id), client, cnx, nil)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
 		defer resp.Body.Close()
 		if err != nil {
