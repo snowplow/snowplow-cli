@@ -33,7 +33,7 @@
                 "properties": {
                   "source": { "$ref": "#/$defs/igluUri" },
                   "comment": { "type": "string" },
-                  "minCardinality": { "type": "number" },
+                  "minCardinality": { "type": "number", "enum": [0, 1]},
                   "maxCardinality": { "type": "number" }
                 }
               }
@@ -47,7 +47,7 @@
                 "properties": {
                   "source": { "$ref": "#/$defs/igluUri" },
                   "comment": { "type": "string" },
-                  "minCardinality": { "type": "number" },
+                  "minCardinality": { "type": "number", "enum": [0, 1]},
                   "maxCardinality": { "type": "number" }
                 }
               }

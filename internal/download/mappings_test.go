@@ -95,9 +95,10 @@ var sampleRemoteEs = console.RemoteEventSpec{
 	Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
 	SourceApplicationIds: []string{sampleSa1.Id},
 	Name:                 "test ES",
-	Event: console.Event{
+	Event: &console.EventWrapper{Event: console.Event{
 		Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
 		Schema: map[string]any{},
+	},
 	},
 	Entities: console.Entities{Tracked: []console.Entity{
 		{

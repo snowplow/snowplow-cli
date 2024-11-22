@@ -45,8 +45,8 @@ type SourceApp struct {
 type SourceAppData struct {
 	ResourceName string `yaml:"-" json:"-"`
 	Name         string
-	Description  string
-	Owner        string
+	Description  string   `yaml:"description,omitempty" json:"description,omitempty"`
+	Owner        string   `yaml:"owner,omitempty" json:"owner,omitempty"`
 	AppIds       []string `yaml:"appIds" json:"appIds"`
 	Entities     *EntitiesDef
 }
@@ -66,10 +66,10 @@ type SchemaRef struct {
 type DataProductCanonicalData struct {
 	ResourceName        string `yaml:"-" json:"-"`
 	Name                string
-	SourceApplications  []Ref `yaml:"sourceApplications" json:"sourceApplications"`
-	Domain              string
+	SourceApplications  []Ref  `yaml:"sourceApplications" json:"sourceApplications"`
+	Domain              string `yaml:"domain,omitempty" json:"domain,omitempty"`
 	Owner               string
-	Description         string
+	Description         string               `yaml:"description,omitempty" json:"description,omitempty"`
 	EventSpecifications []EventSpecCanonical `yaml:"eventSpecifications" json:"eventSpecifications"`
 }
 

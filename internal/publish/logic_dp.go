@@ -12,6 +12,7 @@ package publish
 import (
 	"log/slog"
 	"path/filepath"
+	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
@@ -22,15 +23,26 @@ import (
 type LocalFilesRefsResolved struct {
 	DataProudcts []model.DataProduct
 	SourceApps   []model.SourceApp
+	IdToFileName map[string]string
 }
 
 type DataProductChangeSet struct {
-	saCreate []console.RemoteSourceApplication
-	saUpdate []console.RemoteSourceApplication
-	dpCreate []console.RemoteDataProduct
-	dpUpdate []console.RemoteDataProduct
-	esCreate []console.RemoteEventSpec
-	esUpdate []console.RemoteEventSpec
+	saCreate     []console.RemoteSourceApplication
+	saUpdate     []console.RemoteSourceApplication
+	dpCreate     []console.RemoteDataProduct
+	dpUpdate     []console.RemoteDataProduct
+	esCreate     []console.RemoteEventSpec
+	esUpdate     []console.RemoteEventSpec
+	IdToFileName map[string]string
+}
+
+func (cs DataProductChangeSet) isEmpty() bool {
+	return len(cs.saCreate) == 0 &&
+		len(cs.saUpdate) == 0 &&
+		len(cs.dpCreate) == 0 &&
+		len(cs.dpUpdate) == 0 &&
+		len(cs.esCreate) == 0 &&
+		len(cs.esUpdate) == 0
 }
 
 func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
@@ -39,6 +51,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	probablySas := []model.SourceApp{}
 	filenameToSa := make(map[string]model.SourceApp)
 	filenameToDp := make(map[string]model.DataProduct)
+	idToFileName := make(map[string]string)
 
 	for f, maybeDp := range dp {
 		if resourceType, ok := maybeDp["resourceType"]; ok {
@@ -47,6 +60,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				var dp model.DataProduct
 				if err := mapstructure.Decode(maybeDp, &dp); err == nil {
 					filenameToDp[f] = dp
+					idToFileName[dp.ResourceName] = f
 				} else {
 					return nil, err
 				}
@@ -54,6 +68,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				var sa model.SourceApp
 				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
 					filenameToSa[f] = sa
+					idToFileName[sa.ResourceName] = f
 					probablySas = append(probablySas, sa)
 				} else {
 					return nil, err
@@ -91,6 +106,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 				excludedSourceApps = append(excludedSourceApps, ids)
 			}
 			dp.Data.EventSpecifications[idx].ExcludedSourceApplications = excludedSourceApps
+			idToFileName[es.ResourceName] = dpFile
 		}
 		probablyDps = append(probablyDps, dp)
 	}
@@ -98,50 +114,62 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	res := LocalFilesRefsResolved{
 		DataProudcts: probablyDps,
 		SourceApps:   probablySas,
+		IdToFileName: idToFileName,
 	}
 	return &res, nil
 }
 
-func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources) DataProductChangeSet {
-	saRemoteIds := make(map[string]bool)
+func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources) (*DataProductChangeSet, error) {
+	saRemoteIds := make(map[string]console.RemoteSourceApplication)
+	idToFileName := make(map[string]string)
 	for _, remoteSa := range remote.SourceApplication {
-		saRemoteIds[remoteSa.Id] = true
+		saRemoteIds[remoteSa.Id] = remoteSa
 	}
 	var saCreate []console.RemoteSourceApplication
 	var saUpdate []console.RemoteSourceApplication
 
 	for _, localSa := range local.SourceApps {
-		_, remoteExists := saRemoteIds[localSa.ResourceName]
+		currentRemote, remoteExists := saRemoteIds[localSa.ResourceName]
 
 		if remoteExists {
-			saUpdate = append(saUpdate, localSaToRemote(localSa))
+			possibleUpdate := localSaToRemote(localSa)
+			if !reflect.DeepEqual(possibleUpdate, currentRemote) {
+				saUpdate = append(saUpdate, possibleUpdate)
+				idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
+			}
 		} else {
 			saCreate = append(saCreate, localSaToRemote(localSa))
+			idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
 		}
 	}
 
-	dpRemoteIds := make(map[string]bool)
+	dpRemoteIds := make(map[string]console.RemoteDataProduct)
 	for _, remoteDp := range remote.DataProducts {
-		dpRemoteIds[remoteDp.Id] = true
+		dpRemoteIds[remoteDp.Id] = remoteDp
 	}
 
 	var dpCreate []console.RemoteDataProduct
 	var dpUpdate []console.RemoteDataProduct
 
-	esRemoteIds := make(map[string]bool)
+	esRemoteIds := make(map[string]console.RemoteEventSpec)
 	for _, remoteEs := range remote.EventSpecs {
-		esRemoteIds[remoteEs.Id] = true
+		esRemoteIds[remoteEs.Id] = remoteEs
 	}
 
 	var esCreate []console.RemoteEventSpec
 	var esUpdate []console.RemoteEventSpec
 
 	for _, localDp := range local.DataProudcts {
-		_, remoteExists := dpRemoteIds[localDp.ResourceName]
+		remoteDp, remoteExists := dpRemoteIds[localDp.ResourceName]
 		if remoteExists {
-			dpUpdate = append(dpUpdate, LocalDpToRemote(localDp))
+			possibleUpdate := LocalDpToRemote(localDp)
+			if !reflect.DeepEqual(dpToDiff(possibleUpdate), dpToDiff(remoteDp)) {
+				dpUpdate = append(dpUpdate, possibleUpdate)
+				idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
+			}
 		} else {
 			dpCreate = append(dpCreate, LocalDpToRemote(localDp))
+			idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
 		}
 		var dpSaIds []string
 		for _, sa := range localDp.Data.SourceApplications {
@@ -149,27 +177,41 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		}
 
 		for _, localEs := range localDp.Data.EventSpecifications {
-			_, remoteExists := esRemoteIds[localEs.ResourceName]
+			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
 			if remoteExists {
-				esUpdate = append(esUpdate, LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName))
+				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
+				updateDiff, err := esToDiff(possibleUpdate)
+				if err != nil {
+					return nil, err
+				}
+				remoteDiff, err := esToDiff(remoteEs)
+				if err != nil {
+					return nil, err
+				}
+				if !reflect.DeepEqual(*remoteDiff, *updateDiff) {
+					esUpdate = append(esUpdate, possibleUpdate)
+					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
+				}
 			} else {
 				esCreate = append(esCreate, LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName))
+				idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 			}
-
 		}
 	}
 
-	return DataProductChangeSet{
-		saCreate: saCreate,
-		saUpdate: saUpdate,
-		dpCreate: dpCreate,
-		dpUpdate: dpUpdate,
-		esCreate: esCreate,
-		esUpdate: esUpdate,
-	}
+	return &DataProductChangeSet{
+		saCreate:     saCreate,
+		saUpdate:     saUpdate,
+		dpCreate:     dpCreate,
+		dpUpdate:     dpUpdate,
+		esCreate:     esCreate,
+		esUpdate:     esUpdate,
+		IdToFileName: idToFileName,
+	}, nil
 }
 
 func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *console.ApiClient) error {
+	slog.Info("publish", "msg", "applying changes")
 	for _, saC := range changes.saCreate {
 		err := console.CreateSourceApp(cnx, client, saC)
 		if err != nil {
@@ -209,50 +251,65 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 	return nil
 }
 
-func PrintChangeset(changes DataProductChangeSet) {
-	if len(changes.saCreate) != 0 {
-		for _, sa := range changes.saCreate {
-			slog.Info("will create source apps", "name", sa.Name, "id", sa.Id)
+func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
+	if changes.isEmpty() {
+		slog.Info("publish", "msg", "no changes detected, nothing to apply")
+	} else {
+		if len(changes.saCreate) != 0 {
+			for _, sa := range changes.saCreate {
+				slog.Info("publish", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+			}
 		}
-	}
-	if len(changes.saUpdate) != 0 {
-		for _, sa := range changes.saUpdate {
-			slog.Info("will update source apps", "name", sa.Name, "id", sa.Id)
+		if len(changes.saUpdate) != 0 {
+			for _, sa := range changes.saUpdate {
+				slog.Info("publish", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+			}
 		}
-	}
-	if len(changes.dpCreate) != 0 {
-		for _, dp := range changes.dpCreate {
-			slog.Info("will create data product", "name", dp.Name, "id", dp.Id)
+		if len(changes.dpCreate) != 0 {
+			for _, dp := range changes.dpCreate {
+				slog.Info("publish", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+			}
 		}
-	}
-	if len(changes.dpUpdate) != 0 {
-		for _, dp := range changes.dpUpdate {
-			slog.Info("will update data product", "name", dp.Name, "id", dp.Id)
+		if len(changes.dpUpdate) != 0 {
+			for _, dp := range changes.dpUpdate {
+				slog.Info("publish", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+			}
 		}
-	}
-	if len(changes.esCreate) != 0 {
-		for _, es := range changes.esCreate {
-			slog.Info("will create event specifications", "name", es.Name, "id", es.Id)
+		if len(changes.esCreate) != 0 {
+			for _, es := range changes.esCreate {
+				slog.Info("publish", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id)
+			}
 		}
-	}
-	if len(changes.esUpdate) != 0 {
-		for _, es := range changes.esUpdate {
-			slog.Info("will update event specifications", "name", es.Name, "id", es.Id)
+		if len(changes.esUpdate) != 0 {
+			for _, es := range changes.esUpdate {
+				slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
+			}
 		}
+		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate), "source apps", len(changes.saCreate)+len(changes.saUpdate))
 	}
 }
 
-func Publish(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any) error {
+func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any) (*DataProductChangeSet, error) {
 	localResolved, err := ReadLocalDataProducts(dp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	remote, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	changeSet := findChanges(*localResolved, *remote)
-	PrintChangeset(changeSet)
-	err = ApplyDpChanges(changeSet, cnx, client)
+	changeSet, err := findChanges(*localResolved, *remote)
+	if err != nil {
+		return nil, err
+	}
+	return changeSet, err
+}
+
+func Publish(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
+	PrintChangeset(*changeSet, changeSet.IdToFileName)
+	var err error
+	if !dryRun && !changeSet.isEmpty() {
+		err = ApplyDpChanges(*changeSet, cnx, client)
+	}
 	return err
 }
