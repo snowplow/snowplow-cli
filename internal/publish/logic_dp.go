@@ -254,36 +254,38 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 	if changes.isEmpty() {
 		slog.Info("publish", "msg", "no changes detected, nothing to apply")
-	}
-	if len(changes.saCreate) != 0 {
-		for _, sa := range changes.saCreate {
-			slog.Info("publish", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+	} else {
+		if len(changes.saCreate) != 0 {
+			for _, sa := range changes.saCreate {
+				slog.Info("publish", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+			}
 		}
-	}
-	if len(changes.saUpdate) != 0 {
-		for _, sa := range changes.saUpdate {
-			slog.Info("publish", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+		if len(changes.saUpdate) != 0 {
+			for _, sa := range changes.saUpdate {
+				slog.Info("publish", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "id", sa.Id)
+			}
 		}
-	}
-	if len(changes.dpCreate) != 0 {
-		for _, dp := range changes.dpCreate {
-			slog.Info("publish", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+		if len(changes.dpCreate) != 0 {
+			for _, dp := range changes.dpCreate {
+				slog.Info("publish", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+			}
 		}
-	}
-	if len(changes.dpUpdate) != 0 {
-		for _, dp := range changes.dpUpdate {
-			slog.Info("publish", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+		if len(changes.dpUpdate) != 0 {
+			for _, dp := range changes.dpUpdate {
+				slog.Info("publish", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "id", dp.Id)
+			}
 		}
-	}
-	if len(changes.esCreate) != 0 {
-		for _, es := range changes.esCreate {
-			slog.Info("publish", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id)
+		if len(changes.esCreate) != 0 {
+			for _, es := range changes.esCreate {
+				slog.Info("publish", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id)
+			}
 		}
-	}
-	if len(changes.esUpdate) != 0 {
-		for _, es := range changes.esUpdate {
-			slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
+		if len(changes.esUpdate) != 0 {
+			for _, es := range changes.esUpdate {
+				slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
+			}
 		}
+		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate), "source apps", len(changes.saCreate)+len(changes.saUpdate))
 	}
 }
 
