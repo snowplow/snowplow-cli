@@ -50,40 +50,78 @@ var docsCommand = &cobra.Command{
 			os.Exit(1)
 		}
 
-		position := 0
+		// Collect all documentation content
+		var allContent []struct {
+			title   string
+			content string
+		}
+
 		err := filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			// Convert markdown files to Docusaurus format
-			// skip the autocompletion docs
-			// skip the root command - nothing useful, probably have to be done by hand
-			if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") && !strings.Contains(info.Name(), "completion") && info.Name() != "snowplow-cli.md" {
-				if err := convertToDocusaurus(path, position); err != nil {
-					return err
-				}
-				baseName := strings.TrimSuffix(info.Name(), ".md")
-				// Create new directory
-				dirPath := filepath.Join(outputDir, baseName)
-				if err := os.MkdirAll(dirPath, 0755); err != nil {
-					return err
-				}
-				// Move file
-				err = os.Rename(path, filepath.Join(dirPath, "index.md"))
+
+			if !info.IsDir() && strings.HasSuffix(info.Name(), ".md") &&
+				!strings.Contains(info.Name(), "completion") &&
+				info.Name() != "snowplow-cli.md" {
+
+				content, err := processDocFile(path)
 				if err != nil {
 					return err
 				}
 
-				position++
+				title := strings.TrimSuffix(info.Name(), ".md")
+				title = strings.TrimPrefix(title, "snowplow-cli_")
+				title = strings.ReplaceAll(title, "_", " ")
+
+				allContent = append(allContent, struct {
+					title   string
+					content string
+				}{title, content})
+
+				// Remove the processed file
+				os.Remove(path)
 			}
-			// Remove autocompletion docs
-			// Remove snowplow-cli.md
+
+			// Remove autocompletion docs and root command doc
 			if !info.IsDir() && (strings.Contains(info.Name(), "completion") || info.Name() == "snowplow-cli.md") {
 				os.Remove(path)
 			}
 
 			return nil
 		})
+
+		if err != nil {
+			slog.Error("Failed to process documentation files", "error", err)
+			os.Exit(1)
+		}
+
+		// Create the combined documentation file
+		var combinedContent strings.Builder
+
+		// Add front matter
+		combinedContent.WriteString("---\n")
+		combinedContent.WriteString("title: Command Reference\n")
+		combinedContent.WriteString(fmt.Sprintf("date: %s\n", time.Now().Format("2006-01-02")))
+		combinedContent.WriteString("sidebar_label: Command Reference\n")
+		combinedContent.WriteString("sidebar_position: 1\n")
+		combinedContent.WriteString("---\n\n")
+
+		combinedContent.WriteString("This page contains the complete reference for the Snowplow CLI commands.\n\n")
+
+		// Add each command's content with appropriate heading
+		for _, doc := range allContent {
+			combinedContent.WriteString(fmt.Sprintf("## %s\n\n", strings.Title(doc.title)))
+			combinedContent.WriteString(doc.content)
+			combinedContent.WriteString("\n\n")
+		}
+
+		// Write the combined file
+		outputFile := filepath.Join(outputDir, "index.md")
+		if err := os.WriteFile(outputFile, []byte(combinedContent.String()), 0644); err != nil {
+			slog.Error("Failed to write combined documentation", "error", err)
+			os.Exit(1)
+		}
 
 		if err != nil {
 			slog.Error("Failed to convert documentation to Docusaurus format", "error", err)
@@ -94,11 +132,11 @@ var docsCommand = &cobra.Command{
 	},
 }
 
-func convertToDocusaurus(filepath string, position int) error {
+func processDocFile(filepath string) (string, error) {
 	// Read the file
 	content, err := os.ReadFile(filepath)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	lines := strings.Split(string(content), "\n")
@@ -112,17 +150,7 @@ func convertToDocusaurus(filepath string, position int) error {
 		}
 	}
 
-	// Create new content with front matter
 	var newContent strings.Builder
-
-	// Add front matter
-	newContent.WriteString("---\n")
-	newContent.WriteString(fmt.Sprintf("title: %s\n", title))
-	newContent.WriteString(fmt.Sprintf("date: %s\n", time.Now().Format("2006-01-02")))
-	sidebarLabel := strings.TrimPrefix(title, "snowplow-cli ")
-	newContent.WriteString(fmt.Sprintf("sidebar_label: %s\n", sidebarLabel))
-	newContent.WriteString(fmt.Sprintf("sidebar_position: %d\n", position))
-	newContent.WriteString("---\n\n")
 
 	// Process content
 	inCodeBlock := false
@@ -140,12 +168,14 @@ func convertToDocusaurus(filepath string, position int) error {
 			}
 		}
 
-		processedLine := replaceMarkdownLinks(line)
 		// Add line to new content with escaped angle brackets
-		escapedLine := strings.ReplaceAll(strings.ReplaceAll(processedLine, "<", "\\<"), ">", "\\>")
+		escapedLine := strings.ReplaceAll(strings.ReplaceAll(line, "<", "\\<"), ">", "\\>")
+
 		// Remove link to the autocomplete command
-		if !strings.Contains(escapedLine, "[snowplow-cli completion]") {
+		if !strings.HasPrefix(escapedLine, "### SEE ALSO") {
 			newContent.WriteString(escapedLine + "\n")
+		} else {
+			break
 		}
 	}
 
@@ -154,12 +184,7 @@ func convertToDocusaurus(filepath string, position int) error {
 		"###### Auto generated by spf13/cobra on "+time.Now().Format("2-Jan-2006")+"\n",
 		"", -1)
 
-	return os.WriteFile(filepath, []byte(final), 0644)
-}
-
-// Convert links from name.md to ../name
-func replaceMarkdownLinks(line string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(line, "](", "](../"), ".md)", ")")
+	return final, nil
 }
 
 func init() {
