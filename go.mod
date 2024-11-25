@@ -4,6 +4,7 @@ go 1.22.6
 
 require (
 	github.com/charmbracelet/log v0.4.0
+	github.com/flytam/filenamify v1.2.0
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/google/uuid v1.6.0
@@ -11,6 +12,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
+	golang.org/x/net v0.23.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -36,7 +38,6 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
