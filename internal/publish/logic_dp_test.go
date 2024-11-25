@@ -11,6 +11,7 @@ package publish
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
@@ -238,5 +239,88 @@ func Test_findChanges_UpdateAll(t *testing.T) {
 	}
 	if len(changes.esUpdate) != 1 {
 		t.Errorf("expected 1 event spec update, got %d", len(changes.esUpdate))
+	}
+}
+
+type mockPurgeApi struct {
+	remoteResources *console.DataProductsAndRelatedResources
+	deletedSourceApps []string
+	deletedDataProducts []string
+}
+
+func (a *mockPurgeApi) DeleteSourceApp(sa console.RemoteSourceApplication) error {
+	a.deletedSourceApps = append(a.deletedSourceApps, sa.Id)
+	return nil
+}
+
+func (a *mockPurgeApi) DeleteDataProduct(dp console.RemoteDataProduct) error {
+	a.deletedDataProducts = append(a.deletedDataProducts, dp.Id)
+	return nil
+}
+
+func (a *mockPurgeApi) FetchDataProduct() (*console.DataProductsAndRelatedResources, error) {
+	return a.remoteResources, nil
+}
+
+func Test_Purge(t *testing.T) {
+	dp := map[string]map[string]any{
+		"file1.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+			"resourceName": "do not purgeme",
+		},
+		"file2.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"resourceName": "dp no purge",
+		},
+	}
+
+	remote := &console.DataProductsAndRelatedResources{
+		SourceApplication: []console.RemoteSourceApplication{
+			{Id: "purgeme"},
+			{Id: "do not purgeme"},
+		},
+		DataProducts: []console.RemoteDataProduct{
+			{Id: "dp no purge"},
+			{Id: "dp purge"},
+		},
+	}
+
+	mockApi := &mockPurgeApi{ remoteResources: remote }
+
+	_ = Purge(mockApi, dp, true)
+
+	if !slices.Equal(mockApi.deletedSourceApps, []string{"purgeme"}) {
+		t.Fatal("deleted the wrong source apps")
+	}
+
+	if !slices.Equal(mockApi.deletedDataProducts, []string{"dp purge"}) {
+		t.Fatal("deleted the wrong data products")
+	}
+}
+
+func Test_PurgeNoCommit(t *testing.T) {
+	dp := map[string]map[string]any{}
+
+	remote := &console.DataProductsAndRelatedResources{
+		SourceApplication: []console.RemoteSourceApplication{
+			{Id: "do not purgeme"},
+		},
+		DataProducts: []console.RemoteDataProduct{
+			{Id: "dp no purge"},
+		},
+	}
+
+	mockApi := &mockPurgeApi{ remoteResources: remote }
+
+	_ = Purge(mockApi, dp, false)
+
+	if len(mockApi.deletedDataProducts) > 0 {
+		t.Fatal("deleted source apps")
+	}
+
+	if len(mockApi.deletedDataProducts) > 0 {
+		t.Fatal("deleted data products")
 	}
 }
