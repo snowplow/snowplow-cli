@@ -1,4 +1,4 @@
-/**a
+/**
  * Copyright (c) 2013-present Snowplow Analytics Ltd.
  * All rights reserved.
  * This software is made available by Snowplow Analytics, Ltd.,

@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"github.com/spf13/cobra/doc"
 )
 
@@ -111,7 +113,8 @@ var docsCommand = &cobra.Command{
 
 		// Add each command's content with appropriate heading
 		for _, doc := range allContent {
-			combinedContent.WriteString(fmt.Sprintf("## %s\n\n", strings.Title(doc.title)))
+			caser := cases.Title(language.English)
+			combinedContent.WriteString(fmt.Sprintf("## %s\n\n", caser.String(doc.title)))
 			combinedContent.WriteString(doc.content)
 			combinedContent.WriteString("\n\n")
 		}
