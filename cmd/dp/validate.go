@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
@@ -54,11 +53,10 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		arg0, err := os.Executable()
+		basePath, err := os.Getwd()
 		if err != nil {
 			snplog.LogFatal(err)
 		}
-		basePath := filepath.Dir(arg0)
 
 		cnx := context.Background()
 
