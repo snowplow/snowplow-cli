@@ -35,6 +35,7 @@ type DataProductChangeSet struct {
 	dpUpdate     []console.RemoteDataProduct
 	esCreate     []console.RemoteEventSpec
 	esUpdate     []console.RemoteEventSpec
+	esDelete     []console.RemoteEventSpec
 	IdToFileName map[string]string
 }
 
@@ -44,7 +45,8 @@ func (cs DataProductChangeSet) isEmpty() bool {
 		len(cs.dpCreate) == 0 &&
 		len(cs.dpUpdate) == 0 &&
 		len(cs.esCreate) == 0 &&
-		len(cs.esUpdate) == 0
+		len(cs.esUpdate) == 0 &&
+		len(cs.esDelete) == 0
 }
 
 func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
@@ -160,6 +162,9 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 
 	var esCreate []console.RemoteEventSpec
 	var esUpdate []console.RemoteEventSpec
+	var esDelete []console.RemoteEventSpec
+
+	esLocalIds := make(map[string]bool)
 
 	for _, localDp := range local.DataProudcts {
 		remoteDp, remoteExists := dpRemoteIds[localDp.ResourceName]
@@ -198,6 +203,18 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 				esCreate = append(esCreate, LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName))
 				idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 			}
+
+			esLocalIds[localEs.ResourceName] = true
+		}
+
+		for _, remoteEsId := range remoteDp.EventSpecs {
+			_, localExists := esLocalIds[remoteEsId.Id]
+			if !localExists {
+				// Remote exists, but local is missing, delete event spec
+				esDelete = append(esDelete, esRemoteIds[remoteEsId.Id])
+				// Not a filename, DP name, since file does not exist anymore
+				idToFileName[remoteEsId.Id] = remoteDp.Name
+			}
 		}
 	}
 
@@ -208,6 +225,7 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		dpUpdate:     dpUpdate,
 		esCreate:     esCreate,
 		esUpdate:     esUpdate,
+		esDelete:     esDelete,
 		IdToFileName: idToFileName,
 	}, nil
 }
@@ -250,6 +268,12 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 			return err
 		}
 	}
+	for _, esD := range changes.esDelete {
+		err := console.DeleteEventSpec(cnx, client, esD.Id)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -287,14 +311,19 @@ func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 				slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "id", es.Id, "in data product id", es.DataProductId)
 			}
 		}
-		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate), "source apps", len(changes.saCreate)+len(changes.saUpdate))
+		if len(changes.esDelete) != 0 {
+			for _, es := range changes.esDelete {
+				slog.Info("publish", "msg", "will delete event specifications", "name", es.Name, "id", es.Id, "in data product id", es.DataProductId, "data product name", idToFile[es.Id])
+			}
+		}
+		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate))
 	}
 }
 
 type DataProductPurger interface {
-	DeleteSourceApp (sa console.RemoteSourceApplication) error
-	DeleteDataProduct (dp console.RemoteDataProduct) error
-	FetchDataProduct () (*console.DataProductsAndRelatedResources, error)
+	DeleteSourceApp(sa console.RemoteSourceApplication) error
+	DeleteDataProduct(dp console.RemoteDataProduct) error
+	FetchDataProduct() (*console.DataProductsAndRelatedResources, error)
 }
 
 func Purge(api DataProductPurger, dp map[string]map[string]any, commit bool) error {

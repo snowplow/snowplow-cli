@@ -494,3 +494,28 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 	}
 	return nil
 }
+
+func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
+	resp, err := DoConsoleRequest("DELETE", fmt.Sprintf("%s/event-specs/v1/%s", client.BaseUrl, id), client, cnx, nil)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		rbody, err := io.ReadAll(resp.Body)
+		defer resp.Body.Close()
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = json.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("bad response: %s", dresp)
+
+	}
+	return nil
+}
