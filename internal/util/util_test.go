@@ -89,26 +89,20 @@ func Test_MaybeResourcesfromPaths(t *testing.T) {
 }
 
 func Test_ResourceNameToFileName(t *testing.T) {
-	input1 := "cool_name"
-	input2 := "Normal data product name"
-	expected2 := "normal-data-product-name"
-	input3 := "/щ💡test"
-	expected3 := "/test"
-
-	res1 := ResourceNameToFileName(input1)
-	res2 := ResourceNameToFileName(input2)
-	res3 := ResourceNameToFileName(input3)
-
-	if res1 != input1 {
-		t.Fatalf("result not as expected, expected: %s, actual: %s", input1, res1)
-	}
-	if res2 != expected2 {
-		t.Fatalf("result not as expected, expected: %s, actual: %s", input2, expected2)
-	}
-	if res3 != expected3 {
-		t.Fatalf("result not as expected, expected: %s, actual: %s", input3, expected3)
+	tests := map[string]string{
+		"cool_name":                "cool_name",
+		"Normal data product name": "normal-data-product-name",
+		"/щ💡test":                  "/test",
+		"lpt1":                     "unnamed",
 	}
 
+	for input, expected := range tests {
+		t.Run(input, func(t *testing.T) {
+			if got := ResourceNameToFileName(input); got != expected {
+				t.Fatalf("%s result not as expected, expected: %s, actual: %s", input, expected, got)
+			}
+		})
+	}
 }
 
 func Test_setMinus_OK(t *testing.T) {
@@ -126,7 +120,7 @@ func Test_setMinus_OK(t *testing.T) {
 	slices.Sort(res2)
 	slices.Sort(res3)
 
-	if len(res1) != 0{
+	if len(res1) != 0 {
 		t.Fatalf("result not as expected, expected: [], actual: %s", res1)
 	}
 

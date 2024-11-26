@@ -4,7 +4,6 @@ go 1.22.6
 
 require (
 	github.com/charmbracelet/log v0.4.0
-	github.com/flytam/filenamify v1.2.0
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/go-viper/mapstructure/v2 v2.1.0
 	github.com/google/uuid v1.6.0

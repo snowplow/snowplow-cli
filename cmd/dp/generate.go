@@ -11,27 +11,15 @@
 package dp
 
 import (
-	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/flytam/filenamify"
 	"github.com/google/uuid"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
-
-func mkSafeFilename(name string) (string, error) {
-	appn, err := filenamify.FilenamifyV2(name)
-	if err != nil {
-		return "", err
-	}
-	return strings.ReplaceAll(strings.TrimSpace(strings.ToLower(appn)), " ", "-"), nil
-}
 
 var generateCmd = &cobra.Command{
 	Use:     "generate [paths...]",
@@ -67,58 +55,27 @@ Example:
 		}
 
 		for _, app := range sourceApps {
-			appn, err := mkSafeFilename(app)
+			appn := util.ResourceNameToFileName(app)
+			fpath, err := util.WriteSerializableToFile(buildSaTpl(app), sourceAppDirectory, appn, outFmt)
 			if err != nil {
 				snplog.LogFatal(err)
 			}
-			filename := filepath.Join(sourceAppDirectory, appn+"."+outFmt)
-			err = write(buildSaTpl(app), filename, outFmt)
-			if err != nil {
-				snplog.LogFatal(err)
-			}
-			slog.Info("generate", "msg", "wrote", "kind", "source app", "file", filename)
+			slog.Info("generate", "msg", "wrote", "kind", "source app", "file", fpath)
 		}
 
 		for _, app := range dataProducts {
-			appn, err := mkSafeFilename(app)
+			appn := util.ResourceNameToFileName(app)
 			if err != nil {
 				snplog.LogFatal(err)
 			}
-			filename := filepath.Join(dataproductDirectory, appn+"."+outFmt)
-			err = write(buildDpTpl(app), filename, outFmt)
+			fpath, err := util.WriteSerializableToFile(buildDpTpl(app), dataproductDirectory, appn, outFmt)
 			if err != nil {
 				snplog.LogFatal(err)
 			}
-			slog.Info("generate", "msg", "wrote", "kind", "data product", "file", filename)
+			slog.Info("generate", "msg", "wrote", "kind", "data product", "file", fpath)
 		}
 
 	},
-}
-
-func write(tpl any, fname string, format string) error {
-
-	var out []byte
-	var err error
-
-	if format == "yaml" {
-		out, err = yaml.Marshal(tpl)
-		if err != nil {
-			return err
-		}
-	}
-
-	if format == "json" {
-		out, err = json.MarshalIndent(tpl, "", "  ")
-		if err != nil {
-			return err
-		}
-	}
-
-	err = os.WriteFile(fname, out, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func buildDpTpl(name string) any {
