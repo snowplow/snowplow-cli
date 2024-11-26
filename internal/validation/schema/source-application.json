@@ -10,7 +10,7 @@
     "data": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": ["name","entities", "appIds"],
       "properties": {
         "name": { "type": "string" },
         "domain": { "type": "string" },
@@ -18,11 +18,12 @@
         "owner": { "type": "string" },
         "appIds": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "type": "string" }
         },
         "entities": {
           "type": "object",
           "additionalProperties": false,
+          "required": ["tracked", "enriched"],
           "properties": {
             "tracked": {
               "type": "array",

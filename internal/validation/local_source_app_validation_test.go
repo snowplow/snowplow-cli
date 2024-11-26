@@ -83,7 +83,9 @@ resourceType: source-application
 resourceName: 791a4198-e1ca-4fcf-9c1f-bc882830a34f
 data:
   name: name
+  appIds: []
   entities:
+    enriched: []
     tracked:
     - source: iglu:vendor/name/format/1-0-0
 `
@@ -107,7 +109,9 @@ resourceType: source-application
 resourceName: 791a4198-e1ca-4fcf-9c1f-bc882830a34f
 data:
   name: name
+  appIds: []
   entities:
+    enriched: []
     tracked:
     - source:
 `
