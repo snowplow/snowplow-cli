@@ -11,12 +11,14 @@
 package dp
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/google/uuid"
 	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -44,6 +46,10 @@ Example:
 
 		dataproductDirectory, _ := cmd.Flags().GetString("data-products-directory")
 		dataProducts, _ := cmd.Flags().GetStringArray("data-product")
+
+		if len(sourceApps) == 0 && len(dataProducts) == 0 {
+			snplog.LogFatal(errors.New(("Please provide either --source-app or --source-app flag")))
+		}
 
 		err := os.MkdirAll(sourceAppDirectory, os.ModePerm)
 		if err != nil && !os.IsExist(err) {
@@ -78,31 +84,28 @@ Example:
 	},
 }
 
-func buildDpTpl(name string) any {
-	return map[string]any{
-		"apiVersion":   "v1",
-		"resourceType": "data-product",
-		"resourceName": uuid.NewString(),
-		"data": map[string]any{
-			"name":                name,
-			"sourceApplications":  []string{},
-			"eventSpecifications": []any{},
+func buildDpTpl(name string) model.CliResource[model.DataProductCanonicalData] {
+	return model.CliResource[model.DataProductCanonicalData]{
+		ApiVersion:   "v1",
+		ResourceType: "data-product",
+		ResourceName: uuid.NewString(),
+		Data: model.DataProductCanonicalData{
+			Name:                name,
+			SourceApplications:  []model.Ref{},
+			EventSpecifications: []model.EventSpecCanonical{},
 		},
 	}
 }
 
-func buildSaTpl(name string) any {
-	return map[string]any{
-		"apiVersion":   "v1",
-		"resourceType": "source-application",
-		"resourceName": uuid.NewString(),
-		"data": map[string]any{
-			"name":   name,
-			"appIds": []string{},
-			"entities": map[string]any{
-				"tracked":  []any{},
-				"enriched": []any{},
-			},
+func buildSaTpl(name string) model.CliResource[model.SourceAppData] {
+	return model.CliResource[model.SourceAppData]{
+		ApiVersion:   "v1",
+		ResourceType: "source-application",
+		ResourceName: uuid.NewString(),
+		Data: model.SourceAppData{
+			Name:     name,
+			AppIds:   []string{},
+			Entities: &model.EntitiesDef{},
 		},
 	}
 }
