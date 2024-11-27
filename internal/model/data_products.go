@@ -66,9 +66,9 @@ type SchemaRef struct {
 type DataProductCanonicalData struct {
 	ResourceName        string `yaml:"-" json:"-"`
 	Name                string
-	SourceApplications  []Ref  `yaml:"sourceApplications" json:"sourceApplications"`
-	Domain              string `yaml:"domain,omitempty" json:"domain,omitempty"`
-	Owner               string
+	SourceApplications  []Ref                `yaml:"sourceApplications" json:"sourceApplications"`
+	Domain              string               `yaml:"domain,omitempty" json:"domain,omitempty"`
+	Owner               string               `yaml:"owner,omitempty" json:"owner,omitempty"`
 	Description         string               `yaml:"description,omitempty" json:"description,omitempty"`
 	EventSpecifications []EventSpecCanonical `yaml:"eventSpecifications" json:"eventSpecifications"`
 }

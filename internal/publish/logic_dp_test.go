@@ -243,8 +243,8 @@ func Test_findChanges_UpdateAll(t *testing.T) {
 }
 
 type mockPurgeApi struct {
-	remoteResources *console.DataProductsAndRelatedResources
-	deletedSourceApps []string
+	remoteResources     *console.DataProductsAndRelatedResources
+	deletedSourceApps   []string
 	deletedDataProducts []string
 }
 
@@ -287,7 +287,7 @@ func Test_Purge(t *testing.T) {
 		},
 	}
 
-	mockApi := &mockPurgeApi{ remoteResources: remote }
+	mockApi := &mockPurgeApi{remoteResources: remote}
 
 	_ = Purge(mockApi, dp, true)
 
@@ -312,7 +312,7 @@ func Test_PurgeNoCommit(t *testing.T) {
 		},
 	}
 
-	mockApi := &mockPurgeApi{ remoteResources: remote }
+	mockApi := &mockPurgeApi{remoteResources: remote}
 
 	_ = Purge(mockApi, dp, false)
 
@@ -322,5 +322,65 @@ func Test_PurgeNoCommit(t *testing.T) {
 
 	if len(mockApi.deletedDataProducts) > 0 {
 		t.Fatal("deleted data products")
+	}
+}
+
+func Test_findChanges_DeleteEventSpec(t *testing.T) {
+	sa := model.SourceApp{
+		ResourceName: "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Data: model.SourceAppData{
+			Name: "Source App 1",
+		},
+	}
+	dp := model.DataProduct{
+		ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Data: model.DataProductData{
+			Name:                "Data Product 1",
+			SourceApplications:  []map[string]string{{"id": "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3"}},
+			EventSpecifications: []model.EventSpec{},
+		},
+	}
+	local := LocalFilesRefsResolved{
+		SourceApps:   []model.SourceApp{sa},
+		DataProudcts: []model.DataProduct{dp},
+	}
+
+	remoteSa := console.RemoteSourceApplication{
+		Id:   "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Name: "Source App 1",
+	}
+	remoteDp := console.RemoteDataProduct{
+		Id:                   "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Name:                 "Data Product 1",
+		Status:               "",
+		SourceApplicationIds: []string{"9b6e4e4c-c34a-483c-a5e7-f728d66a53b3"},
+		Domain:               "",
+		Owner:                "",
+		Description:          "",
+		EventSpecs: []console.EventSpecReference{{
+			Id: "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		}},
+	}
+
+	remoteEs := console.RemoteEventSpec{
+		Id:   "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		Name: "Event Spec 1",
+	}
+
+	remote := console.DataProductsAndRelatedResources{
+		SourceApplication: []console.RemoteSourceApplication{remoteSa},
+		DataProducts:      []console.RemoteDataProduct{remoteDp},
+		EventSpecs:        []console.RemoteEventSpec{remoteEs},
+	}
+
+	changes, err := findChanges(local, remote)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if changes.isEmpty() {
+		t.Error("expected changes to not be empty")
+	}
+	if len(changes.esDelete) != 1 {
+		t.Errorf("expected 1 event spec delete, got %d", len(changes.esDelete))
 	}
 }

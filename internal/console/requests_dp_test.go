@@ -441,3 +441,28 @@ func Test_UpdateEventSpec(t *testing.T) {
 	}
 
 }
+
+func Test_DeleteEventSpec(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "DELETE" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := DeleteEventSpec(cnx, client, sampleRemoteEs.Id)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+}
