@@ -11,7 +11,6 @@
 package dp
 
 import (
-	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -46,10 +45,6 @@ Example:
 
 		dataproductDirectory, _ := cmd.Flags().GetString("data-products-directory")
 		dataProducts, _ := cmd.Flags().GetStringArray("data-product")
-
-		if len(sourceApps) == 0 && len(dataProducts) == 0 {
-			snplog.LogFatal(errors.New(("Please provide either --source-app or --source-app flag")))
-		}
 
 		err := os.MkdirAll(sourceAppDirectory, os.ModePerm)
 		if err != nil && !os.IsExist(err) {
@@ -119,4 +114,6 @@ func init() {
 
 	generateCmd.Flags().StringArray("source-app", []string{}, "Name of source app to generate")
 	generateCmd.Flags().StringArray("data-product", []string{}, "Name of data product to generate")
+
+	generateCmd.MarkFlagsOneRequired("source-app", "data-product")
 }
