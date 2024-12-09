@@ -45,14 +45,6 @@
                 }
               },
               "name": { "type": "string", "minLength": 1 },
-              "triggers": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": { "description": { "type": "string" } }
-                }
-              },
               "event": {
                 "type": "object",
                 "additionalProperties": false,

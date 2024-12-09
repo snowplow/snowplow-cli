@@ -33,8 +33,6 @@ data:
       excludedSourceApplications:
         - $ref: ./source-application.yml
       name: event spec 1
-      triggers:
-        - description: number 1 trigger
       event:
         source: iglu:io.snowplow/button_click_custom/jsonschema/1-1-0
 `
