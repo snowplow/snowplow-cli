@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "resourceType", "resourceName", "data"],
+  "properties": {
+    "apiVersion": { "enum": ["v1"] },
+    "resourceType": { "enum": ["source-application"] },
+    "resourceName": { "type": "string", "format": "uuid" },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name","entities", "appIds"],
+      "properties": {
+        "name": { "type": "string" },
+        "domain": { "type": "string" },
+        "description": { "type": "string" },
+        "owner": { "type": "string" },
+        "appIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tracked", "enriched"],
+          "properties": {
+            "tracked": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["source"],
+                "properties": {
+                  "source": { "$ref": "#/$defs/igluUri" },
+                  "comment": { "type": "string" },
+                  "minCardinality": { "type": "number", "enum": [0, 1]},
+                  "maxCardinality": { "type": "number" }
+                }
+              }
+            },
+            "enriched": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["source"],
+                "properties": {
+                  "source": { "$ref": "#/$defs/igluUri" },
+                  "comment": { "type": "string" },
+                  "minCardinality": { "type": "number", "enum": [0, 1]},
+                  "maxCardinality": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "igluUri": {
+      "type": "string",
+      "pattern": "^iglu:[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_]+/[a-zA-Z0-9-_]+/[0-9]+-[0-9]+-[0-9]+$"
+    }
+  }
+}

@@ -21,14 +21,9 @@ import (
 
 type SchemaType string
 
-const (
-	Event  SchemaType = "event"
-	Entity SchemaType = "entity"
-)
-
 type DataStructureMeta struct {
 	Hidden     bool              `yaml:"hidden" json:"hidden"`
-	SchemaType SchemaType        `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
+	SchemaType string            `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
 	CustomData map[string]string `yaml:"customData" json:"customData" validate:"required"`
 }
 
@@ -56,8 +51,8 @@ func (ds DataStructure) GetContentHash() (string, error) {
 	return fmt.Sprintf("%x", hash), nil
 }
 
-func (d DataStructure) ParseData() (DataStrucutreData, error) {
-	var data DataStrucutreData
+func (d DataStructure) ParseData() (DataStructureData, error) {
+	var data DataStructureData
 	err := mapstructure.Decode(d.Data, &data)
 	return data, err
 }
@@ -69,7 +64,7 @@ type DataStructureSelf struct {
 	Version string `mapstructure:"version" json:"version" validate:"required"`
 }
 
-type DataStrucutreData struct {
+type DataStructureData struct {
 	Self   DataStructureSelf `mapstructure:"self" json:"self" validate:"required"`
 	Schema string            `mapstructure:"$schema" json:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`
@@ -82,4 +77,3 @@ type DSChangeContext struct {
 	LocalContentHash  string
 	RemoteContentHash string
 }
-

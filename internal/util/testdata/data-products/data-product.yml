@@ -1,0 +1,47 @@
+apiVersion: v1
+resourceType: data-product
+resourceName: d066a9a7-e6c4-4d72-9a93-1418746f5279
+data:
+  name: Data Product number 1
+  sourceApplications:
+    - $ref: ./source-application.yml
+  domain: Data Products
+  description: This Data Product describes a data product
+  eventSpecifications:
+    - resourceName: e066a9a7-e6c4-4d72-9a93-1418746f5278
+      sourceApplications:
+        - $ref: ./source-application.yml
+      name: event spec 1
+      triggers:
+        - description: number 1 trigger
+      event:
+        source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+    - resourceName: 03546c69-9e1d-4eef-b8ca-f8e70ce1a761
+      name: event spec 1
+      triggers:
+        - description: number 1 trigger
+      event:
+        source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+        comment: something here you can add?
+        schema:
+          type: object
+          $schema: http://json-schema.org/draft-04/schema#
+          additionalProperties: false
+          properties:
+            label:
+              type: number
+              enum: [login]
+              description: This needs to be login
+      entities:
+        tracked:
+          - source: iglu:com.snowplowanalytics.snowplow/button_click/jsonschema/1-0-0
+            schema:
+              type: object
+              $schema: http://json-schema.org/draft-04/schema#
+              required: [label]
+              additionalProperties: false
+              properties:
+                label:
+                  enum: [login]
+                  description: This needs to be login
+

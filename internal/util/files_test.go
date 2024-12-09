@@ -12,10 +12,13 @@ package util
 
 import (
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
+
+	. "github.com/snowplow-product/snowplow-cli/internal/model"
 )
 
 func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
@@ -99,8 +102,7 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"schema": "string"},
-	}
+			"schema": "string"}}
 	vendor2 := "com.test.vendor"
 	name2 := "ds2"
 	ds2 := DataStructure{
@@ -142,4 +144,31 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 		t.Fatalf("%s does not exists", filePath2)
 	}
 
+}
+
+func Test_createUniqueNames_OK(t *testing.T) {
+	input1 := []idFileName{
+		idFileName{Id: "id2", FileName: "NaMe"},
+		idFileName{Id: "id5", FileName: "hey"},
+		idFileName{Id: "id1", FileName: "Name"},
+		idFileName{Id: "id3", FileName: "Test"},
+		idFileName{Id: "id4", FileName: "🐌Hey"},
+	}
+	expected1 := []idFileName{
+		idFileName{Id: "id1", FileName: "name-1"},
+		idFileName{Id: "id2", FileName: "name-2"},
+		idFileName{Id: "id3", FileName: "test"},
+		idFileName{Id: "id4", FileName: "hey-1"},
+		idFileName{Id: "id5", FileName: "hey-2"},
+	}
+
+	res := createUniqueNames(input1)
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Id < res[j].Id
+	})
+
+	if !reflect.DeepEqual(res, expected1) {
+		t.Fatalf("Not expected result, expected: %+v, actual: %+v", expected1, res)
+	}
 }

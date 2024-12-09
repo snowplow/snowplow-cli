@@ -13,6 +13,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/snowplow-product/snowplow-cli/cmd/dp"
 	"github.com/snowplow-product/snowplow-cli/cmd/ds"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ var RootCmd = &cobra.Command{
 	Use:   "snowplow-cli",
 	Short: "Snowplow CLI",
 	Long:  `Work with Snowplow from the command line`,
-	Example: `  $ snowplow-cli data-structure download
+	Example: `  $ snowplow-cli data-structures download
   $ snowplow-cli ds validate`,
 	Version: util.Version,
 }
@@ -47,4 +48,5 @@ Then on:
 	RootCmd.PersistentFlags().BoolP("silent", "s", false, "Disable output")
 	RootCmd.PersistentFlags().Bool("json-output", false, "Log output as json")
 	RootCmd.AddCommand(ds.DataStructuresCmd)
+	RootCmd.AddCommand(dp.DataProductsCmd)
 }

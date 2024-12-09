@@ -92,3 +92,19 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 
 	return &ApiClient{Http: h, Jwt: token.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
 }
+
+func ConsoleRequest(method string, path string, client *ApiClient, cnx context.Context, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(cnx, method, path, body)
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	return req, err
+}
+
+func DoConsoleRequest(method string, path string, client *ApiClient, cnx context.Context, body io.Reader) (*http.Response, error) {
+	req, err := ConsoleRequest(method, path, client, cnx, body)
+	if err != nil {
+		return nil, err
+	}
+	return client.Http.Do(req)
+}

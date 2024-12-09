@@ -13,11 +13,10 @@ package validation
 import (
 	"context"
 	"fmt"
+	. "github.com/snowplow-product/snowplow-cli/internal/changes"
+	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"log/slog"
 	"strings"
-	. "github.com/snowplow-product/snowplow-cli/internal/console"
-	. "github.com/snowplow-product/snowplow-cli/internal/changes"
-
 )
 
 type igluValidationLevel uint
@@ -92,7 +91,7 @@ func (vr *ValidationResults) Slog() {
 	}
 }
 
-func ValidateChanges(cnx context.Context, c *ApiClient, changes Changes) (*ValidationResults, error) {
+func ValidateChanges(cnx context.Context, c *console.ApiClient, changes Changes) (*ValidationResults, error) {
 	var vr ValidationResults
 
 	// Create and create new version both follow the same logic
@@ -100,7 +99,7 @@ func ValidateChanges(cnx context.Context, c *ApiClient, changes Changes) (*Valid
 	validate := append(append(changes.ToCreate, changes.ToUpdateNewVersion...), changes.ToUpdatePatch...)
 	failed := 0
 	for _, ds := range validate {
-		resp, err := Validate(cnx, c, ds.DS)
+		resp, err := console.Validate(cnx, c, ds.DS)
 		if resp != nil {
 			if len(resp.Warnings) > 0 {
 				vr.Iglu = append(vr.Iglu, igluValidation{ds.FileName, resp.Warnings, igluValidationWarn})
@@ -120,7 +119,7 @@ func ValidateChanges(cnx context.Context, c *ApiClient, changes Changes) (*Valid
 
 	migrationsToCheck := append(changes.ToUpdateNewVersion, changes.ToUpdatePatch...)
 	for _, ds := range migrationsToCheck {
-		result, err := ValidateMigrations(cnx, c, ds)
+		result, err := console.ValidateMigrations(cnx, c, ds)
 		if err != nil {
 			return nil, err
 		}
