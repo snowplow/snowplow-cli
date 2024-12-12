@@ -13,3 +13,4 @@ package util
 const DataStructuresFolder = "data-structures"
 const DataProductsFolder = "data-products"
 const SourceAppsFolder = "source-apps"
+const ImagesFolder = "images"

@@ -10,10 +10,14 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package download
 
 import (
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"golang.org/x/net/context"
-	"log/slog"
 )
 
 func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient) error {
@@ -35,6 +39,12 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	esIdToRes := groupRemoteEsById(res.EventSpecs)
 
+	imgToFile, err := createImages(esIdToRes, res.DataProducts, cnx, client, files)
+	if err != nil {
+		return err
+	}
+	slog.Info("download", "msg", "wrote images", "count", len(imgToFile), "img", imgToFile)
+
 	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes)
 
 	_, err = files.CreateDataProducts(dps)
@@ -44,4 +54,59 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	slog.Info("download", "msg", "wrote data products", "count", len(dps))
 	return nil
+}
+
+func createImages(
+	esLookupById map[string]console.RemoteEventSpec,
+	rdp []console.RemoteDataProduct,
+	cnx context.Context,
+	client *console.ApiClient,
+	files util.Files,
+) (map[string]string, error) {
+
+	imgToFile := map[string]string{}
+	for _, d := range rdp {
+		for _, eId := range d.EventSpecs {
+			if e, ok := esLookupById[eId.Id]; ok {
+				triggersWithImg := 0
+				for _, t := range e.Triggers {
+					if original, ok := t.VariantUrls["original"]; ok {
+						img, err := console.GetImage(cnx, client, original)
+						if err != nil {
+							return nil, err
+						}
+						fname := util.ResourceNameToFileName(e.Name) + img.Ext
+						if triggersWithImg > 0 {
+							fname = util.ResourceNameToFileName(e.Name) + fmt.Sprintf("_%d", triggersWithImg) + img.Ext
+						}
+						cwd, err := os.Getwd()
+						if err != nil {
+							return nil, err
+						}
+						path := filepath.Join(cwd, files.DataProductsLocation, files.ImagesLocation)
+						err = os.MkdirAll(path, os.ModePerm)
+
+						if err != nil {
+							return nil, err
+						}
+
+						fpath := filepath.Join(path, fname)
+						err = os.WriteFile(fpath, img.Data, 0644)
+						if err != nil {
+							return nil, err
+						}
+
+						absp, err := filepath.Abs(fpath)
+						if err != nil {
+							return nil, err
+						}
+						imgToFile[original] = absp
+
+						triggersWithImg++
+					}
+				}
+			}
+		}
+	}
+	return imgToFile, nil
 }

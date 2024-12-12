@@ -27,6 +27,7 @@ type Files struct {
 	DataStructuresLocation string
 	DataProductsLocation   string
 	SourceAppsLocation     string
+	ImagesLocation         string
 	ExtentionPreference    string
 }
 

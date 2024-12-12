@@ -41,10 +41,18 @@ type EventSpecReference struct {
 	Id string `json:"id"`
 }
 
+type Triggers struct {
+	Description string            `json:"description"`
+	AppIds      []string          `json:"appIds,omitempty"`
+	Url         string            `json:"url"`
+	VariantUrls map[string]string `json:"variantUrls,omitempty"`
+}
+
 type RemoteEventSpec struct {
 	Id                   string        `json:"id"`
 	SourceApplicationIds []string      `json:"sourceApplications"`
 	Name                 string        `json:"name"`
+	Triggers             []Triggers    `json:"triggers,omitempty"`
 	Status               string        `json:"status"`
 	Version              int           `json:"version"`
 	Event                *EventWrapper `json:"event,omitempty"`
