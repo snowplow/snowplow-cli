@@ -41,7 +41,8 @@ type EventSpecReference struct {
 	Id string `json:"id"`
 }
 
-type Triggers struct {
+type RemoteTrigger struct {
+	Id          string            `json:"id,omitempty"`
 	Description string            `json:"description"`
 	AppIds      []string          `json:"appIds,omitempty"`
 	Url         string            `json:"url"`
@@ -49,15 +50,15 @@ type Triggers struct {
 }
 
 type RemoteEventSpec struct {
-	Id                   string        `json:"id"`
-	SourceApplicationIds []string      `json:"sourceApplications"`
-	Name                 string        `json:"name"`
-	Triggers             []Triggers    `json:"triggers,omitempty"`
-	Status               string        `json:"status"`
-	Version              int           `json:"version"`
-	Event                *EventWrapper `json:"event,omitempty"`
-	Entities             Entities      `json:"entities"`
-	DataProductId        string        `json:"dataProductId"`
+	Id                   string          `json:"id"`
+	SourceApplicationIds []string        `json:"sourceApplications"`
+	Name                 string          `json:"name"`
+	Triggers             []RemoteTrigger `json:"triggers,omitempty"`
+	Status               string          `json:"status"`
+	Version              int             `json:"version"`
+	Event                *EventWrapper   `json:"event,omitempty"`
+	Entities             Entities        `json:"entities"`
+	DataProductId        string          `json:"dataProductId"`
 }
 
 type Event struct {
