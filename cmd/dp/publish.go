@@ -27,7 +27,6 @@ import (
 var publishCommand = &cobra.Command{
 	Use:   "publish {directory ./data-products}",
 	Short: "Publish all data products, event specs and source apps to BDP Console",
-	Args:  cobra.MaximumNArgs(1),
 	Long: `Publish the local version versions of all data products, event specs and source apps from BDP Console.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
