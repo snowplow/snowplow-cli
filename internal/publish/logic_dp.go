@@ -10,7 +10,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log/slog"
@@ -143,7 +143,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 					}
 					defer f.Close()
 
-					h := md5.New()
+					h := sha256.New()
 					if _, err := io.Copy(h, f); err != nil {
 						return nil, err
 					}
