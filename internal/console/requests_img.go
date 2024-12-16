@@ -58,7 +58,7 @@ type imageLookup struct {
 type ImageHashes = []string
 
 func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, error) {
-	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
+	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1/hash-lookup", client.BaseUrl), client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
