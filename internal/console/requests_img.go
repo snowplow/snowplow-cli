@@ -51,14 +51,19 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*Image, erro
 	return &Image{ext[0], rbody}, nil
 }
 
+type imageResource struct {
+	Id   string
+	Hash string
+}
+
 type imageLookup struct {
-	Lookup map[string]string
+	Items []imageResource
 }
 
 type ImageHashes = []string
 
 func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, error) {
-	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1/hash-lookup", client.BaseUrl), client, cnx, nil)
+	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +80,9 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, er
 	}
 
 	hashes := []string{}
-	for _, v := range lookup.Lookup {
-		if v != "" {
-			hashes = append(hashes, v)
+	for _, v := range lookup.Items {
+		if v.Hash != "" {
+			hashes = append(hashes, v.Hash)
 		}
 	}
 
@@ -86,7 +91,7 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, er
 
 type imageUploadLinkResponse struct {
 	UploadURL string
-	Id string
+	Id        string
 }
 
 func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUploadLinkResponse, error) {
@@ -160,7 +165,13 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 		return err
 	}
 
-	var cfResp struct{ Success bool; Errors []struct{ Code int; Message string } }
+	var cfResp struct {
+		Success bool
+		Errors  []struct {
+			Code    int
+			Message string
+		}
+	}
 	err = json.Unmarshal(body, &cfResp)
 	if err != nil {
 		return err
@@ -180,7 +191,7 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 type VariantUrls map[string]string
 
 func confirmImage(cnx context.Context, client *ApiClient, id string, hash string) (VariantUrls, error) {
-	req, err := json.Marshal(map[string]string{ "hash": hash })
+	req, err := json.Marshal(map[string]string{"hash": hash})
 	if err != nil {
 		return nil, err
 	}

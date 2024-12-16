@@ -50,8 +50,9 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
+                  "required": ["id"],
                   "properties": {
-                    "id": { "type": "string" },
+                    "id": { "type": "string", "format": "uuid" },
                     "description": { "type": "string" },
                     "appIds": { "type": "array", "items": { "type": "string" } },
                     "url": { "type": "string" },
