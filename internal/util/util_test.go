@@ -92,7 +92,7 @@ func Test_ResourceNameToFileName(t *testing.T) {
 	tests := map[string]string{
 		"cool_name":                "cool_name",
 		"Normal data product name": "normal-data-product-name",
-		"/щ💡test":                  "/test",
+		"/щ💡test":                  "-test",
 		"lpt1":                     "unnamed",
 	}
 
