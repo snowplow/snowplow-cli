@@ -15,8 +15,17 @@ type EventSpec struct {
 	ExcludedSourceApplications []map[string]string `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string
 	Description                string
+	Triggers                   []Trigger
 	Event                      SchemaRef
 	Entities                   EntitiesDef
+}
+
+type Trigger struct {
+	Id          string
+	Description string
+	AppIds      []string
+	Url         string
+	Image       *Ref
 }
 
 type DataProductData struct {
@@ -84,5 +93,5 @@ type EventSpecCanonical struct {
 }
 
 type Ref struct {
-	Ref string `yaml:"$ref" json:"$ref"`
+	Ref string `yaml:"$ref" json:"$ref" mapstructure:"$ref"`
 }

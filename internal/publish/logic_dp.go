@@ -10,10 +10,14 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -23,9 +27,15 @@ import (
 )
 
 type LocalFilesRefsResolved struct {
-	DataProudcts []model.DataProduct
-	SourceApps   []model.SourceApp
-	IdToFileName map[string]string
+	DataProudcts    []model.DataProduct
+	SourceApps      []model.SourceApp
+	HashToImageFile map[string]string
+	IdToFileName    map[string]string
+}
+
+type ImageCreationEnv struct {
+	fname string
+	hash  string
 }
 
 type DataProductChangeSet struct {
@@ -36,6 +46,7 @@ type DataProductChangeSet struct {
 	esCreate     []console.RemoteEventSpec
 	esUpdate     []console.RemoteEventSpec
 	esDelete     []console.RemoteEventSpec
+	imageCreate  []ImageCreationEnv
 	IdToFileName map[string]string
 }
 
@@ -46,7 +57,8 @@ func (cs DataProductChangeSet) isEmpty() bool {
 		len(cs.dpUpdate) == 0 &&
 		len(cs.esCreate) == 0 &&
 		len(cs.esUpdate) == 0 &&
-		len(cs.esDelete) == 0
+		len(cs.esDelete) == 0 &&
+		len(cs.imageCreate) == 0
 }
 
 func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
@@ -115,10 +127,40 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 		probablyDps = append(probablyDps, dp)
 	}
 
+	localHashToImage := map[string]string{}
+	for dpFile, dp := range filenameToDp {
+		for _, es := range dp.Data.EventSpecifications {
+			for _, t := range es.Triggers {
+				if len(t.Image.Ref) != 0 {
+					dppath, err := filepath.Abs(dpFile)
+					if err != nil {
+						return nil, err
+					}
+					fname := filepath.Clean(filepath.Join(filepath.Dir(dppath), t.Image.Ref))
+					f, err := os.Open(fname)
+					if err != nil {
+						return nil, err
+					}
+					defer f.Close()
+
+					h := sha256.New()
+					if _, err := io.Copy(h, f); err != nil {
+						return nil, err
+					}
+
+					hash := fmt.Sprintf("%x", h.Sum(nil))
+
+					localHashToImage[hash] = fname
+				}
+			}
+		}
+	}
+
 	res := LocalFilesRefsResolved{
-		DataProudcts: probablyDps,
-		SourceApps:   probablySas,
-		IdToFileName: idToFileName,
+		DataProudcts:    probablyDps,
+		SourceApps:      probablySas,
+		IdToFileName:    idToFileName,
+		HashToImageFile: localHashToImage,
 	}
 	return &res, nil
 }
@@ -232,6 +274,13 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 
 func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *console.ApiClient) error {
 	slog.Info("publish", "msg", "applying changes")
+	for _, img := range changes.imageCreate {
+		variants, err := console.PublishImage(cnx, client, img.fname, img.hash)
+		if err != nil {
+			return err
+		}
+		slog.Info("publish", "msg", "what do we do with the images we just uploaded? they need feeding back in to give context to the event spec changes", "img", img.fname,"variants", variants)
+	}
 	for _, saC := range changes.saCreate {
 		err := console.CreateSourceApp(cnx, client, saC)
 		if err != nil {
@@ -316,7 +365,16 @@ func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 				slog.Info("publish", "msg", "will delete event specifications", "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId, "data product name", idToFile[es.Id])
 			}
 		}
-		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate))
+		if len(changes.imageCreate) != 0 {
+			if cwd, err := os.Getwd(); err == nil {
+				for _, img := range changes.imageCreate {
+					if relp, err := filepath.Rel(cwd, img.fname); err == nil {
+						slog.Info("publish", "msg", "will publish image", "file", relp)
+					}
+				}
+			}
+		}
+		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
 	}
 }
 
@@ -409,6 +467,20 @@ func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]m
 	if err != nil {
 		return nil, err
 	}
+	hashLookup, err := console.GetImageHashLookup(cnx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	imagesToCreate := []ImageCreationEnv{}
+	for h, f := range localResolved.HashToImageFile {
+		if !slices.Contains(hashLookup, h) {
+			imagesToCreate = append(imagesToCreate, ImageCreationEnv{f, h})
+		}
+	}
+
+	changeSet.imageCreate = imagesToCreate
+
 	return changeSet, err
 }
 
