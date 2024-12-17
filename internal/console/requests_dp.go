@@ -46,6 +46,7 @@ type RemoteEventSpec struct {
 	SourceApplicationIds []string      `json:"sourceApplications"`
 	Name                 string        `json:"name"`
 	Status               string        `json:"status"`
+	Description          string        `json:"description"`
 	Version              int           `json:"version"`
 	Event                *EventWrapper `json:"event,omitempty"`
 	Entities             Entities      `json:"entities"`

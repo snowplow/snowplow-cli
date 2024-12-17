@@ -14,6 +14,7 @@ type EventSpec struct {
 	ResourceName               string
 	ExcludedSourceApplications []map[string]string `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string
+	Description                string
 	Event                      SchemaRef
 	Entities                   EntitiesDef
 }
@@ -77,6 +78,7 @@ type EventSpecCanonical struct {
 	ResourceName               string `yaml:"resourceName" json:"resourceName"`
 	ExcludedSourceApplications []Ref  `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string
+	Description                string    `yaml:"description,omitempty" json:"description,omitempty"`
 	Event                      SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
 	Entities                   EntitiesDef
 }

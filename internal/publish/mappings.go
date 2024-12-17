@@ -113,6 +113,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 		Id:                   es.ResourceName,
 		SourceApplicationIds: sourceApps,
 		Name:                 es.Name,
+		Description:          es.Description,
 		Event:                &console.EventWrapper{Event: event},
 		Entities:             entities,
 		DataProductId:        dpId,
@@ -122,6 +123,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 type RemoteEventSpecDiff struct {
 	SourceApplicationIds []string
 	Name                 string
+	Description          string
 	Event                string
 	Entities             EntitiesDiff
 	DataProductId        string
@@ -178,6 +180,7 @@ func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
 	return &RemoteEventSpecDiff{
 		SourceApplicationIds: sourceApps,
 		Name:                 es.Name,
+		Description:          es.Description,
 		Event:                string(eventJson),
 		Entities:             EntitiesDiff{Tracked: tracked, Enriched: enriched},
 		DataProductId:        es.DataProductId,
