@@ -17,7 +17,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/snowplow-product/snowplow-cli/internal/model"
 	. "github.com/snowplow-product/snowplow-cli/internal/model"
 
 	"gopkg.in/yaml.v3"
@@ -27,6 +29,7 @@ type Files struct {
 	DataStructuresLocation string
 	DataProductsLocation   string
 	SourceAppsLocation     string
+	ImagesLocation         string
 	ExtentionPreference    string
 }
 
@@ -140,6 +143,30 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 	}
 
 	return res, nil
+}
+
+func (f Files) CreateImageFolder() (string, error) {
+	imagesPath := filepath.Join(".", f.DataProductsLocation, f.ImagesLocation)
+	err := os.MkdirAll(imagesPath, os.ModePerm)
+
+	if err != nil {
+		return "", err
+	}
+	return imagesPath, nil
+}
+
+func (f Files) WriteImage(name string, dir string, image *model.Image) (string, error) {
+	filePath := filepath.Join(dir, fmt.Sprintf("%s%s", name, image.Ext))
+	err := os.WriteFile(filePath, image.Data, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	slog.Debug("wrote", "file", filePath)
+
+	relativePath := fmt.Sprintf(".%s", strings.TrimPrefix(filePath, f.DataProductsLocation))
+
+	return relativePath, err
 }
 
 func WriteSerializableToFile(body any, dir string, name string, ext string) (string, error) {

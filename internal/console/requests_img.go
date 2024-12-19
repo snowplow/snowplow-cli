@@ -23,15 +23,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/snowplow-product/snowplow-cli/internal/model"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
-type Image struct {
-	Ext  string
-	Data []byte
-}
-
-func GetImage(cnx context.Context, client *ApiClient, path string) (*Image, error) {
+func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image, error) {
 	resp, err := DoConsoleRequest("GET", path, client, cnx, nil)
 	if err != nil {
 		return nil, err
@@ -48,7 +44,7 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*Image, erro
 		return nil, err
 	}
 
-	return &Image{ext[0], rbody}, nil
+	return &model.Image{Ext: ext[0], Data: rbody}, nil
 }
 
 type imageResource struct {

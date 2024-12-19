@@ -10,10 +10,11 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package download
 
 import (
+	"log/slog"
+
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"golang.org/x/net/context"
-	"log/slog"
 )
 
 func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient) error {
@@ -35,7 +36,13 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	esIdToRes := groupRemoteEsById(res.EventSpecs)
 
-	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes)
+	triggerIdToFilePath, err := downloadTriggerImages(res.EventSpecs, cnx, client, files)
+
+	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes, triggerIdToFilePath)
+
+	if err != nil {
+		return err
+	}
 
 	_, err = files.CreateDataProducts(dps)
 	if err != nil {
@@ -44,4 +51,33 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	slog.Info("download", "msg", "wrote data products", "count", len(dps))
 	return nil
+}
+
+func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Context, client *console.ApiClient, files util.Files) (map[string]string, error) {
+	triggerIdToUrl := remoteEsToTriggerIdToUrl(remoteEss)
+	triggerIdToFilePath := make(map[string]string)
+	if len(triggerIdToUrl) != 0 {
+		slog.Info("download", "msg", "will attempt to donwload trigger images")
+		dir, err := files.CreateImageFolder()
+		if err != nil {
+			return nil, err
+		}
+		for id, url := range triggerIdToUrl {
+			image, err := console.GetImage(cnx, client, url)
+			if err != nil {
+				return nil, err
+			}
+			// handle 404s
+			if image.Ext != ".json" {
+				path, err := files.WriteImage(id, dir, image)
+				if err != nil {
+					return nil, err
+				}
+				triggerIdToFilePath[id] = path
+
+			}
+		}
+		slog.Info("download", "msg", "wrote trigger images", "count", len(triggerIdToFilePath))
+	}
+	return triggerIdToFilePath, nil
 }

@@ -21,11 +21,11 @@ type EventSpec struct {
 }
 
 type Trigger struct {
-	Id          string
-	Description string
-	AppIds      []string
-	Url         string
-	Image       *Ref
+	Id          string   `yaml:"id,omitempty" json:"id,omitempty"`
+	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
+	AppIds      []string `yaml:"appIds,omitempty" json:"appIds,omitempty"`
+	Url         string   `yaml:"url,omitempty" json:"url,omitempty"`
+	Image       *Ref     `yaml:"image,omitempty" json:"image,omitempty"`
 }
 
 type DataProductData struct {
@@ -90,8 +90,14 @@ type EventSpecCanonical struct {
 	Description                string    `yaml:"description,omitempty" json:"description,omitempty"`
 	Event                      SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
 	Entities                   EntitiesDef
+	Triggers                   []Trigger `yaml:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
 type Ref struct {
-	Ref string `yaml:"$ref" json:"$ref" mapstructure:"$ref"`
+	Ref string `yaml:"$ref,omitempty" json:"$ref,omitempty" mapstructure:"$ref"`
+}
+
+type Image struct {
+	Ext  string
+	Data []byte
 }
