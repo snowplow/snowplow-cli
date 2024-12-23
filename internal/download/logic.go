@@ -54,22 +54,22 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 }
 
 func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Context, client *console.ApiClient, files util.Files) (map[string]string, error) {
-	triggerIdToUrl := remoteEsToTriggerIdToUrl(remoteEss)
+	triggerIdToUrl := remoteEsToTriggerIdToUrlAndFilename(remoteEss)
 	triggerIdToFilePath := make(map[string]string)
 	if len(triggerIdToUrl) != 0 {
-		slog.Info("download", "msg", "will attempt to donwload trigger images")
+		slog.Debug("download", "msg", "will attempt to donwload trigger images")
 		dir, err := files.CreateImageFolder()
 		if err != nil {
 			return nil, err
 		}
-		for id, url := range triggerIdToUrl {
-			image, err := console.GetImage(cnx, client, url)
+		for id, urlAndFilename := range triggerIdToUrl {
+			image, ok, err := console.GetImage(cnx, client, urlAndFilename.url)
 			if err != nil {
 				return nil, err
 			}
 			// handle 404s
-			if image.Ext != ".json" {
-				path, err := files.WriteImage(id, dir, image)
+			if ok {
+				path, err := files.WriteImage(urlAndFilename.filename, dir, image)
 				if err != nil {
 					return nil, err
 				}
@@ -77,7 +77,7 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 
 			}
 		}
-		slog.Info("download", "msg", "wrote trigger images", "count", len(triggerIdToFilePath))
+		slog.Debug("download", "msg", "wrote trigger images", "count", len(triggerIdToFilePath))
 	}
 	return triggerIdToFilePath, nil
 }

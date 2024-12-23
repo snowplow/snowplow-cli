@@ -11,6 +11,7 @@ package download
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
@@ -179,13 +180,38 @@ func remoteDpsToLocalResources(remoteDps []console.RemoteDataProduct, saIdToRef 
 	return dps
 }
 
-func remoteEsToTriggerIdToUrl(remoteEss []console.RemoteEventSpec) map[string]string {
-	triggerIdToUrl := make(map[string]string)
+type imgUrlFile struct {
+	url      string
+	filename string
+}
+
+func remoteEsToTriggerIdToUrlAndFilename(remoteEss []console.RemoteEventSpec) map[string]imgUrlFile {
+	esNameToTriggerId := make(map[string][]string)
+	for _, es := range remoteEss {
+		for _, t := range es.Triggers {
+			name := util.ResourceNameToFileName(es.Name)
+			esNameToTriggerId[name] = append(esNameToTriggerId[name], t.Id)
+		}
+	}
+	filenameById := make(map[string]string)
+	for esName, tIds := range esNameToTriggerId {
+		sort.Strings(tIds)
+		for i, tId := range tIds {
+			if len(tIds) > 1 {
+				filenameById[tId] = fmt.Sprintf("%s_%d", esName, i+1)
+			} else {
+				filenameById[tId] = esName
+			}
+		}
+	}
+
+	triggerIdToUrl := make(map[string]imgUrlFile)
 	for _, es := range remoteEss {
 		for _, t := range es.Triggers {
 			for variant, url := range t.VariantUrls {
 				if variant == "original" {
-					triggerIdToUrl[t.Id] = url
+					filename := filenameById[t.Id]
+					triggerIdToUrl[t.Id] = imgUrlFile{url: url, filename: filename}
 				}
 			}
 		}

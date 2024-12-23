@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -182,4 +183,8 @@ func SetMinus(s1, s2 []string) []string {
 		}
 	}
 	return result
+}
+
+func StringSlicesEqual(one []string, other []string) bool {
+	return len(one) == 0 && len(other) == 0 || reflect.DeepEqual(one, other)
 }

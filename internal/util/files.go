@@ -146,13 +146,23 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 }
 
 func (f Files) CreateImageFolder() (string, error) {
-	imagesPath := filepath.Join(".", f.DataProductsLocation, f.ImagesLocation)
-	err := os.MkdirAll(imagesPath, os.ModePerm)
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	imagesPath := filepath.Join(cwd, f.DataProductsLocation, f.ImagesLocation)
+	err = os.MkdirAll(imagesPath, os.ModePerm)
 
 	if err != nil {
 		return "", err
 	}
-	return imagesPath, nil
+
+	relativePath, err := filepath.Rel(cwd, imagesPath)
+	if err != nil {
+		return "", err
+	}
+	return relativePath, nil
 }
 
 func (f Files) WriteImage(name string, dir string, image *model.Image) (string, error) {

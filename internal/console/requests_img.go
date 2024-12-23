@@ -27,24 +27,24 @@ import (
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 )
 
-func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image, error) {
+func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image, bool, error) {
 	resp, err := DoConsoleRequest("GET", path, client, cnx, nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer resp.Body.Close()
 
 	ext, err := mime.ExtensionsByType(resp.Header.Get("Content-Type"))
 
 	if err != nil || ext == nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return &model.Image{Ext: ext[0], Data: rbody}, nil
+	return &model.Image{Ext: ext[0], Data: rbody}, (resp.StatusCode / 100) == 2, nil
 }
 
 type imageResource struct {
