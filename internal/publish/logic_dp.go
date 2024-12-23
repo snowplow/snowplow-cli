@@ -172,7 +172,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	return &res, nil
 }
 
-func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources, remoteImages []console.ImageResource) (*DataProductChangeSet, error) {
+func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources, remoteImageHashById map[string]string) (*DataProductChangeSet, error) {
 	saRemoteIds := make(map[string]console.RemoteSourceApplication)
 	idToFileName := make(map[string]string)
 	for _, remoteSa := range remote.SourceApplication {
@@ -247,7 +247,7 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 					return nil, err
 				}
 				// check triggers separately because of images
-				triggerChangeset := findTriggerChanges(possibleUpdate.Triggers, remoteEs.Triggers, local.TriggerImageRefsById, remoteImages)
+				triggerChangeset := findTriggerChanges(possibleUpdate.Triggers, remoteEs.Triggers, local.TriggerImageRefsById, remoteImageHashById)
 				// assign remote variant urls to update where image hashes are the same
 				possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
 				if !reflect.DeepEqual(*remoteDiff, *updateDiff) || triggerChangeset.isChanged {
@@ -301,7 +301,7 @@ type triggerChangeset struct {
 	triggersWithOriginalVariantUrls []console.RemoteTrigger
 }
 
-func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTrigger, localImagesByTriggerId map[string]TriggerImageReference, remoteHashes []console.ImageResource) triggerChangeset {
+func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTrigger, localImagesByTriggerId map[string]TriggerImageReference, remoteImageHashById map[string]string) triggerChangeset {
 	differentTriggerSet := len(local) != len(remote)
 	var differentTextData bool
 	var differentImages bool
@@ -321,7 +321,7 @@ func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTr
 			differentTextData = (lt.Url != rt.Url || lt.Description != rt.Description || !util.StringSlicesEqual(lt.AppIds, rt.AppIds))
 		}
 		localImage := localImagesByTriggerId[lt.Id]
-		remoteImageHash := getRemoteImageHashFromTriggerAndHashes(rt, remoteHashes)
+		remoteImageHash := getRemoteImageHashFromTriggerAndHashes(rt, remoteImageHashById)
 		if localImage.hash != remoteImageHash {
 			differentImages = true
 			imagesToUpload = append(imagesToUpload, localImage)
@@ -348,12 +348,7 @@ func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTr
 
 }
 
-func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remoteHashes []console.ImageResource) string {
-	//TODO: Group by in the console function
-	remoteHashesById := map[string]string{}
-	for _, rh := range remoteHashes {
-		remoteHashesById[rh.Id] = rh.Hash
-	}
+func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remoteHashesById map[string]string) string {
 	variant := "original"
 	uri := strings.TrimSuffix(remote.VariantUrls[variant], fmt.Sprintf("/%s", variant))
 	if uri != "" {

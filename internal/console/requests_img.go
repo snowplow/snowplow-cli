@@ -56,7 +56,7 @@ type imageLookup struct {
 	Items []ImageResource
 }
 
-func GetImageHashLookup(cnx context.Context, client *ApiClient) ([]ImageResource, error) {
+func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]string, error) {
 	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
 	if err != nil {
 		return nil, err
@@ -73,14 +73,14 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) ([]ImageResource
 		return nil, err
 	}
 
-	hashes := []string{}
+	hashById := make(map[string]string)
 	for _, v := range lookup.Items {
 		if v.Hash != "" {
-			hashes = append(hashes, v.Hash)
+			hashById[v.Id] = v.Hash
 		}
 	}
 
-	return lookup.Items, nil
+	return hashById, nil
 }
 
 type imageUploadLinkResponse struct {

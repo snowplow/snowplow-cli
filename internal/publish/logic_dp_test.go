@@ -116,7 +116,7 @@ func Test_findChanges_NoChanges(t *testing.T) {
 		EventSpecs:        []console.RemoteEventSpec{},
 	}
 
-	changes, err := findChanges(local, remote)
+	changes, err := findChanges(local, remote, map[string]string{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -155,7 +155,7 @@ func Test_findChanges_CreateAll(t *testing.T) {
 		EventSpecs:        []console.RemoteEventSpec{},
 	}
 
-	changes, err := findChanges(local, remote)
+	changes, err := findChanges(local, remote, map[string]string{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func Test_findChanges_UpdateAll(t *testing.T) {
 		EventSpecs:        []console.RemoteEventSpec{remoteEs},
 	}
 
-	changes, err := findChanges(local, remote)
+	changes, err := findChanges(local, remote, map[string]string{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -373,7 +373,7 @@ func Test_findChanges_DeleteEventSpec(t *testing.T) {
 		EventSpecs:        []console.RemoteEventSpec{remoteEs},
 	}
 
-	changes, err := findChanges(local, remote)
+	changes, err := findChanges(local, remote, map[string]string{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
