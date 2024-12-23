@@ -45,7 +45,7 @@ type RemoteTrigger struct {
 	Id          string            `json:"id,omitempty"`
 	Description string            `json:"description"`
 	AppIds      []string          `json:"appIds,omitempty"`
-	Url         string            `json:"url"`
+	Url         string            `json:"url,omitempty"`
 	VariantUrls map[string]string `json:"variantUrls,omitempty"`
 }
 

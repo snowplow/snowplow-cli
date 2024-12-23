@@ -17,25 +17,27 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"golang.org/x/net/context"
 )
 
 type LocalFilesRefsResolved struct {
-	DataProudcts    []model.DataProduct
-	SourceApps      []model.SourceApp
-	HashToImageFile map[string]string
-	IdToFileName    map[string]string
+	DataProudcts         []model.DataProduct
+	SourceApps           []model.SourceApp
+	TriggerImageRefsById map[string]TriggerImageReference
+	IdToFileName         map[string]string
 }
 
-type ImageCreationEnv struct {
-	fname string
-	hash  string
+type TriggerImageReference struct {
+	eventSpecId string
+	triggerId   string
+	fname       string
+	hash        string
 }
 
 type DataProductChangeSet struct {
@@ -46,7 +48,7 @@ type DataProductChangeSet struct {
 	esCreate     []console.RemoteEventSpec
 	esUpdate     []console.RemoteEventSpec
 	esDelete     []console.RemoteEventSpec
-	imageCreate  []ImageCreationEnv
+	imageCreate  []TriggerImageReference
 	IdToFileName map[string]string
 }
 
@@ -127,7 +129,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 		probablyDps = append(probablyDps, dp)
 	}
 
-	localHashToImage := map[string]string{}
+	triggerImageRefs := make(map[string]TriggerImageReference)
 	for dpFile, dp := range filenameToDp {
 		for _, es := range dp.Data.EventSpecifications {
 			for _, t := range es.Triggers {
@@ -150,22 +152,27 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 
 					hash := fmt.Sprintf("%x", h.Sum(nil))
 
-					localHashToImage[hash] = fname
+					triggerImageRefs[t.Id] = TriggerImageReference{
+						eventSpecId: es.ResourceName,
+						triggerId:   t.Id,
+						fname:       fname,
+						hash:        hash,
+					}
 				}
 			}
 		}
 	}
 
 	res := LocalFilesRefsResolved{
-		DataProudcts:    probablyDps,
-		SourceApps:      probablySas,
-		IdToFileName:    idToFileName,
-		HashToImageFile: localHashToImage,
+		DataProudcts:         probablyDps,
+		SourceApps:           probablySas,
+		IdToFileName:         idToFileName,
+		TriggerImageRefsById: triggerImageRefs,
 	}
 	return &res, nil
 }
 
-func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources) (*DataProductChangeSet, error) {
+func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources, remoteImages []console.ImageResource) (*DataProductChangeSet, error) {
 	saRemoteIds := make(map[string]console.RemoteSourceApplication)
 	idToFileName := make(map[string]string)
 	for _, remoteSa := range remote.SourceApplication {
@@ -208,6 +215,8 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 
 	esLocalIds := make(map[string]bool)
 
+	var imageCreate []TriggerImageReference
+
 	for _, localDp := range local.DataProudcts {
 		remoteDp, remoteExists := dpRemoteIds[localDp.ResourceName]
 		if remoteExists {
@@ -237,13 +246,26 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 				if err != nil {
 					return nil, err
 				}
-				if !reflect.DeepEqual(*remoteDiff, *updateDiff) {
+				// check triggers separately because of images
+				triggerChangeset := findTriggerChanges(possibleUpdate.Triggers, remoteEs.Triggers, local.TriggerImageRefsById, remoteImages)
+				// assign remote variant urls to update where image hashes are the same
+				possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
+				if !reflect.DeepEqual(*remoteDiff, *updateDiff) || triggerChangeset.isChanged {
 					esUpdate = append(esUpdate, possibleUpdate)
 					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
+					imageCreate = append(imageCreate, triggerChangeset.imagesToUpload...)
 				}
 			} else {
-				esCreate = append(esCreate, LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName))
+				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
+				esCreate = append(esCreate, possibleUpdate)
 				idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
+				for _, t := range possibleUpdate.Triggers {
+					triggerImage, exists := local.TriggerImageRefsById[t.Id]
+					if exists {
+						imageCreate = append(imageCreate, triggerImage)
+					}
+
+				}
 			}
 
 			esLocalIds[localEs.ResourceName] = true
@@ -268,19 +290,82 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		esCreate:     esCreate,
 		esUpdate:     esUpdate,
 		esDelete:     esDelete,
+		imageCreate:  imageCreate,
 		IdToFileName: idToFileName,
 	}, nil
 }
 
+type triggerChangeset struct {
+	isChanged                       bool
+	imagesToUpload                  []TriggerImageReference
+	triggersWithOriginalVariantUrls []console.RemoteTrigger
+}
+
+func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTrigger, localImagesByTriggerId map[string]TriggerImageReference, remoteHashes []console.ImageResource) triggerChangeset {
+	differentTriggerSet := len(local) != len(remote)
+	var differentTextData bool
+	var differentImages bool
+	imagesToUpload := []TriggerImageReference{}
+	remoteById := map[string]console.RemoteTrigger{}
+	for _, rt := range remote {
+		remoteById[rt.Id] = rt
+	}
+
+	var triggersWithOriginalVariantUrls []console.RemoteTrigger
+
+	for _, lt := range local {
+		rt, remoteExists := remoteById[lt.Id]
+		if !remoteExists {
+			differentTriggerSet = true
+		} else {
+			differentTextData = (lt.Url != rt.Url || lt.Description != rt.Description || !util.StringSlicesEqual(lt.AppIds, rt.AppIds))
+		}
+		localImage := localImagesByTriggerId[lt.Id]
+		remoteImageHash := getRemoteImageHashFromTriggerAndHashes(rt, remoteHashes)
+		if localImage.hash != remoteImageHash {
+			differentImages = true
+			imagesToUpload = append(imagesToUpload, localImage)
+			// this one won't have variant urls until the images will get uploaded
+			triggersWithOriginalVariantUrls = append(triggersWithOriginalVariantUrls, lt)
+		} else {
+			// populate triggers with links from remote - we dont' have them locally anymore, but we know that they are the same
+			triggersWithOriginalVariantUrls = append(triggersWithOriginalVariantUrls,
+				console.RemoteTrigger{
+					Id:          lt.Id,
+					Description: lt.Description,
+					AppIds:      lt.AppIds,
+					Url:         lt.Url,
+					VariantUrls: rt.VariantUrls,
+				})
+		}
+	}
+
+	return triggerChangeset{
+		isChanged:                       differentTriggerSet || differentTextData || differentImages,
+		imagesToUpload:                  imagesToUpload,
+		triggersWithOriginalVariantUrls: triggersWithOriginalVariantUrls,
+	}
+
+}
+
+func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remoteHashes []console.ImageResource) string {
+	//TODO: Group by in the console function
+	remoteHashesById := map[string]string{}
+	for _, rh := range remoteHashes {
+		remoteHashesById[rh.Id] = rh.Hash
+	}
+	variant := "original"
+	uri := strings.TrimSuffix(remote.VariantUrls[variant], fmt.Sprintf("/%s", variant))
+	if uri != "" {
+		imageId := uri[len(uri)-36:]
+		return remoteHashesById[imageId]
+	} else {
+		return ""
+	}
+}
+
 func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *console.ApiClient) error {
 	slog.Info("publish", "msg", "applying changes")
-	for _, img := range changes.imageCreate {
-		variants, err := console.PublishImage(cnx, client, img.fname, img.hash)
-		if err != nil {
-			return err
-		}
-		slog.Info("publish", "msg", "what do we do with the images we just uploaded? they need feeding back in to give context to the event spec changes", "img", img.fname,"variants", variants)
-	}
 	for _, saC := range changes.saCreate {
 		err := console.CreateSourceApp(cnx, client, saC)
 		if err != nil {
@@ -305,10 +390,34 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 			return err
 		}
 	}
+	triggerIdToVariantUrl := make(map[string]console.VariantUrls)
+	for _, img := range changes.imageCreate {
+		variants, err := console.PublishImage(cnx, client, img.fname, img.hash)
+		if err != nil {
+			return err
+		}
+		triggerIdToVariantUrl[img.triggerId] = variants
+	}
+	for esI, es := range changes.esCreate {
+		for tI, t := range es.Triggers {
+			uploadedVariants, exists := triggerIdToVariantUrl[t.Id]
+			if exists {
+				changes.esCreate[esI].Triggers[tI].VariantUrls = uploadedVariants
+			}
+		}
+	}
 	for _, esC := range changes.esCreate {
 		err := console.CreateEventSpec(cnx, client, esC)
 		if err != nil {
 			return err
+		}
+	}
+	for esI, es := range changes.esUpdate {
+		for tI, t := range es.Triggers {
+			uploadedVariants, exists := triggerIdToVariantUrl[t.Id]
+			if exists {
+				changes.esUpdate[esI].Triggers[tI].VariantUrls = uploadedVariants
+			}
 		}
 	}
 	for _, esU := range changes.esUpdate {
@@ -463,23 +572,14 @@ func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]m
 	if err != nil {
 		return nil, err
 	}
-	changeSet, err := findChanges(*localResolved, *remote)
-	if err != nil {
-		return nil, err
-	}
 	hashLookup, err := console.GetImageHashLookup(cnx, client)
 	if err != nil {
 		return nil, err
 	}
-
-	imagesToCreate := []ImageCreationEnv{}
-	for h, f := range localResolved.HashToImageFile {
-		if !slices.Contains(hashLookup, h) {
-			imagesToCreate = append(imagesToCreate, ImageCreationEnv{f, h})
-		}
+	changeSet, err := findChanges(*localResolved, *remote, hashLookup)
+	if err != nil {
+		return nil, err
 	}
-
-	changeSet.imageCreate = imagesToCreate
 
 	return changeSet, err
 }
