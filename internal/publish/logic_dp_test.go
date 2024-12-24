@@ -14,6 +14,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/snowplow-product/snowplow-cli/internal/console"
 	"github.com/snowplow-product/snowplow-cli/internal/model"
 )
@@ -383,4 +385,246 @@ func Test_findChanges_DeleteEventSpec(t *testing.T) {
 	if len(changes.esDelete) != 1 {
 		t.Errorf("expected 1 event spec delete, got %d", len(changes.esDelete))
 	}
+}
+
+func Test_findTriggerChanges_OK(t *testing.T) {
+	sharedTrigger := console.RemoteTrigger{
+		Id:          "f8500e68-4d1d-491c-b413-61f643e310aa",
+		Description: "trigger 1",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	deletedTrigger := console.RemoteTrigger{
+		Id:          "a191e2ab-b3e8-4d7d-8218-962c19469675",
+		Description: "trigger 2",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	addedTrigger := console.RemoteTrigger{
+		Id:          "74a9496c-dc39-4885-bf1e-56aec455f50e",
+		Description: "trigger 3",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	changedTrigger1_local := console.RemoteTrigger{
+		Id:          "f15fa249-3a25-4479-a47d-571f1d12eafc",
+		Description: "trigger 4 descrtiption change",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	changedTrigger1_remote := console.RemoteTrigger{
+		Id:          "f15fa249-3a25-4479-a47d-571f1d12eafc",
+		Description: "trigger 4",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	changedTrigger2_local := console.RemoteTrigger{
+		Id:          "aa0e98d2-7f0e-4461-bd56-b3d2a7bcb113",
+		Description: "trigger 5",
+		AppIds:      []string{"OK", "app id change"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	changedTrigger2_remote := console.RemoteTrigger{
+		Id:          "aa0e98d2-7f0e-4461-bd56-b3d2a7bcb113",
+		Description: "trigger 5",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	changedTrigger3_local := console.RemoteTrigger{
+		Id:          "54b87f2b-c13c-459f-9fa2-20c6abdb85b3",
+		Description: "trigger 6",
+		AppIds:      []string{"OK"},
+		Url:         "url.change",
+		VariantUrls: map[string]string{},
+	}
+	changedTrigger3_remote := console.RemoteTrigger{
+		Id:          "54b87f2b-c13c-459f-9fa2-20c6abdb85b3",
+		Description: "trigger 6",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	localTriggers := []console.RemoteTrigger{sharedTrigger, addedTrigger, changedTrigger1_local, changedTrigger2_local, changedTrigger3_local}
+	remoteTriggers := []console.RemoteTrigger{sharedTrigger, deletedTrigger, changedTrigger1_remote, changedTrigger2_remote, changedTrigger3_remote}
+	res := findTriggerChanges(localTriggers, remoteTriggers, map[string]TriggerImageReference{}, map[string]string{})
+	expected := triggerChangeset{
+		isChanged:      true,
+		imagesToUpload: []TriggerImageReference{},
+		triggersWithOriginalVariantUrls: []console.RemoteTrigger{
+			sharedTrigger,
+			{
+				Id:          "74a9496c-dc39-4885-bf1e-56aec455f50e",
+				Description: "trigger 3",
+				AppIds:      []string{"OK"},
+				Url:         "",
+				VariantUrls: map[string]string{},
+			},
+			{
+				Id:          "f15fa249-3a25-4479-a47d-571f1d12eafc",
+				Description: "trigger 4 descrtiption change",
+				AppIds:      []string{"OK"},
+				Url:         "",
+				VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+			},
+			{
+				Id:          "aa0e98d2-7f0e-4461-bd56-b3d2a7bcb113",
+				Description: "trigger 5",
+				AppIds:      []string{"OK", "app id change"},
+				Url:         "",
+				VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+			},
+			{
+				Id:          "54b87f2b-c13c-459f-9fa2-20c6abdb85b3",
+				Description: "trigger 6",
+				AppIds:      []string{"OK"},
+				Url:         "url.change",
+				VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+			},
+		},
+	}
+	if !res.isChanged {
+		t.Errorf("findTriggerChanges().isChanged = %t, want %t", res.isChanged, true)
+	}
+	if diff := cmp.Diff(expected.triggersWithOriginalVariantUrls, res.triggersWithOriginalVariantUrls, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("findTriggerChanges().triggersWithOriginalVariantUrls mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func Test_findTriggerChanges_ImageDiff(t *testing.T) {
+	localTrigger := console.RemoteTrigger{
+		Id:          "f8500e68-4d1d-491c-b413-61f643e310aa",
+		Description: "trigger 1",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	remoteTrigger := console.RemoteTrigger{
+		Id:          localTrigger.Id,
+		Description: "trigger 1",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	triggerToCreateWithImage := console.RemoteTrigger{
+		Id:          "09ae9c08-4bfa-42cf-a256-81fbedfc5c09",
+		Description: "trigger 2",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	notChangedTriggerLocal := console.RemoteTrigger{
+		Id:          "41cdcdae-9a32-48e8-8a3b-875e6f284cbe",
+		Description: "trigger 3",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	notChangedTriggerRemote := console.RemoteTrigger{
+		Id:          notChangedTriggerLocal.Id,
+		Description: "trigger 3",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"original": "test.com/97c5fa2c-7159-4c69-921f-112acdd58b50/original"},
+	}
+
+	localImagesByTriggerId := map[string]TriggerImageReference{
+		localTrigger.Id: TriggerImageReference{
+			eventSpecId: "2fc5caf4-aa7a-477e-b200-aeb7edfda51d",
+			triggerId:   localTrigger.Id,
+			fname:       ".images/1.png",
+			hash:        "326f4188c4850f06064996d2f0120eec7ccdaefa6080a9bb19f6b012c46fef69",
+		},
+		triggerToCreateWithImage.Id: TriggerImageReference{
+			eventSpecId: "8cfc1547-d8d2-4498-bab7-066c7a23a821",
+			triggerId:   triggerToCreateWithImage.Id,
+			fname:       ".images/2.png",
+			hash:        "0d7baa385d770797c54d69437473fdd378c3cf646a7469a1a7b54770fd53d24b",
+		},
+		notChangedTriggerLocal.Id: TriggerImageReference{
+			eventSpecId: "8cfc1547-d8d2-4498-bab7-066c7a23a821",
+			triggerId:   notChangedTriggerLocal.Id,
+			fname:       ".images/3.png",
+			hash:        "b5cbf7b50e2559f609e94f26a9b7d268f87caeff12f6982558cd68e4a877da4e",
+		},
+	}
+	remoteImageHashById := map[string]string{
+		"dcddfa7a-67ca-4a48-9d8a-0aaf69594e65": "57970a73313c4f20ea526c23d17ee53a9110c17331ce298f2201c895132c4110",
+		"97c5fa2c-7159-4c69-921f-112acdd58b50": "b5cbf7b50e2559f609e94f26a9b7d268f87caeff12f6982558cd68e4a877da4e",
+	}
+	localTriggers := []console.RemoteTrigger{localTrigger, triggerToCreateWithImage, notChangedTriggerLocal}
+	remoteTriggers := []console.RemoteTrigger{remoteTrigger, notChangedTriggerRemote}
+
+	res := findTriggerChanges(localTriggers, remoteTriggers, localImagesByTriggerId, remoteImageHashById)
+	expected := []TriggerImageReference{
+		{
+			eventSpecId: "2fc5caf4-aa7a-477e-b200-aeb7edfda51d",
+			triggerId:   localTrigger.Id,
+			fname:       ".images/1.png",
+			hash:        "326f4188c4850f06064996d2f0120eec7ccdaefa6080a9bb19f6b012c46fef69",
+		},
+		{
+			eventSpecId: "8cfc1547-d8d2-4498-bab7-066c7a23a821",
+			triggerId:   triggerToCreateWithImage.Id,
+			fname:       ".images/2.png",
+			hash:        "0d7baa385d770797c54d69437473fdd378c3cf646a7469a1a7b54770fd53d24b",
+		},
+	}
+
+	if diff := cmp.Diff(expected, res.imagesToUpload, cmpopts.EquateEmpty(), cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
+		t.Errorf("findTriggerChanges().imagesToUpload mismatch (-want +got):\n%s", diff)
+	}
+
+}
+
+func Test_findTriggerChanges_MissingOriginal(t *testing.T) {
+	localTrigger := console.RemoteTrigger{
+		Id:          "f8500e68-4d1d-491c-b413-61f643e310aa",
+		Description: "trigger 1",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{},
+	}
+	remoteTrigger := console.RemoteTrigger{
+		Id:          localTrigger.Id,
+		Description: "trigger 1",
+		AppIds:      []string{"OK"},
+		Url:         "",
+		VariantUrls: map[string]string{"no_original": "test.com/dcddfa7a-67ca-4a48-9d8a-0aaf69594e65/original"},
+	}
+	localImagesByTriggerId := map[string]TriggerImageReference{
+		localTrigger.Id: TriggerImageReference{
+			eventSpecId: "2fc5caf4-aa7a-477e-b200-aeb7edfda51d",
+			triggerId:   localTrigger.Id,
+			fname:       ".images/1.png",
+			hash:        "326f4188c4850f06064996d2f0120eec7ccdaefa6080a9bb19f6b012c46fef69",
+		},
+	}
+	remoteImageHashById := map[string]string{
+		"dcddfa7a-67ca-4a48-9d8a-0aaf69594e65": "57970a73313c4f20ea526c23d17ee53a9110c17331ce298f2201c895132c4110",
+	}
+	localTriggers := []console.RemoteTrigger{localTrigger}
+	remoteTriggers := []console.RemoteTrigger{remoteTrigger}
+
+	res := findTriggerChanges(localTriggers, remoteTriggers, localImagesByTriggerId, remoteImageHashById)
+
+	expected := []TriggerImageReference{
+		{
+			eventSpecId: "2fc5caf4-aa7a-477e-b200-aeb7edfda51d",
+			triggerId:   localTrigger.Id,
+			fname:       ".images/1.png",
+			hash:        "326f4188c4850f06064996d2f0120eec7ccdaefa6080a9bb19f6b012c46fef69",
+		},
+	}
+
+	if diff := cmp.Diff(expected, res.imagesToUpload, cmpopts.EquateEmpty(), cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
+		t.Errorf("findTriggerChanges().imagesToUpload mismatch (-want +got):\n%s", diff)
+	}
+
 }
