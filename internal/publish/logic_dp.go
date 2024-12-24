@@ -131,7 +131,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 	for dpFile, dp := range filenameToDp {
 		for _, es := range dp.Data.EventSpecifications {
 			for _, t := range es.Triggers {
-				if len(t.Image.Ref) != 0 {
+				if t.Image != nil && len(t.Image.Ref) != 0 {
 					dppath, err := filepath.Abs(dpFile)
 					if err != nil {
 						return nil, err

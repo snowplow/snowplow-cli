@@ -91,6 +91,14 @@ var SaResource = []model.CliResource[model.SourceAppData]{
 	},
 }
 
+var sampleRemoteTrigger = console.RemoteTrigger{
+	Id:          "f843f882-45ec-4a1c-a401-f8986c5120a3",
+	Description: "test trigger",
+	AppIds:      []string{"one"},
+	Url:         "example.com",
+	VariantUrls: map[string]string{"original": "example.com/orig", "thumbnail": "example.com/small"},
+}
+
 var sampleRemoteEs = console.RemoteEventSpec{
 	Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
 	SourceApplicationIds: []string{sampleSa1.Id},
@@ -116,7 +124,9 @@ var sampleRemoteEs = console.RemoteEventSpec{
 	},
 		Enriched: nil,
 	},
+	Triggers: []console.RemoteTrigger{sampleRemoteTrigger},
 }
+
 var sampleRemoteEss = []console.RemoteEventSpec{sampleRemoteEs}
 
 var sampleEsIdToEs = map[string]console.RemoteEventSpec{sampleRemoteEs.Id: sampleRemoteEs}
@@ -156,7 +166,7 @@ func Test_localSasToRefs_OK(t *testing.T) {
 }
 
 func Test_remoteDpsToLocalResources_OK(t *testing.T) {
-	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs)
+	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"})
 	expected := []model.CliResource[model.DataProductCanonicalData]{{
 		ApiVersion:   "v1",
 		ResourceType: "data-product",
@@ -182,12 +192,78 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 					Tracked:  trackedEntites,
 					Enriched: nil,
 				},
+				Triggers: []model.Trigger{{
+					Id:          sampleRemoteTrigger.Id,
+					Description: sampleRemoteTrigger.Description,
+					AppIds:      sampleRemoteTrigger.AppIds,
+					Url:         sampleRemoteTrigger.Url,
+					Image: &model.Ref{
+						Ref: "./images/test",
+					},
+				}},
 			}},
 		},
 	}}
 
 	if !reflect.DeepEqual(expected, res) {
 		t.Errorf("Unexpected local data products expected:%+v got:%+v", expected, res)
+	}
+
+}
+
+func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
+	var sampleRemoteEs = []console.RemoteEventSpec{{
+		Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
+		SourceApplicationIds: []string{sampleSa1.Id},
+		Name:                 "test ES",
+		Event: &console.EventWrapper{Event: console.Event{
+			Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
+			Schema: map[string]any{},
+		},
+		},
+		Triggers: []console.RemoteTrigger{{
+			Id:          "11d52733-bf70-4758-b64d-c4eb694003e3",
+			Description: "test",
+			AppIds:      []string{"one", "two"},
+			Url:         "http://example.com",
+			VariantUrls: map[string]string{"original": "http://example.com/nice", "fake": "http://example.com/bad"},
+		}, {
+			Id:          "90591260-7277-4319-8f66-30ad31c6bd85",
+			Description: "test",
+			AppIds:      []string{"three"},
+			Url:         "http://example.com",
+			VariantUrls: map[string]string{"original": "http://example.com/test", "fake": "http://example.com/bad2"},
+		},
+		},
+	},
+		{
+			Id:                   "39b421d4-5f1a-4ca1-8f89-559cf72f0d91",
+			SourceApplicationIds: []string{sampleSa1.Id},
+			Name:                 "test ES",
+			Event: &console.EventWrapper{Event: console.Event{
+				Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
+				Schema: map[string]any{},
+			},
+			},
+			Triggers: []console.RemoteTrigger{{
+				Id:          "291a4a6b-b46a-4d16-87d1-c3464139b8d9",
+				Description: "test",
+				AppIds:      []string{"one", "two"},
+				Url:         "http://example.com",
+				VariantUrls: map[string]string{"original": "http://example.com/other_dp", "fake": "http://example.com/bad"},
+			},
+			},
+		},
+	}
+
+	res := remoteEsToTriggerIdToUrlAndFilename(sampleRemoteEs)
+	expected := map[string]imgUrlFile{
+		"11d52733-bf70-4758-b64d-c4eb694003e3": imgUrlFile{"http://example.com/nice", "test-es_1"},
+		"291a4a6b-b46a-4d16-87d1-c3464139b8d9": imgUrlFile{"http://example.com/other_dp", "test-es_2"},
+		"90591260-7277-4319-8f66-30ad31c6bd85": imgUrlFile{"http://example.com/test", "test-es_3"}}
+
+	if !reflect.DeepEqual(expected, res) {
+		t.Errorf("Unexpected trigger urls expected:%+v got:%+v", expected, res)
 	}
 
 }
