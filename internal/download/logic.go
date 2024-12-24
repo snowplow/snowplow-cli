@@ -57,7 +57,7 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 	triggerIdToUrl := remoteEsToTriggerIdToUrlAndFilename(remoteEss)
 	triggerIdToFilePath := make(map[string]string)
 	if len(triggerIdToUrl) != 0 {
-		slog.Debug("download", "msg", "will attempt to donwload trigger images")
+		slog.Debug("download", "msg", "will attempt to download trigger images")
 		dir, err := files.CreateImageFolder()
 		if err != nil {
 			return nil, err
