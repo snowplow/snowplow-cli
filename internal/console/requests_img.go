@@ -47,18 +47,16 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image
 	return &model.Image{Ext: ext[0], Data: rbody}, (resp.StatusCode / 100) == 2, nil
 }
 
-type imageResource struct {
+type ImageResource struct {
 	Id   string
 	Hash string
 }
 
 type imageLookup struct {
-	Items []imageResource
+	Items []ImageResource
 }
 
-type ImageHashes = []string
-
-func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, error) {
+func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]string, error) {
 	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
 	if err != nil {
 		return nil, err
@@ -75,14 +73,14 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (ImageHashes, er
 		return nil, err
 	}
 
-	hashes := []string{}
+	hashById := make(map[string]string)
 	for _, v := range lookup.Items {
 		if v.Hash != "" {
-			hashes = append(hashes, v.Hash)
+			hashById[v.Id] = v.Hash
 		}
 	}
 
-	return hashes, nil
+	return hashById, nil
 }
 
 type imageUploadLinkResponse struct {
