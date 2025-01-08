@@ -1,31 +1,81 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
+  "$id": "https://raw.githubusercontent.com/snowplow-product/snowplow-cli/main/internal/validation/schema/source-application.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "resourceType", "resourceName", "data"],
   "properties": {
     "apiVersion": { "enum": ["v1"] },
     "resourceType": { "enum": ["source-application"] },
-    "resourceName": { "type": "string", "format": "uuid" },
+    "resourceName": {
+      "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+      "type": "string",
+      "format": "uuid"
+    },
     "data": {
+      "examples": [
+        {
+          "name": "Website",
+          "appIds": ["web", "web-qa"],
+          "entities": {
+            "tracked": [
+              {
+                "source": "iglu:org.schema/WebPage/jsonschema/1-0-0",
+                "minCardinality": 1
+              },
+              {
+                "source": "iglu:com.snowplowanalytics.snowplow/geolocation_context/jsonschema/1-1-0"
+              }
+            ],
+            "enriched": []
+          }
+        }
+      ],
       "type": "object",
       "additionalProperties": false,
-      "required": ["name","entities", "appIds"],
+      "required": ["name", "entities", "appIds"],
       "properties": {
-        "name": { "type": "string" },
-        "domain": { "type": "string" },
-        "description": { "type": "string" },
-        "owner": { "type": "string" },
+        "name": {
+          "description": "A human readable name that will make sense when exploring your data.",
+          "type": "string"
+        },
+        "domain": {
+          "description": "The team or area of business looking after this application.",
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "owner": {
+          "description": "The primary owner of this source application.",
+          "type": "string"
+        },
         "appIds": {
+          "description": "Identifiers that the trackers send with the different events for this application.",
           "type": "array",
           "items": { "type": "string" }
         },
         "entities": {
+          "description": "The entities that will be associated with all tracking from this application.",
+          "examples": [
+            {
+              "tracked": [
+                {
+                  "source": "iglu:org.schema/WebPage/jsonschema/1-0-0",
+                  "minCardinality": 1
+                },
+                {
+                  "source": "iglu:com.snowplowanalytics.snowplow/geolocation_context/jsonschema/1-1-0"
+                }
+              ]
+            }
+          ],
           "type": "object",
           "additionalProperties": false,
           "required": ["tracked", "enriched"],
           "properties": {
             "tracked": {
+              "description": "Entities added via tracking",
               "type": "array",
               "items": {
                 "type": "object",
@@ -34,12 +84,13 @@
                 "properties": {
                   "source": { "$ref": "#/$defs/igluUri" },
                   "comment": { "type": "string" },
-                  "minCardinality": { "type": "number", "enum": [0, 1]},
+                  "minCardinality": { "type": "number", "enum": [0, 1] },
                   "maxCardinality": { "type": "number" }
                 }
               }
             },
             "enriched": {
+              "description": "Entities added via tracking",
               "type": "array",
               "items": {
                 "type": "object",
@@ -48,7 +99,7 @@
                 "properties": {
                   "source": { "$ref": "#/$defs/igluUri" },
                   "comment": { "type": "string" },
-                  "minCardinality": { "type": "number", "enum": [0, 1]},
+                  "minCardinality": { "type": "number", "enum": [0, 1] },
                   "maxCardinality": { "type": "number" }
                 }
               }
