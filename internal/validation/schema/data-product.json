@@ -9,11 +9,12 @@
     "resourceType": { "enum": ["data-product"] },
     "resourceName": {
       "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+      "examples": [{ "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42" }],
       "type": "string",
       "format": "uuid"
     },
     "data": {
-      "description": "Data product description",
+      "description": "Data product properties",
       "examples": [
         {
           "data": {
@@ -24,7 +25,7 @@
                 "name": "Product added to cart",
                 "event": {
                   "tracked": {
-                    "source": "iglu:snowplow_ecommerce_action/jsonschema/1-0-1",
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
                     "schema": {
                       "type": "object",
                       "additionalProperties": false,
@@ -71,6 +72,7 @@
         "owner": {
           "description": "The primary owner of this data product.",
           "type": "string",
+          "examples": [{ "owner": "owner@example.com" }],
           "format": "email"
         },
         "sourceApplications": {
@@ -97,7 +99,7 @@
                   "name": "Product added to cart",
                   "event": {
                     "tracked": {
-                      "source": "iglu:snowplow_ecommerce_action/jsonschema/1-0-1",
+                      "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
                       "schema": {
                         "type": "object",
                         "additionalProperties": false,
@@ -132,6 +134,9 @@
             "properties": {
               "resourceName": {
                 "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+                "examples": [
+                  { "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42" }
+                ],
                 "type": "string",
                 "format": "uuid"
               },
@@ -163,6 +168,11 @@
                   "properties": {
                     "id": {
                       "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+                      "examples": [
+                        {
+                          "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42"
+                        }
+                      ],
                       "type": "string",
                       "format": "uuid"
                     },
@@ -193,10 +203,10 @@
                 "description": "The event schema that this event specification should validate against along with any additional instructions or refinements.",
                 "examples": [
                   {
-                    "source": "iglu:snowplow_ecommerce_action/jsonschema/1-0-1"
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1"
                   },
                   {
-                    "source": "iglu:snowplow_ecommerce_action/jsonschema/1-0-1",
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
                     "schema": {
                       "type": "object",
                       "additionalProperties": false,

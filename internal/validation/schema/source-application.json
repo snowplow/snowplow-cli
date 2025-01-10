@@ -9,6 +9,7 @@
     "resourceType": { "enum": ["source-application"] },
     "resourceName": {
       "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+      "examples": [{ "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42" }],
       "type": "string",
       "format": "uuid"
     },
@@ -48,12 +49,14 @@
         },
         "owner": {
           "description": "The primary owner of this source application.",
-          "type": "string"
+          "type": "string",
+          "examples": [{ "owner": "owner@example.com" }],
+          "format": "email"
         },
         "appIds": {
           "description": "Identifiers that the trackers send with the different events for this application.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "maxLength": 256 }
         },
         "entities": {
           "description": "The entities that will be associated with all tracking from this application.",
