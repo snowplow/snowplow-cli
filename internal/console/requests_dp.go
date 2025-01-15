@@ -35,6 +35,8 @@ type RemoteDataProduct struct {
 	Owner                string               `json:"owner,omitempty"`
 	Description          string               `json:"description,omitempty"`
 	EventSpecs           []EventSpecReference `json:"eventSpecs"`
+	LockStatus           string               `json:"lockStatus,omitempty"`
+	ManagedFrom          string               `json:"managedFrom,omitempty"`
 }
 
 type EventSpecReference struct {
@@ -95,6 +97,8 @@ type RemoteSourceApplication struct {
 	Owner       string   `json:"owner,omitempty"`
 	AppIds      []string `json:"appIds"`
 	Entities    Entities `json:"entities"`
+	LockStatus  string   `json:"lockStatus,omitempty"`
+	ManagedFrom string   `json:"managedFrom,omitempty"`
 }
 
 type Entities struct {

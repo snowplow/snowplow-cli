@@ -242,3 +242,17 @@ func TestDpToDiff(t *testing.T) {
 		t.Errorf("Description = %v, want %v", result.Description, input.Description)
 	}
 }
+
+func Test_saToDiff(t *testing.T) {
+	input := console.RemoteSourceApplication{
+		Id: "id",
+		LockStatus: "locked",
+		ManagedFrom: "somewhere",
+	}
+
+	result := saToDiff(input)
+
+	if result.LockStatus != "" && result.ManagedFrom != "" {
+		t.Errorf("failed to setup remote source app for sensible comparison")
+	}
+}
