@@ -39,6 +39,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
+		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
 		searchPaths := []string{}
 
@@ -70,6 +71,8 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		if err != nil {
 			snplog.LogFatal(err)
 		}
+
+		publish.LockChanged(changes, managedFrom)
 
 		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName)
 

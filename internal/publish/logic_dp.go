@@ -186,7 +186,7 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 
 		if remoteExists {
 			possibleUpdate := localSaToRemote(localSa)
-			if !reflect.DeepEqual(possibleUpdate, currentRemote) {
+			if !reflect.DeepEqual(saToDiff(possibleUpdate), saToDiff(currentRemote)) {
 				saUpdate = append(saUpdate, possibleUpdate)
 				idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
 			}
@@ -586,4 +586,31 @@ func Publish(cnx context.Context, client *console.ApiClient, changeSet *DataProd
 		err = ApplyDpChanges(*changeSet, cnx, client)
 	}
 	return err
+}
+
+func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
+	for i := range changeSet.dpCreate {
+		changeSet.dpCreate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.dpCreate[i].ManagedFrom = managedFrom
+		}
+	}
+	for i := range changeSet.dpUpdate {
+		changeSet.dpUpdate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.dpUpdate[i].ManagedFrom = managedFrom
+		}
+	}
+	for i := range changeSet.saCreate {
+		changeSet.saCreate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.saCreate[i].ManagedFrom = managedFrom
+		}
+	}
+	for i := range changeSet.saUpdate {
+		changeSet.saUpdate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.saUpdate[i].ManagedFrom = managedFrom
+		}
+	}
 }

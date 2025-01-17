@@ -628,3 +628,32 @@ func Test_findTriggerChanges_MissingOriginal(t *testing.T) {
 	}
 
 }
+
+func Test_LockChanged(t *testing.T) {
+	changeSet := &DataProductChangeSet{
+		dpCreate: []console.RemoteDataProduct{{}},
+		dpUpdate: []console.RemoteDataProduct{{}},
+		saCreate: []console.RemoteSourceApplication{{}},
+		saUpdate: []console.RemoteSourceApplication{{}},
+	}
+
+	LockChanged(changeSet, "my repo")
+
+	results := []bool{
+		changeSet.dpCreate[0].LockStatus == "locked",
+		changeSet.dpCreate[0].ManagedFrom == "my repo",
+		changeSet.dpUpdate[0].LockStatus == "locked",
+		changeSet.dpUpdate[0].ManagedFrom == "my repo",
+
+		changeSet.saCreate[0].LockStatus == "locked",
+		changeSet.saCreate[0].ManagedFrom == "my repo",
+		changeSet.saUpdate[0].LockStatus == "locked",
+		changeSet.saUpdate[0].ManagedFrom == "my repo",
+	}
+
+	for i, r := range results {
+		if !r {
+			t.Errorf("lockstatus or managedfrom failure at i:%d", i)
+		}
+	}
+}

@@ -220,3 +220,9 @@ func dpToDiff(dp console.RemoteDataProduct) RemoteDataProductDiff {
 		Description:          dp.Description,
 	}
 }
+
+func saToDiff(sa console.RemoteSourceApplication) console.RemoteSourceApplication {
+	sa.LockStatus = ""
+	sa.ManagedFrom = ""
+	return sa
+}
