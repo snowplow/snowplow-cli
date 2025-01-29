@@ -1,22 +1,85 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
+  "$id": "https://raw.githubusercontent.com/snowplow-product/snowplow-cli/main/internal/validation/schema/data-product.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "resourceType", "resourceName", "data"],
   "properties": {
     "apiVersion": { "enum": ["v1"] },
     "resourceType": { "enum": ["data-product"] },
-    "resourceName": { "type": "string", "format": "uuid" },
+    "resourceName": {
+      "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+      "examples": [{ "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42" }],
+      "type": "string",
+      "format": "uuid"
+    },
     "data": {
+      "description": "Data product properties",
+      "examples": [
+        {
+          "data": {
+            "name": "E Commerce",
+            "eventSpecifications": [
+              {
+                "resourceName": "c3ab68cb-7b6a-404d-8e45-f71f676f9093",
+                "name": "Product added to cart",
+                "event": {
+                  "tracked": {
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
+                    "schema": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": { "type": { "enum": ["add_to_cart"] } },
+                      "required": ["type"]
+                    }
+                  }
+                },
+                "entites": {
+                  "tracked": [
+                    {
+                      "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/product/jsonschema/1-0-0",
+                      "minCardinality": 1
+                    },
+                    {
+                      "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/cart/jsonschema/1-0-0",
+                      "minCardinality": 1,
+                      "maxCardinality": 1
+                    }
+                  ],
+                  "enriched": []
+                }
+              }
+            ]
+          }
+        }
+      ],
       "type": "object",
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
-        "name": { "type": "string" },
-        "domain": { "type": "string" },
-        "description": { "type": "string" },
-        "owner": { "type": "string", "format": "email"},
+        "name": {
+          "description": "A human readable name that will make sense when exploring your data.",
+          "type": "string"
+        },
+        "domain": {
+          "description": "The team or area of business looking after this data.",
+          "type": "string"
+        },
+        "description": {
+          "description": "What this Data Product contains, including high level descriptions of why it exists, and how it is used.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "The primary owner of this data product.",
+          "type": "string",
+          "examples": [{ "owner": "owner@example.com" }],
+          "format": "email"
+        },
         "sourceApplications": {
+          "description": "Local references to all source applications using this data product.",
+          "examples": [
+            { "sourceApplications": [{ "$ref": "./source-apps/web.yml" }] }
+          ],
           "type": "array",
           "items": {
             "type": "object",
@@ -28,13 +91,55 @@
           }
         },
         "eventSpecifications": {
+          "examples": [
+            {
+              "eventSpecifications": [
+                {
+                  "resourceName": "c3ab68cb-7b6a-404d-8e45-f71f676f9093",
+                  "name": "Product added to cart",
+                  "event": {
+                    "tracked": {
+                      "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": { "type": { "enum": ["add_to_cart"] } },
+                        "required": ["type"]
+                      }
+                    }
+                  },
+                  "entites": {
+                    "tracked": [
+                      {
+                        "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/product/jsonschema/1-0-0",
+                        "minCardinality": 1
+                      },
+                      {
+                        "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/cart/jsonschema/1-0-0",
+                        "minCardinality": 1,
+                        "maxCardinality": 1
+                      }
+                    ],
+                    "enriched": []
+                  }
+                }
+              ]
+            }
+          ],
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["resourceName", "name"],
             "properties": {
-              "resourceName": { "type": "string", "format": "uuid" },
+              "resourceName": {
+                "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+                "examples": [
+                  { "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42" }
+                ],
+                "type": "string",
+                "format": "uuid"
+              },
               "excludedSourceApplications": {
                 "type": "array",
                 "items": {
@@ -44,14 +149,77 @@
                   "properties": { "$ref": { "type": "string" } }
                 }
               },
-              "name": { "type": "string", "minLength": 1 },
-              "description": { "type": "string", "minLength": 1 },
+              "name": {
+                "description": "A short human readable name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "description": "A description of this event specification so that others are able to better understand how to use it.",
+                "type": "string",
+                "minLength": 1
+              },
+              "triggers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id"],
+                  "properties": {
+                    "id": {
+                      "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
+                      "examples": [
+                        {
+                          "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42"
+                        }
+                      ],
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "description": {
+                      "description": "A description of when and where this event triggers",
+                      "type": "string"
+                    },
+                    "appIds": {
+                      "description": "Identifiers that will be sent with this event specification. They must be present in the source applications refered to from the parent data product.",
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "url": { "type": "string" },
+                    "image": {
+                      "description": "An image to illustrate this trigger.\n\nShould be a reference to a local file relative to the data product description. For example: `$ref: ./images/a-trigger.png`.",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["$ref"],
+                      "properties": { "$ref": { "type": "string" } }
+                    }
+                  }
+                }
+              },
               "event": {
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["source"],
+                "description": "The event schema that this event specification should validate against along with any additional instructions or refinements.",
+                "examples": [
+                  {
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1"
+                  },
+                  {
+                    "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/snowplow_ecommerce_action/jsonschema/1-0-1",
+                    "schema": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": { "type": { "enum": ["add_to_cart"] } },
+                      "required": ["type"]
+                    }
+                  }
+                ],
                 "properties": {
-                  "source": { "$ref": "#/$defs/igluUri" },
+                  "source": {
+                    "description": "The event schema that this event specification should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
+                    "$ref": "#/$defs/igluUri"
+                  },
                   "comment": { "type": "string" },
                   "schema": {
                     "$ref": "#/$defs/schema"
@@ -59,20 +227,45 @@
                 }
               },
               "entities": {
+                "description": "The entity data structure/s that should be attached to this event.",
+                "examples": [
+                  {
+                    "tracked": [
+                      {
+                        "source": "iglu:org.schema/WebPage/jsonschema/1-0-0",
+                        "minCardinality": 1
+                      },
+                      {
+                        "source": "iglu:com.snowplowanalytics.snowplow/geolocation_context/jsonschema/1-1-0"
+                      }
+                    ]
+                  }
+                ],
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "tracked": {
+                    "description": "Entities added via tracking",
                     "type": "array",
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
                       "required": ["source"],
                       "properties": {
-                        "source": { "$ref": "#/$defs/igluUri" },
+                        "source": {
+                          "description": "The schema that this entity should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
+
+                          "$ref": "#/$defs/igluUri"
+                        },
                         "comment": { "type": "string" },
-                        "minCardinality": { "type": "number" },
-                        "maxCardinality": { "type": "number" },
+                        "minCardinality": {
+                          "description": "The minimum number of this entity type that will be attached.",
+                          "type": "number"
+                        },
+                        "maxCardinality": {
+                          "description": "The maximum number of this entity type that will be attached.",
+                          "type": "number"
+                        },
                         "schema": {
                           "$ref": "#/$defs/schema"
                         }
@@ -80,16 +273,26 @@
                     }
                   },
                   "enriched": {
+                    "description": "Entities added via enrichments",
                     "type": "array",
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
                       "required": ["source"],
                       "properties": {
-                        "source": { "$ref": "#/$defs/igluUri" },
+                        "source": {
+                          "description": "The schema that this entity should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
+                          "$ref": "#/$defs/igluUri"
+                        },
                         "comment": { "type": "string" },
-                        "minCardinality": { "type": "number" },
-                        "maxCardinality": { "type": "number" },
+                        "minCardinality": {
+                          "description": "The minimum number of this entity type that will be attached.",
+                          "type": "number"
+                        },
+                        "maxCardinality": {
+                          "description": "The maximum number of this entity type that will be attached.",
+                          "type": "number"
+                        },
                         "schema": {
                           "$ref": "#/$defs/schema"
                         }
@@ -112,6 +315,7 @@
     "schema": {
       "allOf": [
         {
+          "description": "A json schema definition describing a refinement of the `source` schema for use with this event specification.",
           "$ref": "http://json-schema.org/draft-04/schema#"
         },
         {

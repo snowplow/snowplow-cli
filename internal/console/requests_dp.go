@@ -35,22 +35,33 @@ type RemoteDataProduct struct {
 	Owner                string               `json:"owner,omitempty"`
 	Description          string               `json:"description,omitempty"`
 	EventSpecs           []EventSpecReference `json:"eventSpecs"`
+	LockStatus           string               `json:"lockStatus,omitempty"`
+	ManagedFrom          string               `json:"managedFrom,omitempty"`
 }
 
 type EventSpecReference struct {
 	Id string `json:"id"`
 }
 
+type RemoteTrigger struct {
+	Id          string            `json:"id,omitempty"`
+	Description string            `json:"description"`
+	AppIds      []string          `json:"appIds,omitempty"`
+	Url         string            `json:"url,omitempty"`
+	VariantUrls map[string]string `json:"variantUrls,omitempty"`
+}
+
 type RemoteEventSpec struct {
-	Id                   string        `json:"id"`
-	SourceApplicationIds []string      `json:"sourceApplications"`
-	Name                 string        `json:"name"`
-	Status               string        `json:"status"`
-	Description          string        `json:"description"`
-	Version              int           `json:"version"`
-	Event                *EventWrapper `json:"event,omitempty"`
-	Entities             Entities      `json:"entities"`
-	DataProductId        string        `json:"dataProductId"`
+	Id                   string          `json:"id"`
+	SourceApplicationIds []string        `json:"sourceApplications"`
+	Name                 string          `json:"name"`
+	Description          string          `json:"description"`
+	Triggers             []RemoteTrigger `json:"triggers,omitempty"`
+	Status               string          `json:"status"`
+	Version              int             `json:"version"`
+	Event                *EventWrapper   `json:"event,omitempty"`
+	Entities             Entities        `json:"entities"`
+	DataProductId        string          `json:"dataProductId"`
 }
 
 type Event struct {
@@ -86,6 +97,8 @@ type RemoteSourceApplication struct {
 	Owner       string   `json:"owner,omitempty"`
 	AppIds      []string `json:"appIds"`
 	Entities    Entities `json:"entities"`
+	LockStatus  string   `json:"lockStatus,omitempty"`
+	ManagedFrom string   `json:"managedFrom,omitempty"`
 }
 
 type Entities struct {

@@ -109,6 +109,20 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 	}
 
 	sourceApps := util.SetMinus(dpSourceApps, excludedSourceAppIds)
+
+	triggers := []console.RemoteTrigger{}
+	for _, t := range es.Triggers {
+		triggers = append(triggers, console.RemoteTrigger{
+			Id:          t.Id,
+			Description: t.Description,
+			AppIds:      t.AppIds,
+			Url:         t.Url,
+			// Variant URLs are not available until the image is uploaded
+			// They will be populated later if needed
+			VariantUrls: map[string]string{},
+		})
+	}
+
 	return console.RemoteEventSpec{
 		Id:                   es.ResourceName,
 		SourceApplicationIds: sourceApps,
@@ -117,6 +131,7 @@ func LocalEventSpecToRemote(es model.EventSpec, dpSourceApps []string, dpId stri
 		Event:                &console.EventWrapper{Event: event},
 		Entities:             entities,
 		DataProductId:        dpId,
+		Triggers:             triggers,
 	}
 }
 
@@ -204,4 +219,10 @@ func dpToDiff(dp console.RemoteDataProduct) RemoteDataProductDiff {
 		Owner:                dp.Owner,
 		Description:          dp.Description,
 	}
+}
+
+func saToDiff(sa console.RemoteSourceApplication) console.RemoteSourceApplication {
+	sa.LockStatus = ""
+	sa.ManagedFrom = ""
+	return sa
 }

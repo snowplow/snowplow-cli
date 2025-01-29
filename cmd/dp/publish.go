@@ -27,7 +27,6 @@ import (
 var publishCommand = &cobra.Command{
 	Use:   "publish {directory ./data-products}",
 	Short: "Publish all data products, event specs and source apps to BDP Console",
-	Args:  cobra.MaximumNArgs(1),
 	Long: `Publish the local version versions of all data products, event specs and source apps from BDP Console.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
@@ -40,6 +39,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		org, _ := cmd.Flags().GetString("org-id")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
+		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
 		searchPaths := []string{}
 
@@ -71,6 +71,8 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		if err != nil {
 			snplog.LogFatal(err)
 		}
+
+		publish.LockChanged(changes, managedFrom)
 
 		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName)
 
