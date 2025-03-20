@@ -613,4 +613,16 @@ func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
 			changeSet.saUpdate[i].ManagedFrom = managedFrom
 		}
 	}
+	for i := range changeSet.esCreate {
+		changeSet.esCreate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.esCreate[i].ManagedFrom = managedFrom
+		}
+	}
+	for i := range changeSet.esUpdate {
+		changeSet.esUpdate[i].LockStatus = "locked"
+		if managedFrom != "" {
+			changeSet.esUpdate[i].ManagedFrom = managedFrom
+		}
+	}
 }

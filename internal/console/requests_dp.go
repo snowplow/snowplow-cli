@@ -62,6 +62,8 @@ type RemoteEventSpec struct {
 	Event                *EventWrapper   `json:"event,omitempty"`
 	Entities             Entities        `json:"entities"`
 	DataProductId        string          `json:"dataProductId"`
+	LockStatus           string          `json:"lockStatus,omitempty"`
+	ManagedFrom          string          `json:"managedFrom,omitempty"`
 }
 
 type Event struct {
