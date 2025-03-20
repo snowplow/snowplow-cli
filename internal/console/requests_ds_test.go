@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -662,6 +663,154 @@ func Test_MetadataUpdate_Fail(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected failure, got success")
+	}
+}
+
+func Test_GetDataStructure_Ok(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1" {
+			resp := `[
+				{
+					"hash": "abcdef1234567890",
+					"vendor": "com.example",
+					"name": "test_schema",
+					"format": "jsonschema",
+					"meta": {
+						"hidden": false,
+						"schemaType": "event",
+						"customData": {}
+					},
+					"deployments": [
+						{
+							"version": "1-0-0",
+							"env": "DEV",
+							"contentHash": "contenthash123"
+						}
+					]
+				}
+			]`
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/abcdef1234567890/versions/1-0-0" {
+			resp := `{
+				"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+				"self": {
+					"vendor": "com.example",
+					"name": "test_schema",
+					"format": "jsonschema",
+					"version": "1-0-0"
+				},
+				"type": "object",
+				"properties": {
+					"testField": {
+						"type": "string"
+					}
+				}
+			}`
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	// Test with a valid Iglu URI
+	ds, err := GetDataStructure(cnx, client, "iglu:com.example/test_schema/jsonschema/1-0-0")
+
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+
+	if ds == nil {
+		t.Fatal("Expected data structure, got nil")
+	}
+
+	// Verify the data structure properties
+	data, err := ds.ParseData()
+	if err != nil {
+		t.Errorf("Failed to parse data: %v", err)
+	}
+
+	if data.Self.Vendor != "com.example" || 
+	   data.Self.Name != "test_schema" || 
+	   data.Self.Format != "jsonschema" || 
+	   data.Self.Version != "1-0-0" {
+		t.Errorf("Data structure self properties don't match expected values")
+	}
+
+	if ds.Meta.SchemaType != "event" {
+		t.Errorf("Expected schema type 'event', got '%s'", ds.Meta.SchemaType)
+	}
+}
+
+func Test_GetDataStructure_InvalidUri(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `[]`) 
+			return
+		}
+		t.Errorf("Unexpected request path: %s", r.URL.Path)
+	}))
+	defer server.Close()
+	
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	_, err := GetDataStructure(cnx, client, "iglu:com.example")
+	if err == nil {
+		t.Error("Expected error for invalid URI 'iglu:com.example', got success")
+	}
+	
+	_, err = GetDataStructure(cnx, client, "iglu:com.example/test_schema/jsonschema")
+	if err == nil {
+		t.Error("Expected error for invalid URI 'iglu:com.example/test_schema/jsonschema', got success")
+	}
+}
+
+func Test_GetDataStructure_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1" {
+			resp := `[
+				{
+					"hash": "abcdef1234567890",
+					"vendor": "com.different",
+					"name": "other_schema",
+					"format": "jsonschema",
+					"deployments": [
+						{
+							"version": "1-0-0",
+							"env": "DEV"
+						}
+					]
+				}
+			]`
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+
+		t.Errorf("Unexpected request, got: %s", r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	_, err := GetDataStructure(cnx, client, "iglu:com.example/test_schema/jsonschema/1-0-0")
+
+	if err == nil {
+		t.Error("Expected 'not found' error, got success")
+	}
+	
+	if err != nil && !strings.Contains(err.Error(), "data structure not found") {
+		t.Errorf("Expected 'data structure not found' error, got: %v", err)
 	}
 }
 

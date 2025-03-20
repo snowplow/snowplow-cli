@@ -445,3 +445,88 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *DataStructureSelf, fu
 
 	return nil
 }
+
+func GetDataStructure(cnx context.Context, client *ApiClient, uri string) (*DataStructure, error) {
+    // Parse the URI to extract vendor, name, format, and version
+    parts := strings.Split(strings.TrimPrefix(uri, "iglu:"), "/")
+    if len(parts) != 4 {
+        return nil, fmt.Errorf("invalid iglu uri: %s", uri)
+    }
+    
+    vendor := parts[0]
+    name := parts[1]
+    format := parts[2]
+    version := parts[3]
+    
+    // Get the listing to find the hash for this data structure
+    listing, err := GetDataStructureListing(cnx, client)
+    if err != nil {
+        return nil, err
+    }
+    
+    var dsHash string
+    var dsMetadata ListResponse
+    var found bool
+    
+    // Find the hash for this specific data structure
+    for _, dsResp := range listing {
+        if dsResp.Vendor == vendor && dsResp.Name == name && dsResp.Format == format {
+            // Check if the requested version exists in deployments
+            for _, deployment := range dsResp.Deployments {
+                if deployment.Version == version && deployment.Env == DEV {
+                    dsHash = dsResp.Hash
+                    dsMetadata = dsResp
+                    found = true
+                    break
+                }
+            }
+            if found {
+                break
+            }
+        }
+    }
+    
+    if !found || dsHash == "" {
+        return nil, fmt.Errorf("data structure not found: %s", uri)
+    }
+    
+    // Get the data structure version
+    req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsHash, version), nil)
+    auth := fmt.Sprintf("Bearer %s", client.Jwt)
+    req.Header.Add("authorization", auth)
+    req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+    
+    if err != nil {
+        return nil, err
+    }
+    resp, err := client.Http.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+    }
+    
+    rbody, err := io.ReadAll(resp.Body)
+    defer resp.Body.Close()
+    if err != nil {
+        return nil, err
+    }
+    
+    var dsData map[string]any
+    err = json.Unmarshal(rbody, &dsData)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Create a DataStructure with the fetched content
+    dataStructure := DataStructure{
+        ApiVersion:   "v1",
+        ResourceType: "data-structure",
+        Meta:         dsMetadata.Meta,
+        Data:         dsData,
+    }
+    
+    return &dataStructure, nil
+}

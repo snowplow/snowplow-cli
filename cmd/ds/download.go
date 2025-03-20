@@ -15,6 +15,7 @@ import (
 	"log/slog"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
+	"github.com/snowplow-product/snowplow-cli/internal/model"
 	. "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -29,13 +30,18 @@ var downloadCmd = &cobra.Command{
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.`,
 	Example: `  $ snowplow-cli ds download
-  $ snowplow-cli ds download --output-format json ./my-data-structures`,
+  $ snowplow-cli ds download --output-format json ./my-data-structures,
+  Download a specific data structure
+  $ snowplow-cli ds download --uri iglu:com.example/event_name/jsonschema/1-0-0  
+  Download with custom output format and directory
+  $ snowplow-cli ds download --output-format json --uri iglu:com.example/event_name/jsonschema/1-0-0 ./my-data-structures`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		dataStructuresFolder := util.DataStructuresFolder
 		if len(args) > 0 {
 			dataStructuresFolder = args[0]
 		}
 		format, _ := cmd.Flags().GetString("output-format")
+		uri, _ := cmd.Flags().GetString("uri")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
@@ -50,17 +56,30 @@ If no directory is provided then defaults to 'data-structures' in the current di
 			LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := console.GetAllDataStructures(cnx, c)
-		if err != nil {
-			LogFatalMsg("data structure fetch failed", err)
-		}
+		if uri != "" {
+			ds, err := console.GetDataStructure(cnx, c, uri)
+			if err != nil {
+				LogFatalMsg("data structure fetch failed", err)
+			}
+			err = files.CreateDataStructures([]model.DataStructure{*ds})
+			if err != nil {
+				LogFatal(err)
+			}
 
-		err = files.CreateDataStructures(dss)
-		if err != nil {
-			LogFatal(err)
-		}
+			slog.Info("wrote data structure", "uri", uri)
+		} else {
+			dss, err := console.GetAllDataStructures(cnx, c)
+			if err != nil {
+				LogFatalMsg("data structure fetch failed", err)
+			}
 
-		slog.Info("wrote data structures", "count", len(dss))
+			err = files.CreateDataStructures(dss)
+			if err != nil {
+				LogFatal(err)
+			}
+
+			slog.Info("wrote data structures", "count", len(dss))
+		}
 	},
 }
 
@@ -68,4 +87,5 @@ func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
+	downloadCmd.PersistentFlags().StringP("uri", "u", "", "URI of a specific data structure to download (e.g., iglu:com.example/event_name/jsonschema/1-0-0)")
 }
