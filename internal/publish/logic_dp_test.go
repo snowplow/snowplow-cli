@@ -635,6 +635,8 @@ func Test_LockChanged(t *testing.T) {
 		dpUpdate: []console.RemoteDataProduct{{}},
 		saCreate: []console.RemoteSourceApplication{{}},
 		saUpdate: []console.RemoteSourceApplication{{}},
+		esCreate: []console.RemoteEventSpec{{}},
+		esUpdate: []console.RemoteEventSpec{{}},
 	}
 
 	LockChanged(changeSet, "my repo")
@@ -649,6 +651,11 @@ func Test_LockChanged(t *testing.T) {
 		changeSet.saCreate[0].ManagedFrom == "my repo",
 		changeSet.saUpdate[0].LockStatus == "locked",
 		changeSet.saUpdate[0].ManagedFrom == "my repo",
+
+		changeSet.esCreate[0].LockStatus == "locked",
+		changeSet.esCreate[0].ManagedFrom == "my repo",
+		changeSet.esUpdate[0].LockStatus == "locked",
+		changeSet.esUpdate[0].ManagedFrom == "my repo",
 	}
 
 	for i, r := range results {
