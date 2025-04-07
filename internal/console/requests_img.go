@@ -23,8 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/snowplow-product/snowplow-cli/internal/model"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image, bool, error) {

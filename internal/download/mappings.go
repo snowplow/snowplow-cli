@@ -14,9 +14,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 func remoteSaToLocal(remoteSa console.RemoteSourceApplication) model.SourceAppData {

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 )
 
 func Test_NewClient_Ok(t *testing.T) {

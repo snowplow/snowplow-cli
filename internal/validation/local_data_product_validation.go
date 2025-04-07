@@ -13,8 +13,8 @@ package validation
 import (
 	"fmt"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
 func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) DPValidations {

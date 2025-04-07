@@ -13,9 +13,9 @@ package cmd
 import (
 	"os"
 
-	"github.com/snowplow-product/snowplow-cli/cmd/dp"
-	"github.com/snowplow-product/snowplow-cli/cmd/ds"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/cmd/dp"
+	"github.com/snowplow/snowplow-cli/cmd/ds"
+	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
 

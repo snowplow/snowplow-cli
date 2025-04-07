@@ -13,9 +13,9 @@ import (
 	"encoding/json"
 	"sort"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 func localSaToRemote(local model.SourceApp) console.RemoteSourceApplication {

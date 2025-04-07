@@ -17,8 +17,8 @@ import (
 	"reflect"
 
 	"github.com/r3labs/diff/v3"
-	. "github.com/snowplow-product/snowplow-cli/internal/console"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	. "github.com/snowplow/snowplow-cli/internal/console"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 )
 
 type DataStructureWithDiff struct {

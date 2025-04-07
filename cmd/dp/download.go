@@ -13,10 +13,10 @@ package dp
 import (
 	"context"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/download"
-	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/download"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
 

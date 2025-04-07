@@ -16,11 +16,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/publish"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
-	"github.com/snowplow-product/snowplow-cli/internal/validation"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/publish"
+	"github.com/snowplow/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 

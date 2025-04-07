@@ -23,9 +23,9 @@ builds:
       - windows
       - darwin
     ldflags:
-      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Version={{.Version}}"
-      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Os={{.Os}}"
-      - -s -w -X "github.com/snowplow-product/snowplow-cli/internal/util.Arch={{.Arch}}"
+      - -s -w -X "github.com/snowplow/snowplow-cli/internal/util.Version={{.Version}}"
+      - -s -w -X "github.com/snowplow/snowplow-cli/internal/util.Os={{.Os}}"
+      - -s -w -X "github.com/snowplow/snowplow-cli/internal/util.Arch={{.Arch}}"
 
 archives:
   - format: binary
@@ -47,9 +47,9 @@ changelog:
 brews:
   - name: snowplow-cli
     description: Work with Snowplow from the command line
-    homepage: https://github.com/snowplow-product/snowplow-cli
+    homepage: https://github.com/snowplow/snowplow-cli
 
     repository:
-      owner: snowplow-product
+      owner: snowplow
       name: homebrew-taps
       token: "{{ .Env.HOMEBREW_TAPS_GITHUB_TOKEN }}"

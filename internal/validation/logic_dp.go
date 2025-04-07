@@ -15,8 +15,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 )
 
 func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string) {

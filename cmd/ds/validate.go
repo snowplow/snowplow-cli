@@ -15,11 +15,11 @@ import (
 	"errors"
 	"log/slog"
 
-	changesPkg "github.com/snowplow-product/snowplow-cli/internal/changes"
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	. "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
-	"github.com/snowplow-product/snowplow-cli/internal/validation"
+	changesPkg "github.com/snowplow/snowplow-cli/internal/changes"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	. "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/util"
+	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 

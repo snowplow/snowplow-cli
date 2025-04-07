@@ -18,9 +18,9 @@ import (
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
 type DPLookup struct {

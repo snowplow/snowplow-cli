@@ -13,8 +13,8 @@ package validation
 import (
 	"context"
 	"fmt"
-	. "github.com/snowplow-product/snowplow-cli/internal/changes"
-	"github.com/snowplow-product/snowplow-cli/internal/console"
+	. "github.com/snowplow/snowplow-cli/internal/changes"
+	"github.com/snowplow/snowplow-cli/internal/console"
 	"log/slog"
 	"strings"
 )
