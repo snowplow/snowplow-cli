@@ -82,7 +82,6 @@ func Test_Validate_Ok(t *testing.T) {
 	}
 
 	result, err := Validate(cnx, client, ds)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -156,7 +155,6 @@ func Test_publish_Ok(t *testing.T) {
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -225,8 +223,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
 			}
 
-			resp :=
-				`[
+			resp := `[
 					{
 						"hash": "1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8",
 						"organizationId": "177234df-d425-412e-ad8d-8b97515b2807",
@@ -496,7 +493,6 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
 	result, err := GetAllDataStructures(cnx, client, []string{})
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -504,7 +500,6 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("Unexpected number of results, expected 2, got: %d", len(result))
 	}
-
 }
 
 func Test_GetAllDataStructuresSkips404(t *testing.T) {
@@ -514,8 +509,7 @@ func Test_GetAllDataStructuresSkips404(t *testing.T) {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
 			}
 
-			resp :=
-				`[
+			resp := `[
 					{
 						"hash": "1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8",
 						"organizationId": "177234df-d425-412e-ad8d-8b97515b2807",
@@ -605,7 +599,6 @@ func Test_GetAllDataStructuresSkips404(t *testing.T) {
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
 	result, err := GetAllDataStructures(cnx, client, []string{})
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -637,7 +630,6 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
 
 	err := MetadateUpdate(cnx, client, &ds, "")
-
 	if err != nil {
 		t.Fatal("expected failure, got success")
 	}
@@ -682,7 +674,6 @@ func Test_Patch(t *testing.T) {
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, true)
-
 	if err != nil {
 		t.Error(err)
 	}
@@ -721,7 +712,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/data-structures/v1") && len(r.URL.Path) == len("/data-structures/v1"):
 			data, _ := json.Marshal(mockListings)
 			w.WriteHeader(http.StatusOK)
-			w.Write(data)
+			_, _ = w.Write(data)
 
 		case r.URL.Path == "/data-structures/v1/abc123/versions/1-0-0":
 			_, _ = io.WriteString(w, `{
