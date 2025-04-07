@@ -309,7 +309,7 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	return deploys, nil
 }
 
-func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructure, error) {
+func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string) ([]DataStructure, error) {
 
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
@@ -328,13 +328,27 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient) ([]DataStructu
 	var res []DataStructure
 
 	for _, dsResp := range listResp {
+		matched := false
+		for _, m := range match {
+			dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
+			if strings.HasPrefix(dsUri, m) {
+				matched = true
+			}
+
+			slog.Debug("fetching data structure", "match", m, "dsUri", dsUri, "result", matched)
+		}
+
+		if !matched && len(match) > 0 {
+			continue
+		}
+
 		for _, deployment := range dsResp.Deployments {
 			if deployment.Env == DEV {
 				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
 				auth := fmt.Sprintf("Bearer %s", client.Jwt)
 				req.Header.Add("authorization", auth)
 				req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-				slog.Info("fetching data structure", "uri", fmt.Sprintf("iglu:%s/%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version))
+				slog.Info("fetching data structure", "ds", fmt.Sprintf("%s/%s", dsResp.Vendor, dsResp.Name), "schema", deployment.Version)
 
 				if err != nil {
 					return nil, err

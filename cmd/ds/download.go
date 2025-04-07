@@ -15,7 +15,7 @@ import (
 	"log/slog"
 
 	"github.com/snowplow-product/snowplow-cli/internal/console"
-	. "github.com/snowplow-product/snowplow-cli/internal/logging"
+	snplog "github.com/snowplow-product/snowplow-cli/internal/logging"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -29,6 +29,11 @@ var downloadCmd = &cobra.Command{
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.`,
 	Example: `  $ snowplow-cli ds download
+
+  Download data structures matching com.example/event_name* or com.example.subdomain*
+  $ snowplow-cli ds download --match com.example/event_name --match com.example.subdomain
+
+  Download with custom output format and directory
   $ snowplow-cli ds download --output-format json ./my-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dataStructuresFolder := util.DataStructuresFolder
@@ -36,6 +41,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 			dataStructuresFolder = args[0]
 		}
 		format, _ := cmd.Flags().GetString("output-format")
+		match, _ := cmd.Flags().GetStringArray("match")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
@@ -47,17 +53,17 @@ If no directory is provided then defaults to 'data-structures' in the current di
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			LogFatalMsg("client creation fail", err)
+			snplog.LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := console.GetAllDataStructures(cnx, c)
+		dss, err := console.GetAllDataStructures(cnx, c, match)
 		if err != nil {
-			LogFatalMsg("data structure fetch failed", err)
+			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
 
 		err = files.CreateDataStructures(dss)
 		if err != nil {
-			LogFatal(err)
+			snplog.LogFatal(err)
 		}
 
 		slog.Info("wrote data structures", "count", len(dss))
@@ -68,4 +74,5 @@ func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
+	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
 }
