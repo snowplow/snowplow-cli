@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"strings"
 
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type msgResponse struct {

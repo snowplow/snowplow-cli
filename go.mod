@@ -1,4 +1,4 @@
-module github.com/snowplow-product/snowplow-cli
+module github.com/snowplow/snowplow-cli
 
 go 1.22.6
 require (

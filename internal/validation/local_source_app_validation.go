@@ -17,8 +17,8 @@ import (
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
 //go:embed schema/source-application.json

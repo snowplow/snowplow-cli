@@ -18,7 +18,7 @@ import (
 	"sort"
 	"testing"
 
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 )
 
 func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {

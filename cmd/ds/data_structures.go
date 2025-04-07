@@ -14,8 +14,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/snowplow-product/snowplow-cli/internal/config"
-	. "github.com/snowplow-product/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/config"
+	. "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/spf13/cobra"
 )
 

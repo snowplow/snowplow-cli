@@ -10,7 +10,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 
 package main
 
-import "github.com/snowplow-product/snowplow-cli/cmd"
+import "github.com/snowplow/snowplow-cli/cmd"
 
 func main() {
 	cmd.Execute()

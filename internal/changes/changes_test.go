@@ -11,8 +11,8 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package changes
 
 import (
-	. "github.com/snowplow-product/snowplow-cli/internal/console"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	. "github.com/snowplow/snowplow-cli/internal/console"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 	"testing"
 )
 

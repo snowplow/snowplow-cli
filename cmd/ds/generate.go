@@ -19,9 +19,9 @@ import (
 	"path/filepath"
 	"regexp"
 
-	. "github.com/snowplow-product/snowplow-cli/internal/logging"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
-	"github.com/snowplow-product/snowplow-cli/internal/util"
+	. "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

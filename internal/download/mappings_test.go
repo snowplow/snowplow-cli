@@ -14,8 +14,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/snowplow-product/snowplow-cli/internal/console"
-	"github.com/snowplow-product/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
 func intPtr(i int) *int {

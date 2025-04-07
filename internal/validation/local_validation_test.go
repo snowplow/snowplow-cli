@@ -13,7 +13,7 @@ package validation
 import (
 	"encoding/json"
 	"errors"
-	. "github.com/snowplow-product/snowplow-cli/internal/model"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 	"strings"
 	"testing"
 )

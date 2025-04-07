@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "$id": "https://raw.githubusercontent.com/snowplow-product/snowplow-cli/main/internal/validation/schema/source-application.json",
+  "$id": "https://raw.githubusercontent.com/snowplow/snowplow-cli/main/internal/validation/schema/source-application.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "resourceType", "resourceName", "data"],
