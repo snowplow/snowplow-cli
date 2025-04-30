@@ -70,8 +70,9 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 
 		result, err := cc(*event, entities)
 		if err != nil {
-			errors = append(
-				errors,
+			path := fmt.Sprintf("/data/eventSpecifications/%d", i)
+			pathErrors[path] = append(
+				pathErrors[path],
 				fmt.Sprintf("unexpected error checking compatibility got: %s", err.Error()),
 			)
 			continue
