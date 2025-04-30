@@ -3,7 +3,7 @@ name: cd
 on:
   push:
     tags:
-      - '*'
+      - 'v*.*.*'
 
 permissions:
   contents: write
@@ -31,3 +31,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAPS_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAPS_GITHUB_TOKEN }}
+      -
+        name: Get tag without 'v' prefix
+        run: echo "SNP_CLI_VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      -
+        name: Publish npm packages
+        uses: actions/setup-node@v4
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISHING_AUTOMATION_TOKEN }}
+        with:
+          node-version: 'latest'
+          registry-url: 'https://registry.npmjs.org'
+        run: cd npm && version="$SNP_CLI_VERSION" ./create-platform-packages.sh
