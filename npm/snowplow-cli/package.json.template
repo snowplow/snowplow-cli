@@ -1,0 +1,19 @@
+{
+  "name": "@snowplow/snowplow-cli",
+  "version": "",
+  "license": "see license in LICENSE.md",
+  "repository": "https://github.com/snowplow/snowplow-cli",
+  "bin": {
+    "snowplow-cli": "bin/snowplow-cli.js"
+  },
+  "optionalDependencies": {
+    "@snowplow/snowplow-cli-darwin-arm64": "",
+    "@snowplow/snowplow-cli-darwin-amd64": "",
+    "@snowplow/snowplow-cli-linux-386": "",
+    "@snowplow/snowplow-cli-linux-amd64": "",
+    "@snowplow/snowplow-cli-linux-arm64": "",
+    "@snowplow/snowplow-cli-win32-386": "",
+    "@snowplow/snowplow-cli-win32-amd64": "",
+    "@snowplow/snowplow-cli-win32-arm64": ""
+  }
+}

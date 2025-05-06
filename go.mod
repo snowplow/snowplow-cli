@@ -1,6 +1,7 @@
 module github.com/snowplow/snowplow-cli
 
 go 1.22.6
+
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/go-playground/validator/v10 v10.22.1
