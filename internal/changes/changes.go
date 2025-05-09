@@ -157,9 +157,17 @@ func PerformChangesDev(cnx context.Context, c *ApiClient, changes Changes, manag
 	return nil
 }
 
-func PerformChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
+func ValidateChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
 	if len(changes.ToUpdatePatch) != 0 {
 		return errors.New("patching is not available on prod. You must increment versions on dev before deploying")
+	}
+	return nil
+}
+
+func PerformChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
+	err := ValidateChangesProd(cnx, c, changes, managedFrom)
+	if err != nil {
+		return err
 	}
 	validatePublish := append(changes.ToCreate, changes.ToUpdateNewVersion...)
 	for _, ds := range validatePublish {
