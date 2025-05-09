@@ -12,16 +12,29 @@ package validation
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
+type result struct {
+	source     string
+	status     console.CompatStatus
+	props      map[string]string
+	err        error
+	pathLookup map[string]string
+}
+
 func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) DPValidations {
 	pathErrors := map[string][]string{}
 	pathWarnings := map[string][]string{}
-
 	errors := []string{}
+
+	resultsChan := make(chan result)
+
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 3) // Semaphore for 3x parallelism
 
 	for i, spec := range dp.Data.EventSpecifications {
 		var event *console.CompatCheckable
@@ -68,45 +81,68 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 			continue
 		}
 
-		result, err := cc(*event, entities)
-		if err != nil {
-			path := fmt.Sprintf("/data/eventSpecifications/%d", i)
-			pathErrors[path] = append(
-				pathErrors[path],
-				fmt.Sprintf("unexpected error checking compatibility got: %s", err.Error()),
-			)
+		wg.Add(1)
+		go func(event console.CompatCheckable, entities []console.CompatCheckable, pathLookup map[string]string) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}        // Acquire semaphore
+			defer func() { <-semaphore }() // Release semaphore
+
+			cc_result, err := cc(event, entities)
+			if err != nil {
+				resultsChan <- result{
+					err: fmt.Errorf("unexpected error checking compatibility: %s", err.Error()),
+				}
+				return
+			}
+			for _, s := range cc_result.Sources {
+				resultsChan <- result{
+					source:     s.Source,
+					status:     s.Status,
+					props:      s.Properties,
+					err:        nil,
+					pathLookup: pathLookup,
+				}
+			}
+		}(*event, entities, pathLookup)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
+	for res := range resultsChan {
+		if res.err != nil {
+			errors = append(errors, res.err.Error())
 			continue
 		}
-
-		for _, s := range result.Sources {
-			if path, ok := pathLookup[s.Source]; ok {
-				if s.Status == console.CompatIncompatible {
-					pathErrors[path] = append(
-						pathErrors[path],
-						fmt.Sprintf("definition incompatible with source data structure (%s)", s.Source),
+		if path, ok := res.pathLookup[res.source]; ok {
+			if res.status == console.CompatIncompatible {
+				pathErrors[path] = append(
+					pathErrors[path],
+					fmt.Sprintf("definition incompatible with source data structure (%s)", res.source),
+				)
+			}
+			if res.status == console.CompatUndecidable {
+				pathWarnings[path] = append(
+					pathWarnings[path],
+					fmt.Sprintf("definition has unknown compatibility with source data structure (%s)", res.source),
+				)
+			}
+			for k, v := range res.props {
+				lp := fmt.Sprintf("%s/%s", path, k)
+				if v == console.CompatIncompatible {
+					pathErrors[lp] = append(
+						pathErrors[lp],
+						fmt.Sprintf("definition incompatible with .%s in source data structure (%s)", k, res.source),
 					)
 				}
-				if s.Status == console.CompatUndecidable {
-					pathErrors[path] = append(
-						pathErrors[path],
-						fmt.Sprintf("definition has unknown compatibility with source data structure (%s)", s.Source),
+				if v == console.CompatUndecidable {
+					pathWarnings[lp] = append(
+						pathWarnings[lp],
+						fmt.Sprintf("definition has unknown compatibility with .%s in source data structure (%s)", k, res.source),
 					)
-				}
-				for k, v := range s.Properties {
-					if v == console.CompatIncompatible {
-						lp := fmt.Sprintf("%s/%s", path, k)
-						pathErrors[lp] = append(
-							pathErrors[lp],
-							fmt.Sprintf("definition incompatible with .%s in source data structure (%s)", k, s.Source),
-						)
-					}
-					if v == console.CompatUndecidable {
-						lp := fmt.Sprintf("%s/%s", path, k)
-						pathWarnings[lp] = append(
-							pathWarnings[lp],
-							fmt.Sprintf("definition has unknown compatibility with .%s in source data structure (%s)", k, s.Source),
-						)
-					}
 				}
 			}
 		}
