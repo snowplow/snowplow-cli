@@ -53,17 +53,17 @@ type SourceApp struct {
 }
 
 type SourceAppData struct {
-	ResourceName string `yaml:"-" json:"-"`
-	Name         string
-	Description  string   `yaml:"description,omitempty" json:"description,omitempty"`
-	Owner        string   `yaml:"owner,omitempty" json:"owner,omitempty"`
-	AppIds       []string `yaml:"appIds" json:"appIds"`
-	Entities     *EntitiesDef
+	ResourceName string       `yaml:"-" json:"-"`
+	Name         string       `yaml:"name" json:"name"`
+	Description  string       `yaml:"description,omitempty" json:"description,omitempty"`
+	Owner        string       `yaml:"owner,omitempty" json:"owner,omitempty"`
+	AppIds       []string     `yaml:"appIds" json:"appIds"`
+	Entities     *EntitiesDef `yaml:"entities" json:"entities"`
 }
 
 type EntitiesDef struct {
-	Tracked  []SchemaRef
-	Enriched []SchemaRef
+	Tracked  []SchemaRef `yaml:"tracked" json:"tracked"`
+	Enriched []SchemaRef `yaml:"enriched" json:"enriched"`
 }
 
 type SchemaRef struct {
@@ -74,8 +74,8 @@ type SchemaRef struct {
 }
 
 type DataProductCanonicalData struct {
-	ResourceName        string `yaml:"-" json:"-"`
-	Name                string
+	ResourceName        string               `yaml:"-" json:"-"`
+	Name                string               `yaml:"name" json:"name"`
 	SourceApplications  []Ref                `yaml:"sourceApplications" json:"sourceApplications"`
 	Domain              string               `yaml:"domain,omitempty" json:"domain,omitempty"`
 	Owner               string               `yaml:"owner,omitempty" json:"owner,omitempty"`
@@ -84,13 +84,13 @@ type DataProductCanonicalData struct {
 }
 
 type EventSpecCanonical struct {
-	ResourceName               string `yaml:"resourceName" json:"resourceName"`
-	ExcludedSourceApplications []Ref  `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
-	Name                       string
-	Description                string    `yaml:"description,omitempty" json:"description,omitempty"`
-	Event                      SchemaRef `yaml:"event,omitempty" json:"event,omitempty"`
-	Entities                   EntitiesDef
-	Triggers                   []Trigger `yaml:"triggers,omitempty" json:"triggers,omitempty"`
+	ResourceName               string      `yaml:"resourceName" json:"resourceName"`
+	ExcludedSourceApplications []Ref       `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
+	Name                       string      `yaml:"name" json:"name"`
+	Description                string      `yaml:"description,omitempty" json:"description,omitempty"`
+	Event                      SchemaRef   `yaml:"event,omitempty" json:"event,omitempty"`
+	Entities                   EntitiesDef `yaml:"entities" json:"entities"`
+	Triggers                   []Trigger   `yaml:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
 type Ref struct {

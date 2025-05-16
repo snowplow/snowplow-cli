@@ -311,7 +311,15 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 
 func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string) ([]DataStructure, error) {
 
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
+	listResp, err := GetDataStructureListing(cnx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []DataStructure
+	var dsData []map[string]any
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/schemas/versions?latest=true", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
 	req.Header.Add("authorization", auth)
 	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
@@ -319,13 +327,29 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	if err != nil {
 		return nil, err
 	}
-
-	listResp, err := GetDataStructureListing(cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	var res []DataStructure
+	err = json.Unmarshal(rbody, &dsData)
+	if err != nil {
+		return nil, err
+	}
+
+	dsDataMap := map[string]map[string]any{}
+	for _, ds := range dsData {
+		if self, ok := ds["self"].(map[string]any); ok {
+			dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
+		} else {
+			return nil, fmt.Errorf("Wrong data structure self section %s", ds["self"])
+		}
+	}
 
 	for _, dsResp := range listResp {
 		matched := false
@@ -344,40 +368,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 
 		for _, deployment := range dsResp.Deployments {
 			if deployment.Env == DEV {
-				req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/versions/%s", client.BaseUrl, dsResp.Hash, deployment.Version), nil)
-				auth := fmt.Sprintf("Bearer %s", client.Jwt)
-				req.Header.Add("authorization", auth)
-				req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-				slog.Info("fetching data structure", "ds", fmt.Sprintf("%s/%s", dsResp.Vendor, dsResp.Name), "schema", deployment.Version)
-
-				if err != nil {
-					return nil, err
-				}
-				resp, err := client.Http.Do(req)
-				if err != nil {
-					return nil, err
-				}
-				rbody, err := io.ReadAll(resp.Body)
-				defer resp.Body.Close()
-				if err != nil {
-					return nil, err
-				}
-
-				var ds map[string]any
-				err = json.Unmarshal(rbody, &ds)
-				if err != nil {
-					return nil, err
-				}
-
-				if resp.StatusCode == http.StatusNotFound {
-					continue
-				}
-
-				if resp.StatusCode != http.StatusOK {
-					return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
-				}
-
-				dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: ds}
+				dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
 				res = append(res, dataStructure)
 			}
 		}
