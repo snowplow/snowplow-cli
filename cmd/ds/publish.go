@@ -110,7 +110,9 @@ Changes to it will be published by this command.
 			LogFatal(errors.New(vr.Message))
 		}
 
-		if !dryRun {
+		if dryRun {
+			slog.Info("dry run, not performing changes")
+		} else {
 			err = changesPkg.PerformChangesDev(cnx, c, changes, managedFrom)
 			if err != nil {
 				LogFatal(err)
@@ -180,13 +182,16 @@ environment will be published to your production environment.
 		if err != nil {
 			LogFatal(err)
 		}
-		if !dryRun {
+		if dryRun {
+			slog.Info("dry run, not performing changes")
+			err = changesPkg.ValidateChangesProd(cnx, c, changes, managedFrom)
+		} else {
 			err = changesPkg.PerformChangesProd(cnx, c, changes, managedFrom)
-			if err != nil {
-				LogFatal(err)
-			}
-			slog.Info("all done!")
 		}
+		if err != nil {
+			LogFatal(err)
+		}
+		slog.Info("all done!")
 	},
 }
 
