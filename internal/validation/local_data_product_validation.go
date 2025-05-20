@@ -26,7 +26,7 @@ type result struct {
 	pathLookup map[string]string
 }
 
-func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) DPValidations {
+func ValidateDPEventSpecCompat(cc console.CompatChecker, concurrency int, dp model.DataProduct) DPValidations {
 	pathErrors := map[string][]string{}
 	pathWarnings := map[string][]string{}
 	errors := []string{}
@@ -34,7 +34,7 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, dp model.DataProduct) D
 	resultsChan := make(chan result)
 
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 3) // Semaphore for 3x parallelism
+	semaphore := make(chan struct{}, concurrency)
 
 	for i, spec := range dp.Data.EventSpecifications {
 		var event *console.CompatCheckable

@@ -40,6 +40,17 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 		managedFrom, _ := cmd.Flags().GetString("managed-from")
+		concurrentReq, _ := cmd.Flags().GetInt("concurrency")
+
+		if concurrentReq > 10 {
+			concurrentReq = 10
+			slog.Debug("validation", "msg", "concurrency set to > 10, limited to 10")
+		}
+
+		if concurrentReq < 1 {
+			concurrentReq = 1
+			slog.Debug("validation", "msg", "concurrency set to < 1, increased to 1")
+		}
 
 		searchPaths := []string{}
 
@@ -74,7 +85,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 
 		publish.LockChanged(changes, managedFrom)
 
-		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName)
+		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, concurrentReq)
 
 		err = publish.Publish(cnx, c, changes, dryRun)
 		if err != nil {
@@ -88,4 +99,5 @@ func init() {
 	DataProductsCmd.AddCommand(publishCommand)
 	publishCommand.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 	publishCommand.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
+	publishCommand.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
 }

@@ -36,7 +36,7 @@ func Test_DPLookup_RelativePaths(t *testing.T) {
 		},
 	}
 
-	lookup, err := NewDPLookup(nil, nil, input, nil, true)
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func Test_DPLookup_EventSpecBadSourceApp(t *testing.T) {
 		},
 	}
 
-	lookup, err := NewDPLookup(nil, nil, input, nil, true)
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func Test_DPLookup_Resolved(t *testing.T) {
 		},
 	}
 
-	lookup, err := NewDPLookup(nil, nil, input, nil, true)
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func Test_DPLookup_Ignored(t *testing.T) {
 		},
 	}
 
-	lookup, err := NewDPLookup(nil, nil, input, nil, true)
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
 
 	if err != nil {
 		t.Fatal(err)
