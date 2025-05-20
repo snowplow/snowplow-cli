@@ -51,7 +51,7 @@ func Test_ValidateDPEventSpecCompatOk(t *testing.T) {
 		return &console.CompatResult{Status: "compatible"}, nil
 	}
 
-	result := ValidateDPEventSpecCompat(cc, dp)
+	result := ValidateDPEventSpecCompat(cc, 1, dp)
 
 	if len(result.Errors) > 0 || len(result.Warnings) > 0 {
 		t.Fatal("unexpected failures")
@@ -62,7 +62,7 @@ func Test_ValidateDPEventSpecCompatMissingEvent(t *testing.T) {
 	dp := newValidDPForCompatTesting()
 	dp.Data.EventSpecifications[0].Event = model.SchemaRef{}
 
-	result := ValidateDPEventSpecCompat(nil, dp).WarningsWithPaths
+	result := ValidateDPEventSpecCompat(nil, 1, dp).WarningsWithPaths
 
 	expectPath := "/data/eventSpecifications/0"
 	expectValue := []string{"will not run compatibility check without an event defined"}
@@ -98,7 +98,7 @@ func Test_ValidateDPEventSpecCompatFail(t *testing.T) {
 		}, nil
 	}
 
-	result := ValidateDPEventSpecCompat(cc, dp)
+	result := ValidateDPEventSpecCompat(cc, 2, dp)
 
 	expectedErrorPaths := []string{
 		"/data/eventSpecifications/0/event/schema/key",

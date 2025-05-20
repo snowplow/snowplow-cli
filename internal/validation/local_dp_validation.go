@@ -63,7 +63,7 @@ func (v *DPValidations) concat(r DPValidations) {
 	}
 }
 
-func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any, changedIdToFile map[string]string, validateAll bool) (*DPLookup, error) {
+func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any, changedIdToFile map[string]string, validateAll bool, concurrency int) (*DPLookup, error) {
 
 	probablyDps := map[string]model.DataProduct{}
 	probablySap := map[string]model.SourceApp{}
@@ -97,10 +97,10 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				changed := changedFiles[f]
 				if ok {
 					if validateAll {
-						v.concat(ValidateDPEventSpecCompat(cc, dp))
+						v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
 					} else {
 						if changed {
-							v.concat(ValidateDPEventSpecCompat(cc, dp))
+							v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
 						} else {
 							v.Debug = append(v.Debug, fmt.Sprintf("skipping compatibility check for %s, since it was not changed, use --full to include it in validation", f))
 						}

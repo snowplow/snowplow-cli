@@ -19,7 +19,7 @@ import (
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 )
 
-func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string) {
+func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, concurrency int) {
 	possibleFiles := []string{}
 	for n := range files {
 		possibleFiles = append(possibleFiles, n)
@@ -34,7 +34,7 @@ func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[st
 		return console.CompatCheck(cnx, c, event, entities)
 	}
 
-	lookup, err := NewDPLookup(compatChecker, schemaResolver, files, changedIdToFile, validateAll)
+	lookup, err := NewDPLookup(compatChecker, schemaResolver, files, changedIdToFile, validateAll, concurrency)
 	if err != nil {
 		snplog.LogFatal(err)
 	}
