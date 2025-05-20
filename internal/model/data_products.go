@@ -62,8 +62,8 @@ type SourceAppData struct {
 }
 
 type EntitiesDef struct {
-	Tracked  []SchemaRef `yaml:"tracked,omitempty" json:"tracked,omitempty"`
-	Enriched []SchemaRef `yaml:"enriched,omitempty" json:"enriched,omitempty"`
+	Tracked  []SchemaRef `yaml:"tracked" json:"tracked,omitempty"`
+	Enriched []SchemaRef `yaml:"enriched" json:"enriched,omitempty"`
 }
 
 type SchemaRef struct {
