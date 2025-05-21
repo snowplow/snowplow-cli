@@ -17,7 +17,7 @@ import (
 
 	changesPkg "github.com/snowplow/snowplow-cli/internal/changes"
 	"github.com/snowplow/snowplow-cli/internal/console"
-	. "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
@@ -55,6 +55,8 @@ Changes to it will be published by this command.
 		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
+		ctx := cmd.Context()
+
 		dataStructureFolders := []string{util.DataStructuresFolder}
 		if len(args) > 0 {
 			dataStructureFolders = args
@@ -63,12 +65,12 @@ Changes to it will be published by this command.
 		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
-			LogFatalMultiple(errs)
+			logging.LogFatalMultiple(errs)
 		}
 
 		slog.Info("publishing to dev from", "paths", dataStructureFolders)
@@ -77,37 +79,37 @@ Changes to it will be published by this command.
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "DEV")
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
-		err = changesPkg.PrintChangeset(changes)
+		err = changesPkg.PrintChangeset(ctx, changes)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		vr, err := validation.ValidateChanges(cnx, c, changes)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
-		vr.Slog()
+		vr.Slog(ctx)
 
 		if ghOut {
 			vr.GithubAnnotate()
 		}
 
 		if !vr.Valid {
-			LogFatal(errors.New(vr.Message))
+			logging.LogFatal(errors.New(vr.Message))
 		}
 
 		if dryRun {
@@ -115,7 +117,7 @@ Changes to it will be published by this command.
 		} else {
 			err = changesPkg.PerformChangesDev(cnx, c, changes, managedFrom)
 			if err != nil {
-				LogFatal(err)
+				logging.LogFatal(err)
 			}
 			slog.Info("all done!")
 		}
@@ -144,6 +146,8 @@ environment will be published to your production environment.
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		managedFrom, _ := cmd.Flags().GetString("managed-from")
 
+		ctx := cmd.Context()
+
 		dataStructureFolders := []string{util.DataStructuresFolder}
 		if len(args) > 0 {
 			dataStructureFolders = args
@@ -151,12 +155,12 @@ environment will be published to your production environment.
 
 		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		errs := validation.ValidateLocalDs(dataStructuresLocal)
 		if len(errs) > 0 {
-			LogFatalMultiple(errs)
+			logging.LogFatalMultiple(errs)
 		}
 
 		slog.Info("publishing to prod from", "paths", dataStructureFolders)
@@ -165,22 +169,22 @@ environment will be published to your production environment.
 
 		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		remotesListing, err := console.GetDataStructureListing(cnx, c)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "PROD")
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
-		err = changesPkg.PrintChangeset(changes)
+		err = changesPkg.PrintChangeset(ctx, changes)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 		if dryRun {
 			slog.Info("dry run, not performing changes")
@@ -189,7 +193,7 @@ environment will be published to your production environment.
 			err = changesPkg.PerformChangesProd(cnx, c, changes, managedFrom)
 		}
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 		slog.Info("all done!")
 	},

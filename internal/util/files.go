@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
-	. "github.com/snowplow/snowplow-cli/internal/model"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,7 +32,7 @@ type Files struct {
 	ExtentionPreference    string
 }
 
-func (f Files) CreateDataStructures(dss []DataStructure) error {
+func (f Files) CreateDataStructures(dss []model.DataStructure) error {
 	dataStructuresPath := filepath.Join(".", f.DataStructuresLocation)
 	for _, ds := range dss {
 		data, err := ds.ParseData()
@@ -83,7 +82,7 @@ func createUniqueNames(idsToFileNames []idFileName) []idFileName {
 	return idToUniqueName
 }
 
-func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]CliResource[SourceAppData], error) {
+func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData]) (map[string]model.CliResource[model.SourceAppData], error) {
 	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
 	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
 
@@ -92,7 +91,7 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 	}
 
 	var idToFileName []idFileName
-	idToSa := make(map[string]CliResource[SourceAppData])
+	idToSa := make(map[string]model.CliResource[model.SourceAppData])
 	for _, sa := range sas {
 		idToSa[sa.ResourceName] = sa
 		idToFileName = append(idToFileName, idFileName{Id: sa.ResourceName, FileName: sa.Data.Name})
@@ -100,7 +99,7 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 
 	uniqueNames := createUniqueNames(idToFileName)
 
-	var res = make(map[string]CliResource[SourceAppData])
+	var res = make(map[string]model.CliResource[model.SourceAppData])
 
 	for _, idToName := range uniqueNames {
 		sa := idToSa[idToName.Id]
@@ -114,7 +113,7 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 	return res, nil
 }
 
-func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (map[string]CliResource[DataProductCanonicalData], error) {
+func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanonicalData]) (map[string]model.CliResource[model.DataProductCanonicalData], error) {
 	dataProductsPath := filepath.Join(".", f.DataProductsLocation)
 	err := os.MkdirAll(dataProductsPath, os.ModePerm)
 
@@ -123,7 +122,7 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 	}
 
 	var idToFileName []idFileName
-	idToDp := make(map[string]CliResource[DataProductCanonicalData])
+	idToDp := make(map[string]model.CliResource[model.DataProductCanonicalData])
 	for _, dp := range dps {
 		idToDp[dp.ResourceName] = dp
 		idToFileName = append(idToFileName, idFileName{Id: dp.ResourceName, FileName: dp.Data.Name})
@@ -131,7 +130,7 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 
 	uniqueNames := createUniqueNames(idToFileName)
 
-	var res = make(map[string]CliResource[DataProductCanonicalData])
+	var res = make(map[string]model.CliResource[model.DataProductCanonicalData])
 
 	for _, idToName := range uniqueNames {
 		dp := idToDp[idToName.Id]

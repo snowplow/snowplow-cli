@@ -16,10 +16,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
@@ -41,14 +41,16 @@ type loggingRoundTripper struct {
 func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
 
-	slog.Debug("-->", "method", req.Method, "url", req.URL)
+	logger := logging.LoggerFromContext(req.Context())
+
+	logger.Debug("-->", "method", req.Method, "url", req.URL)
 
 	resp, err := t.Transport.RoundTrip(req)
 	if err != nil {
 		return resp, err
 	}
 
-	slog.Debug("<--", "status", resp.StatusCode, "url", resp.Request.URL, "t", time.Since(start))
+	logger.Debug("<--", "status", resp.StatusCode, "url", resp.Request.URL, "t", time.Since(start))
 
 	return resp, err
 }
@@ -79,7 +81,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 		return nil, errors.New("bad token request")
 	}
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(ctx, resp.Body)
 	if err != nil {
 		return nil, err
 	}

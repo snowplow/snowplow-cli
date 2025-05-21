@@ -53,7 +53,7 @@ func Test_Validate_Ok(t *testing.T) {
 			}
 
 			b, err := io.ReadAll(r.Body)
-			defer r.Body.Close()
+			defer func() { _ = r.Body.Close() }()
 			if err != nil {
 				t.Error(err)
 			}
@@ -218,12 +218,14 @@ func Test_publish_FailCompletely(t *testing.T) {
 
 func Test_GetAllDataStructuresOk(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
+		switch r.URL.Path {
+		case "/api/msc/v1/organizations/orgid/data-structures/v1":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
 
-			resp := `[
+				resp := `[
 					{
 						"hash": "1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8",
 						"organizationId": "177234df-d425-412e-ad8d-8b97515b2807",
@@ -274,15 +276,17 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 					}
 				]`
 
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
-			return
-		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/schemas/versions" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
 			}
+		case "/api/msc/v1/organizations/orgid/data-structures/v1/schemas/versions":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
 
-			resp := `
+				resp := `
 			[
 				{
 						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -486,11 +490,14 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 				}
 			]`
 
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
+			}
+		default:
+			t.Errorf("Unexpected request, got: %s", r.URL.Path)
 			return
 		}
-		t.Errorf("Unexpected request, got: %s", r.URL.Path)
 	}))
 	defer server.Close()
 

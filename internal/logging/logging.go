@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package logging
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"os"
@@ -19,6 +20,19 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
+
+type loggerKey struct{}
+
+func ContextWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
+    return context.WithValue(ctx, loggerKey{}, logger)
+}
+
+func LoggerFromContext(ctx context.Context) *slog.Logger {
+    if logger, ok := ctx.Value(loggerKey{}).(*slog.Logger); ok {
+        return logger
+    }
+    return slog.Default()
+}
 
 func InitLogging(cmd *cobra.Command) error {
 

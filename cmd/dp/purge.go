@@ -75,7 +75,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = publish.Purge(purgeApi{c, cnx}, files, yes)
+		err = publish.Purge(cnx, purgeApi{c, cnx}, files, yes)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
