@@ -277,12 +277,14 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, resp)
 			return
-		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8/versions/2-0-0" {
+		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/schemas/versions" {
 			if r.Header.Get("authorization") != "Bearer token" {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
 			}
 
-			resp := `{
+			resp := `
+			[
+				{
 						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
 						"additionalProperties": false,
 						"description": "Schema for an example event",
@@ -459,32 +461,35 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 						  "version": "2-0-0"
 						},
 						"type": "object"
-					  }`
-
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
-			return
-		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/ea9631259272070c8a6f56aa3ec0c5d3fc41ee7390bf4830211e894128978733/versions/1-0-0" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
-
-			resp := `{
-					"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-					"self": {
-					  "format": "jsonschema",
-					  "name": "ad_click",
-					  "vendor": "com.acme",
-					  "version": "1-0-0"
-					},
-					"type": "BodyOnly"
-				  }`
+				},
+				{
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+						"additionalProperties": false,
+						"description": "Schema for an example event",
+						"properties": {
+						  "astring": {
+							"description": "a description",
+							"maxLength": 200,
+							"type": "string"
+						  }
+						},
+						"required": [
+						  "astring"
+						],
+						"self": {
+						  "format": "jsonschema",
+						  "name": "d_test",
+						  "vendor": "com.snplow.msc.aws",
+						  "version": "1-0-0"
+						},
+						"type": "object"
+				}
+			]`
 
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, resp)
 			return
 		}
-
 		t.Errorf("Unexpected request, got: %s", r.URL.Path)
 	}))
 	defer server.Close()
@@ -499,112 +504,6 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 
 	if len(result) != 2 {
 		t.Errorf("Unexpected number of results, expected 2, got: %d", len(result))
-	}
-}
-
-func Test_GetAllDataStructuresSkips404(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
-
-			resp := `[
-					{
-						"hash": "1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8",
-						"organizationId": "177234df-d425-412e-ad8d-8b97515b2807",
-						"vendor": "com.snplow.msc.aws",
-						"name": "d_entity",
-						"format": "jsonschema",
-						"description": "",
-						"meta": {
-							"hidden": true,
-							"schemaType": "entity",
-							"customData": {}
-						},
-						"deployments": [
-							{
-								"version": "2-0-0",
-								"patchLevel": 0,
-								"contentHash": "cf9d2e8b2c1849d36611c0fb258698dbc48e268fcdeb0850a693d75f68c449fd",
-								"env": "DEV",
-								"ts": "2024-02-21T08:39:42Z",
-								"message": null,
-								"initiator": "Registry bootstrapping"
-							}
-						]
-					},
-					{
-						"hash": "ea9631259272070c8a6f56aa3ec0c5d3fc41ee7390bf4830211e894128978733",
-						"organizationId": "177234df-d425-412e-ad8d-8b97515b2807",
-						"vendor": "com.acme",
-						"name": "ad_click",
-						"format": "jsonschema",
-						"description": null,
-						"meta": {
-							"hidden": false,
-							"schemaType": "event",
-							"customData": {}
-						},
-						"deployments": [
-							{
-								"version": "1-0-0",
-								"patchLevel": 0,
-								"contentHash": "2725be307976bdcb14f826b2061d4011fb02b05e60c7ba4ebe02bd9a611f43d5",
-								"env": "DEV",
-								"ts": "2023-03-29T18:19:31Z",
-								"message": "Inserted via registry bootstrapping",
-								"initiator": "Registry bootstrapping"
-							}
-						]
-					}
-				]`
-
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
-			return
-		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/1d0e5aecd7b08c8dc0ee37e68a3a6cab9bb737ca7114f4ef67f16d415f23e6e8/versions/2-0-0" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = io.WriteString(w, `{"message":"Im lost"}`)
-			return
-		} else if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/ea9631259272070c8a6f56aa3ec0c5d3fc41ee7390bf4830211e894128978733/versions/1-0-0" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
-
-			resp := `{
-					"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-					"self": {
-					  "format": "jsonschema",
-					  "name": "ad_click",
-					  "vendor": "com.acme",
-					  "version": "1-0-0"
-					},
-					"type": "BodyOnly"
-				  }`
-
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
-			return
-		}
-
-		t.Errorf("Unexpected request, got: %s", r.URL.Path)
-	}))
-	defer server.Close()
-
-	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
-
-	result, err := GetAllDataStructures(cnx, client, []string{})
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(result) != 1 {
-		t.Errorf("Unexpected number of results, expected 1, got: %d", len(result))
 	}
 }
 
@@ -689,7 +588,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 			Hash:   "abc123",
 			Vendor: "com.acme",
 			Name:   "event",
-			Format: "json",
+			Format: "jsonschema",
 			Meta:   DataStructureMeta{},
 			Deployments: []Deployment{
 				{Env: DEV, Version: "1-0-0"},
@@ -699,7 +598,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 			Hash:   "def456",
 			Vendor: "org.example",
 			Name:   "purchase",
-			Format: "json",
+			Format: "jsonschema",
 			Meta:   DataStructureMeta{},
 			Deployments: []Deployment{
 				{Env: DEV, Version: "2-0-0"},
@@ -714,16 +613,16 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(data)
 
-		case r.URL.Path == "/data-structures/v1/abc123/versions/1-0-0":
-			_, _ = io.WriteString(w, `{
-				"self": { "name": "event", "vendor": "com.acme", "version": "1-0-0", "format": "jsonschema" }
-			}`)
-
-		case r.URL.Path == "/data-structures/v1/def456/versions/2-0-0":
-			_, _ = io.WriteString(w, `{
-				"self": { "name": "purchase", "vendor": "org.example", "version": "2-0-0", "format": "jsonschema" }
-			}`)
-
+		case r.URL.Path == "/data-structures/v1/schemas/versions":
+			_, _ = io.WriteString(w, `
+				[
+					{
+						"self": { "name": "event", "vendor": "com.acme", "version": "1-0-0", "format": "jsonschema" }
+					},
+					{
+						"self": { "name": "purchase", "vendor": "org.example", "version": "2-0-0", "format": "jsonschema" }
+					}
+				]`)
 		default:
 			http.NotFound(w, r)
 		}
