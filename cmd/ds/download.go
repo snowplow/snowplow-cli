@@ -27,14 +27,20 @@ var downloadCmd = &cobra.Command{
 	Long: `Downloads the latest versions of all data structures from BDP Console.
 
 Will retrieve schema contents from your development environment.
-If no directory is provided then defaults to 'data-structures' in the current directory.`,
+If no directory is provided then defaults to 'data-structures' in the current directory.
+
+By default, data structures with empty schemaType (legacy format) are skipped.
+Use --include-legacy to include them (they will be set to 'entity' schemaType).`,
 	Example: `  $ snowplow-cli ds download
 
   Download data structures matching com.example/event_name* or com.example.subdomain*
   $ snowplow-cli ds download --match com.example/event_name --match com.example.subdomain
 
   Download with custom output format and directory
-  $ snowplow-cli ds download --output-format json ./my-data-structures`,
+  $ snowplow-cli ds download --output-format json ./my-data-structures
+
+  Include legacy data structures with empty schemaType
+  $ snowplow-cli ds download --include-legacy`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dataStructuresFolder := util.DataStructuresFolder
 		if len(args) > 0 {
@@ -42,6 +48,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 		}
 		format, _ := cmd.Flags().GetString("output-format")
 		match, _ := cmd.Flags().GetStringArray("match")
+		includeLegacy, _ := cmd.Flags().GetBool("include-legacy")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
@@ -56,7 +63,7 @@ If no directory is provided then defaults to 'data-structures' in the current di
 			snplog.LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := console.GetAllDataStructures(cnx, c, match)
+		dss, err := console.GetAllDataStructures(cnx, c, match, includeLegacy)
 		if err != nil {
 			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
@@ -75,4 +82,6 @@ func init() {
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
+	downloadCmd.PersistentFlags().Bool("include-legacy", false, "Include legacy data structures with empty schemaType (will be set to 'entity')")
+
 }
