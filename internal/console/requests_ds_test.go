@@ -497,7 +497,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := GetAllDataStructures(cnx, client, []string{})
+	result, err := GetAllDataStructures(cnx, client, []string{}, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -589,7 +589,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 			Vendor: "com.acme",
 			Name:   "event",
 			Format: "jsonschema",
-			Meta:   DataStructureMeta{},
+			Meta:   DataStructureMeta{SchemaType: "event"},
 			Deployments: []Deployment{
 				{Env: DEV, Version: "1-0-0"},
 			},
@@ -599,7 +599,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 			Vendor: "org.example",
 			Name:   "purchase",
 			Format: "jsonschema",
-			Meta:   DataStructureMeta{},
+			Meta:   DataStructureMeta{SchemaType: "event"},
 			Deployments: []Deployment{
 				{Env: DEV, Version: "2-0-0"},
 			},
@@ -638,7 +638,7 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 	ctx := context.Background()
 	match := []string{"com.acme/event"} // only match one of the two
 
-	res, err := GetAllDataStructures(ctx, client, match)
+	res, err := GetAllDataStructures(ctx, client, match, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -649,5 +649,99 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 
 	if data, _ := res[0].ParseData(); data.Self.Name != "event" {
 		t.Errorf("unexpected data structure: %+v", data.Self)
+	}
+}
+
+func TestGetAllDataStructures_EmptySchemaType(t *testing.T) {
+	mockListings := []ListResponse{
+		{
+			Hash:   "abc123",
+			Vendor: "com.legacy",
+			Name:   "old_event",
+			Format: "jsonschema",
+			Meta:   DataStructureMeta{SchemaType: ""}, // Empty schemaType
+			Deployments: []Deployment{
+				{Env: DEV, Version: "1-0-0"},
+			},
+		},
+		{
+			Hash:   "def456",
+			Vendor: "com.modern",
+			Name:   "new_event",
+			Format: "jsonschema",
+			Meta:   DataStructureMeta{SchemaType: "event"}, // Valid schemaType
+			Deployments: []Deployment{
+				{Env: DEV, Version: "1-0-0"},
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/data-structures/v1") && len(r.URL.Path) == len("/data-structures/v1"):
+			data, _ := json.Marshal(mockListings)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+
+		case r.URL.Path == "/data-structures/v1/schemas/versions":
+			_, _ = io.WriteString(w, `
+				[
+					{
+						"self": { "name": "old_event", "vendor": "com.legacy", "version": "1-0-0", "format": "jsonschema" }
+					},
+					{
+						"self": { "name": "new_event", "vendor": "com.modern", "version": "1-0-0", "format": "jsonschema" }
+					}
+				]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := &ApiClient{
+		BaseUrl: server.URL,
+		Jwt:     "fake-jwt",
+		Http:    server.Client(),
+	}
+
+	ctx := context.Background()
+
+	res, err := GetAllDataStructures(ctx, client, []string{}, false)
+	if err != nil {
+		t.Fatalf("GetAllDataStructures with includeLegacy=false failed: %v", err)
+	}
+
+	if len(res) != 1 {
+		t.Fatalf("default behavior should skip data structures with empty schemaType: expected 1 result, got %d", len(res))
+	}
+
+	if data, _ := res[0].ParseData(); data.Self.Name != "new_event" {
+		t.Errorf("default behavior should only return modern data structure: expected new_event, got %s", data.Self.Name)
+	}
+
+	res, err = GetAllDataStructures(ctx, client, []string{}, true)
+	if err != nil {
+		t.Fatalf("GetAllDataStructures with includeLegacy=true failed: %v", err)
+	}
+
+	if len(res) != 2 {
+		t.Fatalf("includeLegacy=true should include data structures with empty schemaType: expected 2 results, got %d", len(res))
+	}
+
+	var legacyDS *DataStructure
+	for i := range res {
+		if data, _ := res[i].ParseData(); data.Self.Name == "old_event" {
+			legacyDS = &res[i]
+			break
+		}
+	}
+
+	if legacyDS == nil {
+		t.Fatal("includeLegacy=true should include legacy data structure with name 'old_event'")
+	}
+
+	if legacyDS.Meta.SchemaType != "entity" {
+		t.Errorf("legacy data structure with empty schemaType should be converted to 'entity': got '%s'", legacyDS.Meta.SchemaType)
 	}
 }

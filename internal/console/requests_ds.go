@@ -309,7 +309,7 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	return deploys, nil
 }
 
-func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string) ([]DataStructure, error) {
+func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]DataStructure, error) {
 
 	listResp, err := GetDataStructureListing(cnx, client)
 	if err != nil {
@@ -368,8 +368,22 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 
 		for _, deployment := range dsResp.Deployments {
 			if deployment.Env == DEV {
-				dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
-				res = append(res, dataStructure)
+				if dsResp.Meta.SchemaType == "" {
+					dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
+					if !includeLegacy {
+						slog.Info("download", "msg", "skipping data structure with empty schemaType (use --include-legacy to include)", "dataStructure", dsUri)
+						continue
+					} else {
+						slog.Warn("download", "msg", "including legacy data structure with empty schemaType, setting to 'entity'", "dataStructure", dsUri)
+						meta := dsResp.Meta
+						meta.SchemaType = "entity"
+						dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+						res = append(res, dataStructure)
+					}
+				} else {
+					dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+					res = append(res, dataStructure)
+				}
 			}
 		}
 	}
