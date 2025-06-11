@@ -318,6 +318,8 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 
 	var res []DataStructure
 	var dsData []map[string]any
+	var skippedCount int
+	var includedLegacyCount int
 
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/schemas/versions?latest=true", client.BaseUrl), nil)
 	auth := fmt.Sprintf("Bearer %s", client.Jwt)
@@ -369,12 +371,11 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 		for _, deployment := range dsResp.Deployments {
 			if deployment.Env == DEV {
 				if dsResp.Meta.SchemaType == "" {
-					dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
 					if !includeLegacy {
-						slog.Info("download", "msg", "skipping data structure with empty schemaType (use --include-legacy to include)", "dataStructure", dsUri)
+						skippedCount++
 						continue
 					} else {
-						slog.Warn("download", "msg", "including legacy data structure with empty schemaType, setting to 'entity'", "dataStructure", dsUri)
+						includedLegacyCount++
 						meta := dsResp.Meta
 						meta.SchemaType = "entity"
 						dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
@@ -386,6 +387,13 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 				}
 			}
 		}
+	}
+
+	if skippedCount > 0 {
+		slog.Info("skipped legacy data structures with empty schemaType", "count", skippedCount, "note", "use --include-legacy to include them")
+	}
+	if includedLegacyCount > 0 {
+		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
 	}
 
 	return res, nil
