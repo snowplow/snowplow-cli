@@ -11,11 +11,13 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package util
 
 import (
+	"debug/elf"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -44,7 +46,7 @@ func (f Files) CreateDataStructures(dss []model.DataStructure) error {
 		if err != nil {
 			return err
 		}
-		_, err = WriteSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		_, err = WriteResourceToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference, false, DataStructureResourceType)
 		if err != nil {
 			return err
 		}
@@ -103,7 +105,7 @@ func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData]) (m
 
 	for _, idToName := range uniqueNames {
 		sa := idToSa[idToName.Id]
-		abs, err := WriteSerializableToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference)
+		abs, err := WriteResourceToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference, false, sa.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +136,7 @@ func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanon
 
 	for _, idToName := range uniqueNames {
 		dp := idToDp[idToName.Id]
-		abs, err := WriteSerializableToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference)
+		abs, err := WriteResourceToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference, false, dp.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +180,7 @@ func (f Files) WriteImage(name string, dir string, image *model.Image) (string, 
 	return relativePath, err
 }
 
-func WriteSerializableToFile(body any, dir string, name string, ext string) (string, error) {
+func WriteSerializableToFile(body any, dir string, name string, ext string, yamlPrefix string) (string, error) {
 	var bytes []byte
 	var err error
 
@@ -186,6 +188,9 @@ func WriteSerializableToFile(body any, dir string, name string, ext string) (str
 		bytes, err = yaml.Marshal(body)
 		if err != nil {
 			return "", err
+		}
+		if yamlPrefix != "" {
+			bytes = append([]byte(yamlPrefix+"\n"), bytes...)
 		}
 	} else {
 		bytes, err = json.MarshalIndent(body, "", "  ")
@@ -203,4 +208,26 @@ func WriteSerializableToFile(body any, dir string, name string, ext string) (str
 	slog.Debug("wrote", "file", filePath)
 
 	return filePath, err
+}
+
+func WriteResourceToFile(body any, dir string, name string, ext string, noLsp bool, resourceType string) (string, error) {
+	if noLsp {
+		return WriteSerializableToFile(body, dir, name, ext, "")
+	} else {
+		prefix, err := getLspComment(resourceType)
+		if err != nil {
+			return "", err
+		}
+		return WriteSerializableToFile(body, dir, name, ext, prefix)
+	}
+}
+
+func getLspComment(resourceType string) (string, error) {
+	if slices.Contains([]string{DataStructureResourceType, DataProductResourceType, SourceApplicationResourceType}, resourceType) {
+		template := "# yaml-language-server: %s%s.json"
+		return fmt.Sprintf(template, resourceType, RepoRawFileURL), nil
+	} else {
+		return "", fmt.Errorf("Value %s is not a valid resource type")
+	}
+
 }

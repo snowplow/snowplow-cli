@@ -35,6 +35,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		format, _ := cmd.Flags().GetString("output-format")
+		// noLsp, _ := cmd.Flags().GetBool("no-lsp")
 
 		dataProductsFolder := util.DataProductsFolder
 
@@ -62,4 +63,5 @@ func init() {
 	DataProductsCmd.AddCommand(downloadCommand)
 
 	downloadCommand.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
+	downloadCommand.PersistentFlags().Bool("no-lsp", true, "Disable LSP server functionality")
 }

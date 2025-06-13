@@ -14,3 +14,9 @@ const DataStructuresFolder = "data-structures"
 const DataProductsFolder = "data-products"
 const SourceAppsFolder = "source-apps"
 const ImagesFolder = "images"
+
+const DataStructureResourceType = "data-structure"
+const DataProductResourceType = "data-product"
+const SourceApplicationResourceType = "source-application"
+
+const RepoRawFileURL = "https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/"
