@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$id": "https://raw.githubusercontent.com/snowplow/snowplow-cli/main/internal/validation/schema/data-structure.json",
+  "title": "Snowplow Data Structure",
+  "description": "Defines the structure of a Snowplow data structure, which encapsulates a Snowplow self-describing JSON schema and its associated metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "resourceType", "meta", "data"],
+  "examples": [
+    {
+      "apiVersion": "v1",
+      "resourceType": "data-structure",
+      "meta": {
+        "hidden": false,
+        "schemaType": "event",
+        "customData": {}
+      },
+      "data": {
+        "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        "description": "A marker event indicating a user viewed their shopping cart. Details of the cart items would be in attached entities.",
+        "self": {
+          "vendor": "com.acme_corp",
+          "name": "cart_viewed",
+          "format": "jsonschema",
+          "version": "1-0-0"
+        },
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "resourceType": "data-structure",
+      "meta": {
+        "hidden": false,
+        "schemaType": "entity",
+        "customData": {}
+      },
+      "data": {
+        "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        "description": "Provides detailed context about a product. Could be attached to events like 'cart_viewed' or 'product_viewed'.",
+        "self": {
+          "vendor": "com.acme_corp",
+          "name": "product_details",
+          "format": "jsonschema",
+          "version": "1-2-0"
+        },
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "description": "Stock Keeping Unit, primary key for product."
+          },
+          "productName": {
+            "type": "string",
+            "description": "Display name of the product."
+          },
+          "category": {
+            "type": "string",
+            "description": "Product category (e.g., 'Electronics', 'Apparel')."
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Price per unit of the product."
+          }
+        },
+        "required": ["sku", "productName", "category", "unitPrice"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "properties": {
+    "apiVersion": {
+      "description": "The version of this data structure resource format. Currently fixed at 'v1'.",
+      "enum": ["v1"],
+      "examples": ["v1"]
+    },
+    "resourceType": {
+      "description": "The type of resource being described. For Snowplow data structures, this is always 'data-structure'.",
+      "enum": ["data-structure"],
+      "examples": ["data-structure"]
+    },
+    "meta": {
+      "description": "Metadata associated with the Snowplow data structure.",
+      "type": "object",
+      "required": ["hidden", "schemaType", "customData"],
+      "additionalProperties": false,
+      "properties": {
+        "hidden": {
+          "description": "If true, this data structure will be hidden in the BDP Console.",
+          "type": "boolean"
+        },
+        "schemaType": {
+          "description": "Indicates whether this schema defines an 'event' (an action, e.g., page view, click) or an 'entity' (contextual information about an event, e.g., user details, product information).",
+          "enum": ["event", "entity"]
+        },
+        "customData": {
+          "description": "An open object for storing arbitrary key-value pairs of custom metadata related to this data structure. Useful for integration-specific information or extended annotations.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "data": {
+      "description": "The core Snowplow self-describing JSON schema, which defines the actual structure of the event or entity data. For a public registry of Snowplow schemas, see Iglu Central: https://github.com/snowplow/iglu-central/tree/master/schemas.",
+      "type": "object",
+      "allOf": [
+        {
+          "description": "The core Snowplow self-describing JSON schema, which defines the actual structure of the event or entity data. For a public registry of Snowplow schemas, see Iglu Central: https://github.com/snowplow/iglu-central/tree/master/schemas.",
+          "properties": {
+            "$schema": {
+              "enum": [
+                "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+              ]
+            },
+            "self": {
+              "type": "object",
+              "description": "The self-describing identifier for the schema, providing its unique identity.",
+              "examples": [
+                {
+                  "vendor": "com.my_company.gaming",
+                  "name": "player_profile",
+                  "format": "jsonschema",
+                  "version": "2-1-0"
+                }
+              ],
+              "properties": {
+                "vendor": {
+                  "description": "The vendor or organization responsible for the schema, typically in reverse domain name notation (e.g., 'com.snowplowanalytics', 'com.acme').",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9-_.]+$",
+                  "examples": ["com.acme_inc", "io.snowplow"]
+                },
+                "name": {
+                  "description": "The name of the schema, identifying the event or entity (e.g., 'page_view', 'user')",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9-_]+$",
+                  "examples": [
+                    "user_login",
+                    "product_details",
+                    "video_playback_started"
+                  ]
+                },
+                "format": {
+                  "description": "The format of the schema. For Snowplow JSON schemas, this is typically 'jsonschema'.",
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9-_]+$",
+                  "examples": ["jsonschema"]
+                },
+                "version": {
+                  "description": "The version of the schema in SchemaVer format (MODEL-REVISION-ADDITION, e.g., '1-0-0'). CRITICAL: Increment MODEL (e.g., 1-x-x to 2-0-0) for ANY breaking change that could reject previously valid data (removals, type changes, constraint tightening). Increment REVISION (e.g., 1-0-x to 1-1-0) only for non-breaking additions (new optional properties, constraint loosening). Increment ADDITION (e.g., 1-0-0 to 1-0-1) for editorial changes only.",
+                  "type": "string",
+                  "pattern": "^[1-9][0-9]*-[0-9]+-[0-9]+$",
+                  "examples": ["1-0-0", "1-1-0", "2-0-1"]
+                }
+              },
+              "required": ["vendor", "name", "format", "version"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["self", "$schema"]
+        },
+        {
+          "description": "Ensures the content is a valid JSON Schema (Draft-04).",
+          "$ref": "http://json-schema.org/draft-04/schema#"
+        }
+      ],
+      "examples": [
+        {
+          "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "description": "Schema for a generic 'button_click_event'.",
+          "self": {
+            "vendor": "com.my_website",
+            "name": "button_click",
+            "format": "jsonschema",
+            "version": "1-0-0"
+          },
+          "type": "object",
+          "properties": {
+            "buttonId": {
+              "type": "string",
+              "description": "The ID of the button clicked."
+            },
+            "buttonText": {
+              "type": "string",
+              "description": "The text content of the button."
+            }
+          },
+          "required": ["buttonId", "pageUrl"],
+          "additionalProperties": false
+        },
+        {
+          "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "description": "Schema for 'user_details' providing context about the user performing an action.",
+          "self": {
+            "vendor": "com.my_company_app",
+            "name": "user_details",
+            "format": "jsonschema",
+            "version": "1-2-0"
+          },
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique identifier for the user."
+            },
+            "userSegment": {
+              "type": "string",
+              "enum": ["new", "returning", "vip"],
+              "description": "Segment the user belongs to."
+            },
+            "deviceType": {
+              "type": "string",
+              "enum": ["desktop", "mobile", "tablet"],
+              "description": "Type of device used."
+            }
+          },
+          "required": ["userId"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
