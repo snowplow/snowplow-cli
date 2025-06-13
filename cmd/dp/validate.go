@@ -11,14 +11,11 @@
 package dp
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
 
-	"github.com/snowplow/snowplow-cli/internal/console"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/publish"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
@@ -32,13 +29,7 @@ var validateCmd = &cobra.Command{
 	Example: `  $ snowplow-cli dp validate ./data-products ./source-applications
   $ snowplow-cli dp validate ./src`,
 	Run: func(cmd *cobra.Command, args []string) {
-		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key")
-		host, _ := cmd.Flags().GetString("host")
-		org, _ := cmd.Flags().GetString("org-id")
-		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
-		full, _ := cmd.Flags().GetBool("full")
-		concurrentReq, _ := cmd.Flags().GetInt("concurrency")
+		ctx := cmd.Context()
 
 		searchPaths := []string{}
 
@@ -47,41 +38,18 @@ var validateCmd = &cobra.Command{
 			slog.Debug("validation", "msg", fmt.Sprintf("no path provided, using default (./%s)", util.DataProductsFolder))
 		}
 
-		if concurrentReq > 10 {
-			concurrentReq = 10
-			slog.Debug("validation", "msg", "concurrency set to > 10, limited to 10")
-		}
-
-		if concurrentReq < 1 {
-			concurrentReq = 1
-			slog.Debug("validation", "msg", "concurrency set to < 1, increased to 1")
-		}
-
 		searchPaths = append(searchPaths, args...)
-
-		files, err := util.MaybeResourcesfromPaths(searchPaths)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
 
 		basePath, err := os.Getwd()
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		cnx := context.Background()
-
-		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		err = validation.ValidateDataProductsFromCmd(ctx, cmd, searchPaths, basePath)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		changes, err := publish.FindChanges(cnx, c, files)
-		if err != nil {
-			snplog.LogFatal(err)
-		}
-
-		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, full, changes.IdToFileName, concurrentReq)
 	},
 }
 

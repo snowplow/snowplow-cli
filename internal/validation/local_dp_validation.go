@@ -11,15 +11,15 @@
 package validation
 
 import (
+	"context"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow/snowplow-cli/internal/console"
-	snplog "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
@@ -196,7 +196,7 @@ func (lookup *DPLookup) resolveRefs() error {
 						for _, absSaPath := range resolvedSas {
 							relPath, err := filepath.Rel(filepath.Dir(dpFile), absSaPath)
 							if err != nil {
-								snplog.LogFatal(err)
+								logging.LogFatal(err)
 							}
 							relativeSas = append(relativeSas, relPath)
 						}
@@ -218,29 +218,30 @@ func (lookup *DPLookup) resolveRefs() error {
 	return nil
 }
 
-func (lookup *DPLookup) SlogValidations(basePath string) error {
+func (lookup *DPLookup) SlogValidations(ctx context.Context, basePath string) error {
+	logger := logging.LoggerFromContext(ctx)
 	for f, v := range lookup.Validations {
 		rp, err := filepath.Rel(basePath, f)
 		if err != nil {
 			return err
 		}
 		for _, m := range v.Debug {
-			slog.Debug("validating", "file", rp, "msg", m)
+			logger.Debug("validating", "file", rp, "msg", m)
 		}
 		for _, m := range v.Info {
-			slog.Info("validating", "file", rp, "msg", m)
+			logger.Info("validating", "file", rp, "msg", m)
 		}
 		for _, m := range v.Warnings {
-			slog.Warn("validating", "file", rp, "msg", m)
+			logger.Warn("validating", "file", rp, "msg", m)
 		}
 		for k, se := range v.WarningsWithPaths {
-			slog.Warn("validating", "file", rp, "path", k, "warnings", strings.Join(se, "\n")+"\n")
+			logger.Warn("validating", "file", rp, "path", k, "warnings", strings.Join(se, "\n")+"\n")
 		}
 		for _, m := range v.Errors {
-			slog.Error("validating", "file", rp, "msg", m)
+			logger.Error("validating", "file", rp, "msg", m)
 		}
 		for k, se := range v.ErrorsWithPaths {
-			slog.Error("validating", "file", rp, "path", k, "errors", strings.Join(se, "\n")+"\n")
+			logger.Error("validating", "file", rp, "path", k, "errors", strings.Join(se, "\n")+"\n")
 		}
 	}
 

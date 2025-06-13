@@ -13,50 +13,52 @@ package validation
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
-	snplog "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/logging"
 )
 
-func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, concurrency int) {
+func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, concurrency int) error {
+
+	logger := logging.LoggerFromContext(ctx)
+
 	possibleFiles := []string{}
 	for n := range files {
 		possibleFiles = append(possibleFiles, n)
 	}
 
-	schemaResolver, err := console.NewSchemaDeployChecker(cnx, c)
+	schemaResolver, err := console.NewSchemaDeployChecker(ctx, c)
 	if err != nil {
-		snplog.LogFatal(err)
+		return err
 	}
 
 	compatChecker := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
-		return console.CompatCheck(cnx, c, event, entities)
+		return console.CompatCheck(ctx, c, event, entities)
 	}
 
 	lookup, err := NewDPLookup(compatChecker, schemaResolver, files, changedIdToFile, validateAll, concurrency)
 	if err != nil {
-		snplog.LogFatal(err)
+		return err
 	}
 
-	slog.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
+	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
 
-	err = lookup.SlogValidations(basePath)
+	err = lookup.SlogValidations(ctx, basePath)
 	if err != nil {
-		snplog.LogFatal(err)
+		return err
 	}
 
 	if ghOut {
 		err := lookup.GhAnnotateValidations(basePath)
 		if err != nil {
-			snplog.LogFatal(err)
+			logging.LogFatal(err)
 		}
 	}
 
 	numErrors := lookup.ValidationErrorCount()
 
 	if numErrors > 0 {
-		snplog.LogFatal(fmt.Errorf("validation failed %d errors", numErrors))
+		return fmt.Errorf("validation failed %d errors", numErrors)
 	} else {
 		dpCount := 0
 		for range lookup.DataProducts {
@@ -66,6 +68,8 @@ func Validate(cnx context.Context, c *console.ApiClient, files map[string]map[st
 		for range lookup.SourceApps {
 			saCount++
 		}
-		slog.Info("validation", "msg", "success", "data products found", dpCount, "source applications found", saCount)
+		logger.Info("validation", "msg", "success", "data products found", dpCount, "source applications found", saCount)
 	}
+
+	return nil
 }

@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package util
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,11 +24,12 @@ import (
 	"slices"
 	"strings"
 
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
+func DataStructuresFromPaths(paths []string) (map[string]model.DataStructure, error) {
 
 	files := map[string]bool{}
 
@@ -46,7 +48,7 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 		}
 	}
 
-	ds := make(map[string]DataStructure)
+	ds := make(map[string]model.DataStructure)
 
 	exts := []string{".yaml", ".yml", ".json"}
 
@@ -70,19 +72,19 @@ func DataStructuresFromPaths(paths []string) (map[string]DataStructure, error) {
 	return ds, nil
 }
 
-func dataStructureFromFileName(f string) (*DataStructure, error) {
+func dataStructureFromFileName(f string) (*model.DataStructure, error) {
 	file, err := os.Open(f)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func () { _ = file.Close() }()
 
 	body, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
 
-	ds := DataStructure{}
+	ds := model.DataStructure{}
 	switch filepath.Ext(file.Name()) {
 	case ".json":
 		err = json.Unmarshal(body, &ds)
@@ -102,7 +104,7 @@ func dataFromFileName(f string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func () { _ = file.Close() }()
 
 	body, err := io.ReadAll(file)
 	if err != nil {
@@ -188,3 +190,11 @@ func SetMinus(s1, s2 []string) []string {
 func StringSlicesEqual(one []string, other []string) bool {
 	return len(one) == 0 && len(other) == 0 || reflect.DeepEqual(one, other)
 }
+
+func LoggingCloser(ctx context.Context, toClose io.Closer) {
+	if err := toClose.Close(); err != nil {
+		logger := logging.LoggerFromContext(ctx)
+		logger.Error("Error closing", "msg", err.Error())
+	}
+}
+

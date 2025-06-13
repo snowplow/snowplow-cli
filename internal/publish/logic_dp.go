@@ -63,7 +63,7 @@ func (cs DataProductChangeSet) isEmpty() bool {
 		len(cs.imageCreate) == 0
 }
 
-func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
+func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
 
 	probablyDps := []model.DataProduct{}
 	probablySas := []model.SourceApp{}
@@ -143,7 +143,7 @@ func ReadLocalDataProducts(dp map[string]map[string]any) (*LocalFilesRefsResolve
 					if err != nil {
 						return nil, err
 					}
-					defer f.Close()
+					defer util.LoggingCloser(ctx, f)
 
 					h := sha256.New()
 					if _, err := io.Copy(h, f); err != nil {
@@ -488,8 +488,8 @@ type DataProductPurger interface {
 	FetchDataProduct() (*console.DataProductsAndRelatedResources, error)
 }
 
-func Purge(api DataProductPurger, dp map[string]map[string]any, commit bool) error {
-	localResolved, err := ReadLocalDataProducts(dp)
+func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]any, commit bool) error {
+	localResolved, err := ReadLocalDataProducts(ctx, dp)
 	if err != nil {
 		return err
 	}
@@ -559,7 +559,7 @@ func Purge(api DataProductPurger, dp map[string]map[string]any, commit bool) err
 }
 
 func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]map[string]any) (*DataProductChangeSet, error) {
-	localResolved, err := ReadLocalDataProducts(dp)
+	localResolved, err := ReadLocalDataProducts(cnx, dp)
 	if err != nil {
 		return nil, err
 	}

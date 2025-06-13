@@ -36,7 +36,7 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image
 	if err != nil {
 		return nil, false, err
 	}
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 
 	ext, err := mime.ExtensionsByType(resp.Header.Get("Content-Type"))
 
@@ -65,7 +65,7 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]stri
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 
 	var lookup imageLookup
 	err = json.Unmarshal(rbody, &lookup)
@@ -94,7 +94,7 @@ func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUpload
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer util.LoggingCloser(cnx, f)
 
 	b, err := io.ReadAll(f)
 	if err != nil {
@@ -142,7 +142,10 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 		return err
 	}
 
-	writer.Close()
+	err = writer.Close()
+	if err != nil {
+		return err
+	}
 
 	req, err := http.NewRequestWithContext(cnx, "POST", uploadLink.UploadURL, &upBuf)
 	if err != nil {
@@ -154,7 +157,7 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 		return err
 	}
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -199,7 +202,7 @@ func confirmImage(cnx context.Context, client *ApiClient, id string, hash string
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}

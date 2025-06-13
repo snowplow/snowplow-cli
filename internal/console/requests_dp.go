@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type DataProductsAndRelatedResources struct {
@@ -135,7 +137,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +157,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 	sarbody, err := io.ReadAll(saResp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +231,7 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +261,7 @@ func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -288,7 +290,7 @@ func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -313,7 +315,7 @@ func DeleteSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -342,7 +344,7 @@ func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -372,7 +374,7 @@ func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -397,7 +399,7 @@ func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -429,7 +431,7 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -452,7 +454,7 @@ func getEventSpec(cnx context.Context, client *ApiClient, id string) (*RemoteEve
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +496,7 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -519,7 +521,7 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}

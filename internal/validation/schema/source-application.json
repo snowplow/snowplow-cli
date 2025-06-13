@@ -3,6 +3,7 @@
   "$id": "https://raw.githubusercontent.com/snowplow/snowplow-cli/main/internal/validation/schema/source-application.json",
   "type": "object",
   "additionalProperties": false,
+  "description": "Defines a Source Application, representing a system (e.g., website, mobile app, backend service) that generates Snowplow events. It includes metadata about the application, its identifiers (appIds), and entities that are GLOBALLY consistent across ALL events from this source.\n\nIMPORTANT: Only include entities in 'tracked' that are meaningful and present on EVERY event from this application (e.g., web page context for websites, app context for mobile apps). Content-specific or interaction-specific entities (e.g., video context, form context, product context) should be defined in individual event specifications within data products, not here.",
   "required": ["apiVersion", "resourceType", "resourceName", "data"],
   "properties": {
     "apiVersion": { "enum": ["v1"] },
@@ -93,7 +94,7 @@
               }
             },
             "enriched": {
-              "description": "Entities added via tracking",
+              "description": "Entities added via enrichment",
               "type": "array",
               "items": {
                 "type": "object",

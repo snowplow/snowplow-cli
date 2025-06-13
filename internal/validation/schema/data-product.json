@@ -3,6 +3,7 @@
   "$id": "https://raw.githubusercontent.com/snowplow/snowplow-cli/main/internal/validation/schema/data-product.json",
   "type": "object",
   "additionalProperties": false,
+  "description": "Defines a Snowplow Data Product, a central artifact for managing and governing how specific business interactions are tracked. It specifies WHAT data to track (via event specifications), WHERE it's tracked from (source applications), and HOW it's tracked (instructions and triggers within event specifications). Data Products act as a contract, enhancing data quality, governance, and discoverability across an organization.",
   "required": ["apiVersion", "resourceType", "resourceName", "data"],
   "properties": {
     "apiVersion": { "enum": ["v1"] },
@@ -34,7 +35,7 @@
                     }
                   }
                 },
-                "entites": {
+                "entities": {
                   "tracked": [
                     {
                       "source": "iglu:com.snowplowanalytics.snowplow.ecommerce/product/jsonschema/1-0-0",
@@ -127,6 +128,7 @@
             }
           ],
           "type": "array",
+          "description": "An array defining the specific events and their associated entities that constitute this Data Product. Each specification details a trackable interaction, including its base schema, any refinements, expected entities, and triggering conditions.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -168,11 +170,7 @@
                   "properties": {
                     "id": {
                       "description": "A version 4 uuid value to identify this resource. On a mac you can generate one by typing `uuidgen` in the terminal.",
-                      "examples": [
-                        {
-                          "resourceName": "9567c7f6-356e-4f73-a7ec-e5097e4d2f42"
-                        }
-                      ],
+                      "examples": ["9567c7f6-356e-4f73-a7ec-e5097e4d2f42"],
                       "type": "string",
                       "format": "uuid"
                     },
@@ -220,7 +218,10 @@
                     "description": "The event schema that this event specification should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
                     "$ref": "#/$defs/igluUri"
                   },
-                  "comment": { "type": "string" },
+                  "comment": {
+                    "description": "Never to be used. Triggers or schema narrowing must be used instead.",
+                    "type": "string"
+                  },
                   "schema": {
                     "$ref": "#/$defs/schema"
                   }
@@ -254,10 +255,12 @@
                       "properties": {
                         "source": {
                           "description": "The schema that this entity should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
-
                           "$ref": "#/$defs/igluUri"
                         },
-                        "comment": { "type": "string" },
+                        "comment": {
+                          "description": "Never to be used. Triggers or schema narrowing must be used instead.",
+                          "type": "string"
+                        },
                         "minCardinality": {
                           "description": "The minimum number of this entity type that will be attached.",
                           "type": "number"
@@ -284,7 +287,10 @@
                           "description": "The schema that this entity should validate against.\n\nIt must take the form of an iglu uri `iglu:vendor/name/format/version` see: https://docs.snowplow.io/docs/api-reference/iglu/common-architecture/self-describing-jsons",
                           "$ref": "#/$defs/igluUri"
                         },
-                        "comment": { "type": "string" },
+                        "comment": {
+                          "description": "Never to be used. Triggers or schema narrowing must be used instead.",
+                          "type": "string"
+                        },
                         "minCardinality": {
                           "description": "The minimum number of this entity type that will be attached.",
                           "type": "number"

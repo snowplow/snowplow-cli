@@ -13,10 +13,11 @@ package validation
 import (
 	"context"
 	"fmt"
-	. "github.com/snowplow/snowplow-cli/internal/changes"
-	"github.com/snowplow/snowplow-cli/internal/console"
-	"log/slog"
 	"strings"
+
+	"github.com/snowplow/snowplow-cli/internal/changes"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/logging"
 )
 
 type igluValidationLevel uint
@@ -73,25 +74,26 @@ func (vr *ValidationResults) GithubAnnotate() {
 	}
 }
 
-func (vr *ValidationResults) Slog() {
+func (vr *ValidationResults) Slog(ctx context.Context) {
+	logger := logging.LoggerFromContext(ctx)
 	for _, iglu := range vr.Iglu {
 		switch iglu.Level {
 		case igluValidationError:
-			slog.Error("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
+			logger.Error("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
 		case igluValidationWarn:
-			slog.Warn("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
+			logger.Warn("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
 		case igluValidationInfo:
-			slog.Warn("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
+			logger.Warn("validation", "file", iglu.File, "messages", strings.Join(iglu.Messages, "\n"))
 		}
 	}
 
 	for _, migration := range vr.Migration {
-		slog.Error("validation", "file", migration.File, "destination", migration.Destination,
+		logger.Error("validation", "file", migration.File, "destination", migration.Destination,
 			"suggestedVersion", migration.Suggested, "messages", strings.Join(migration.Messages, "\n"))
 	}
 }
 
-func ValidateChanges(cnx context.Context, c *console.ApiClient, changes Changes) (*ValidationResults, error) {
+func ValidateChanges(cnx context.Context, c *console.ApiClient, changes changes.Changes) (*ValidationResults, error) {
 	var vr ValidationResults
 
 	// Create and create new version both follow the same logic

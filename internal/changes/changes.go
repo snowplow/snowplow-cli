@@ -13,16 +13,16 @@ package changes
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"reflect"
 
 	"github.com/r3labs/diff/v3"
-	. "github.com/snowplow/snowplow-cli/internal/console"
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
 type DataStructureWithDiff struct {
-	DataStructure DataStructure
+	DataStructure model.DataStructure
 	Operation     string
 	Diff          diff.Changelog
 }
@@ -33,7 +33,7 @@ type DataStructureId struct {
 	Format string
 }
 
-func idFromSelf(self DataStructureSelf) DataStructureId {
+func idFromSelf(self model.DataStructureSelf) DataStructureId {
 	return DataStructureId{
 		self.Vendor,
 		self.Name,
@@ -41,33 +41,33 @@ func idFromSelf(self DataStructureSelf) DataStructureId {
 	}
 }
 
-func NewDSChangeContext(ds DataStructure, fileName string) DSChangeContext {
-	return DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: "", LocalContentHash: "", RemoteContentHash: ""}
+func NewDSChangeContext(ds model.DataStructure, fileName string) model.DSChangeContext {
+	return model.DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: "", LocalContentHash: "", RemoteContentHash: ""}
 }
 
-func NewDSChangeContextWithVersion(ds DataStructure, fileName string, v string) DSChangeContext {
-	return DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: v, LocalContentHash: "", RemoteContentHash: ""}
+func NewDSChangeContextWithVersion(ds model.DataStructure, fileName string, v string) model.DSChangeContext {
+	return model.DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: v, LocalContentHash: "", RemoteContentHash: ""}
 }
 
-func NewDSChangeContextWithVersionAndHashes(ds DataStructure, fileName string, v string, localHash string, remoteHash string) DSChangeContext {
-	return DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: v, LocalContentHash: localHash, RemoteContentHash: remoteHash}
+func NewDSChangeContextWithVersionAndHashes(ds model.DataStructure, fileName string, v string, localHash string, remoteHash string) model.DSChangeContext {
+	return model.DSChangeContext{DS: ds, FileName: fileName, RemoteVersion: v, LocalContentHash: localHash, RemoteContentHash: remoteHash}
 }
 
 type Changes struct {
-	ToCreate           []DSChangeContext
-	ToUpdateMeta       []DSChangeContext
-	ToUpdateNewVersion []DSChangeContext
-	ToUpdatePatch      []DSChangeContext
+	ToCreate           []model.DSChangeContext
+	ToUpdateMeta       []model.DSChangeContext
+	ToUpdateNewVersion []model.DSChangeContext
+	ToUpdatePatch      []model.DSChangeContext
 }
 
-func GetChanges(locals map[string]DataStructure, remoteListing []ListResponse, env DataStructureEnv) (Changes, error) {
+func GetChanges(locals map[string]model.DataStructure, remoteListing []console.ListResponse, env console.DataStructureEnv) (Changes, error) {
 	res := Changes{
-		make([]DSChangeContext, 0),
-		make([]DSChangeContext, 0),
-		make([]DSChangeContext, 0),
-		make([]DSChangeContext, 0),
+		make([]model.DSChangeContext, 0),
+		make([]model.DSChangeContext, 0),
+		make([]model.DSChangeContext, 0),
+		make([]model.DSChangeContext, 0),
 	}
-	remotesSet := make(map[DataStructureId]ListResponse)
+	remotesSet := make(map[DataStructureId]console.ListResponse)
 	for _, remote := range remoteListing {
 		remotesSet[DataStructureId{remote.Vendor, remote.Name, remote.Format}] = remote
 	}
@@ -118,37 +118,37 @@ func GetChanges(locals map[string]DataStructure, remoteListing []ListResponse, e
 	return res, nil
 }
 
-func PerformChangesDev(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
+func PerformChangesDev(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {
 	// Create and create new version both follow the same logic
 	validatePublish := append(changes.ToCreate, changes.ToUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		vr, err := Validate(cnx, c, ds.DS)
+		vr, err := console.Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
 		if !vr.Valid {
 			return errors.New(vr.Message)
 		}
-		_, err = PublishDev(cnx, c, ds.DS, false, managedFrom)
+		_, err = console.PublishDev(cnx, c, ds.DS, false, managedFrom)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.ToUpdatePatch {
-		vr, err := Validate(cnx, c, ds.DS)
+		vr, err := console.Validate(cnx, c, ds.DS)
 		if err != nil {
 			return err
 		}
 		if !vr.Valid {
 			return errors.New(vr.Message)
 		}
-		_, err = PublishDev(cnx, c, ds.DS, true, managedFrom)
+		_, err = console.PublishDev(cnx, c, ds.DS, true, managedFrom)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.ToUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds.DS, managedFrom)
+		err := console.MetadateUpdate(cnx, c, &ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
@@ -157,27 +157,27 @@ func PerformChangesDev(cnx context.Context, c *ApiClient, changes Changes, manag
 	return nil
 }
 
-func ValidateChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
+func ValidateChangesProd(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {
 	if len(changes.ToUpdatePatch) != 0 {
 		return errors.New("patching is not available on prod. You must increment versions on dev before deploying")
 	}
 	return nil
 }
 
-func PerformChangesProd(cnx context.Context, c *ApiClient, changes Changes, managedFrom string) error {
+func PerformChangesProd(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {
 	err := ValidateChangesProd(cnx, c, changes, managedFrom)
 	if err != nil {
 		return err
 	}
 	validatePublish := append(changes.ToCreate, changes.ToUpdateNewVersion...)
 	for _, ds := range validatePublish {
-		_, err := PublishProd(cnx, c, ds.DS, managedFrom)
+		_, err := console.PublishProd(cnx, c, ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ds := range changes.ToUpdateMeta {
-		err := MetadateUpdate(cnx, c, &ds.DS, managedFrom)
+		err := console.MetadateUpdate(cnx, c, &ds.DS, managedFrom)
 		if err != nil {
 			return err
 		}
@@ -186,14 +186,16 @@ func PerformChangesProd(cnx context.Context, c *ApiClient, changes Changes, mana
 	return nil
 }
 
-func PrintChangeset(changes Changes) error {
+func PrintChangeset(ctx context.Context, changes Changes) error {
+	logger := logging.LoggerFromContext(ctx)
+
 	if len(changes.ToUpdateMeta) != 0 {
 		for _, ds := range changes.ToUpdateMeta {
 			data, err := ds.DS.ParseData()
 			if err != nil {
 				return err
 			}
-			slog.Info("will update metadata of", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name)
+			logger.Info("will update metadata of", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name)
 		}
 	}
 	if len(changes.ToCreate) != 0 {
@@ -202,7 +204,7 @@ func PrintChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			slog.Info("will create", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name, "version", data.Self.Version)
+			logger.Info("will create", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name, "version", data.Self.Version)
 		}
 	}
 	if len(changes.ToUpdateNewVersion) != 0 {
@@ -211,7 +213,7 @@ func PrintChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			slog.Info("will update", "file", ds.FileName, "local", data.Self.Version, "remote", ds.RemoteVersion)
+			logger.Info("will update", "file", ds.FileName, "local", data.Self.Version, "remote", ds.RemoteVersion)
 		}
 	}
 	if len(changes.ToUpdatePatch) != 0 {
@@ -220,7 +222,7 @@ func PrintChangeset(changes Changes) error {
 			if err != nil {
 				return err
 			}
-			slog.Info(
+			logger.Info(
 				"will patch", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name,
 				"version", data.Self.Version, "local", ds.LocalContentHash, "remote", ds.RemoteContentHash,
 			)

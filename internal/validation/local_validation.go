@@ -13,14 +13,14 @@ package validation
 import (
 	"errors"
 	"fmt"
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
 
-func validateDs(validate *validator.Validate, ds DataStructure) error {
+func validateDs(validate *validator.Validate, ds model.DataStructure) error {
 
 	type validation struct {
 		field          string
@@ -59,7 +59,7 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 		for _, err := range allErrs {
 			switch err.validationType {
 			case "required":
-				result = append(result, fmt.Errorf("Required field %s is missing", err.path))
+				result = append(result, fmt.Errorf("required field %s is missing", err.path))
 			case "oneof":
 				firstSentence := fmt.Sprintf("Invalid value %s at %s. Avaliable values are: ", err.value, err.path)
 				var secondSentence string
@@ -85,7 +85,7 @@ func validateDs(validate *validator.Validate, ds DataStructure) error {
 
 }
 
-func ValidateLocalDs(dss map[string]DataStructure) []error {
+func ValidateLocalDs(dss map[string]model.DataStructure) []error {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 	validate.RegisterTagNameFunc(func(field reflect.StructField) string {
 		return field.Tag.Get("json")
@@ -95,7 +95,7 @@ func ValidateLocalDs(dss map[string]DataStructure) []error {
 	for fileName, ds := range dss {
 		errs := validateDs(validate, ds)
 		if errs != nil {
-			error := errors.Join(fmt.Errorf("Validation failed for %s", fileName), errs)
+			error := errors.Join(fmt.Errorf("validation failed for %s", fileName), errs)
 			allErrors = append(allErrors, error)
 		}
 		data, err := ds.ParseData()
@@ -107,7 +107,7 @@ func ValidateLocalDs(dss map[string]DataStructure) []error {
 	}
 	for key, files := range counts {
 		if len(files) > 1 {
-			allErrors = append(allErrors, fmt.Errorf("The mapping between data structures and files should be unique. Files %s describe the same data structure %s.", files, key))
+			allErrors = append(allErrors, fmt.Errorf("the mapping between data structures and files should be unique. Files %s describe the same data structure %s", files, key))
 		}
 	}
 

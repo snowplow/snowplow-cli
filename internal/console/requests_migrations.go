@@ -19,7 +19,7 @@ import (
 	"io"
 	"net/http"
 
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
@@ -33,7 +33,7 @@ type apiError struct {
 
 type migrationRequest struct {
 	DestinationType string            `json:"destinationType"`
-	SourceSchemaKey DataStructureSelf `json:"sourceSchemaKey"`
+	SourceSchemaKey model.DataStructureSelf `json:"sourceSchemaKey"`
 	TargetSchema    map[string]any    `json:"targetSchema"`
 }
 
@@ -54,7 +54,7 @@ type MigrationReport struct {
 	Messages         []string
 }
 
-func fetchMigration(cnx context.Context, client *ApiClient, destination string, from DataStructureSelf, to map[string]any) (*migrationResponse, error) {
+func fetchMigration(cnx context.Context, client *ApiClient, destination string, from model.DataStructureSelf, to map[string]any) (*migrationResponse, error) {
 
 	mreq := migrationRequest{destination, from, to}
 
@@ -78,7 +78,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 
 }
 
-func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeContext) (map[string]MigrationReport, error) {
+func ValidateMigrations(cnx context.Context, client *ApiClient, ds model.DSChangeContext) (map[string]MigrationReport, error) {
 
 	destinations, err := fetchDestinations(cnx, client)
 	if err != nil {
@@ -169,18 +169,18 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds DSChangeConte
 				messages = append(messages, migration.Message)
 			}
 
-			remoteV, err := ParseSemVer(ds.RemoteVersion)
+			remoteV, err := model.ParseSemVer(ds.RemoteVersion)
 			if err != nil {
 				return nil, err
 			}
-			localV, err := ParseSemVer(f.Self.Version)
+			localV, err := model.ParseSemVer(f.Self.Version)
 			if err != nil {
 				return nil, err
 			}
 
-			nextVer := SemNextVer(*remoteV, m.ChangeType)
+			nextVer := model.SemNextVer(*remoteV, m.ChangeType)
 
-			if SemVerCmp(nextVer, *localV) == 1 {
+			if model.SemVerCmp(nextVer, *localV) == 1 {
 				result[dest.Type] = MigrationReport{
 					Messages:         messages,
 					SuggestedVersion: nextVer.String(),
