@@ -89,7 +89,7 @@ Example:
 
 		lspComment := ""
 		if !noLsp {
-			lspComment = fmt.Sprint("\n# yaml-language-server: $schema=%s%s.json", util.RepoRawFileURL, util.DataStructureResourceType)
+			lspComment = fmt.Sprintf("\n# yaml-language-server: $schema=%s%s.json", util.RepoRawFileURL, util.DataStructureResourceType)
 		}
 
 		yamlOut := fmt.Sprintf(yamlTemplate, lspComment, schemaType, vendor, name)

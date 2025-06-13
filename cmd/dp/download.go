@@ -35,7 +35,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		host, _ := cmd.Flags().GetString("host")
 		org, _ := cmd.Flags().GetString("org-id")
 		format, _ := cmd.Flags().GetString("output-format")
-		// noLsp, _ := cmd.Flags().GetBool("no-lsp")
+		noLsp, _ := cmd.Flags().GetBool("no-lsp")
 
 		dataProductsFolder := util.DataProductsFolder
 
@@ -51,7 +51,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = download.DownloadDataProductsAndRelatedResources(files, cnx, c)
+		err = download.DownloadDataProductsAndRelatedResources(files, cnx, c, noLsp)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -63,5 +63,5 @@ func init() {
 	DataProductsCmd.AddCommand(downloadCommand)
 
 	downloadCommand.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
-	downloadCommand.PersistentFlags().Bool("no-lsp", true, "Disable LSP server functionality")
+	downloadCommand.PersistentFlags().Bool("no-lsp", false, "Disable LSP server functionality")
 }
