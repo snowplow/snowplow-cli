@@ -77,7 +77,7 @@ func dataStructureFromFileName(f string) (*model.DataStructure, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func () { _ = file.Close() }()
+	defer func() { _ = file.Close() }()
 
 	body, err := io.ReadAll(file)
 	if err != nil {
@@ -104,7 +104,7 @@ func dataFromFileName(f string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func () { _ = file.Close() }()
+	defer func() { _ = file.Close() }()
 
 	body, err := io.ReadAll(file)
 	if err != nil {
@@ -197,4 +197,3 @@ func LoggingCloser(ctx context.Context, toClose io.Closer) {
 		logger.Error("Error closing", "msg", err.Error())
 	}
 }
-

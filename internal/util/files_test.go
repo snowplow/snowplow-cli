@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	. "github.com/snowplow/snowplow-cli/internal/model"
@@ -62,7 +63,7 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 
 	dir := filepath.Join("../..", "out", "test-ds2")
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
-	err := files.CreateDataStructures([]DataStructure{ds1, ds2})
+	err := files.CreateDataStructures([]DataStructure{ds1, ds2}, false)
 
 	if err != nil {
 		t.Fatalf("Can't create directory %s", err)
@@ -124,7 +125,7 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 
 	dir := filepath.Join("../..", "out", "test-ds2")
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
-	err := files.CreateDataStructures([]DataStructure{ds1, ds2})
+	err := files.CreateDataStructures([]DataStructure{ds1, ds2}, false)
 
 	if err != nil {
 		t.Fatalf("Can't create directory %s", err)
@@ -171,4 +172,70 @@ func Test_createUniqueNames_OK(t *testing.T) {
 	if !reflect.DeepEqual(res, expected1) {
 		t.Fatalf("Not expected result, expected: %+v, actual: %+v", expected1, res)
 	}
+}
+
+func TestRespectsNoLsp(t *testing.T) {
+	extension := "yaml"
+	vendor1 := "test.my.vendor"
+	name1 := "my-test-ds"
+	ds1 := DataStructure{
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{
+			"additionalProp1": "string",
+			"additionalProp2": "string",
+			"additionalProp3": "string",
+		},
+		},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  vendor1,
+				"name":    name1,
+				"format":  "string",
+				"version": "1-2-0",
+			},
+			"schema": "string"},
+	}
+
+	dir := filepath.Join("../..", "out", "test-ds3")
+	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
+	err := files.CreateDataStructures([]DataStructure{ds1}, false)
+
+	if err != nil {
+		t.Fatalf("Can't create directory %s", err)
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Fatalf("%s does not exists", dir)
+	}
+
+	filePath1 := filepath.Join(dir, vendor1, fmt.Sprintf("%s.%s", name1, extension))
+	if _, err := os.Stat(filePath1); os.IsNotExist(err) {
+		t.Fatalf("%s does not exists", filePath1)
+	}
+
+	// Read the file contents and check for the LSP schema URL
+	fileContent, err := os.ReadFile(filePath1)
+	if err != nil {
+		t.Fatalf("Failed to read file %s: %v", filePath1, err)
+	}
+
+	// Check that the file contains the RepoRawFileURL (which is part of the LSP schema URL)
+	if !strings.Contains(string(fileContent), RepoRawFileURL) {
+		t.Fatalf("Expected file to contain LSP schema URL with %s, but it didn't", RepoRawFileURL)
+	}
+
+	err = files.CreateDataStructures([]DataStructure{ds1}, true)
+
+	if err != nil {
+		t.Fatalf("Can't create directory %s", err)
+	}
+
+	fileContent, err = os.ReadFile(filePath1)
+	if err != nil {
+		t.Fatalf("Failed to read file %s: %v", filePath1, err)
+	}
+
+	if strings.Contains(string(fileContent), RepoRawFileURL) {
+		t.Fatalf("Expected file to not contain LSP schema URL with %s, but it did", RepoRawFileURL)
+	}
+
 }
