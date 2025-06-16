@@ -15,7 +15,7 @@ import (
 	"os"
 
 	"github.com/snowplow/snowplow-cli/internal/config"
-	. "github.com/snowplow/snowplow-cli/internal/logging"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -27,10 +27,9 @@ var DataStructuresCmd = &cobra.Command{
   $ snowplow-cli ds validate
   $ snowplow-cli ds publish dev`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := InitLogging(cmd); err != nil {
+		if err := snplog.InitLogging(cmd); err != nil {
 			return err
 		}
-
 		if err := config.InitConsoleConfig(cmd); err != nil {
 			slog.Error("config failure", "error", err)
 			os.Exit(1)

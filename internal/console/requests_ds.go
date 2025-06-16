@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
@@ -80,7 +80,7 @@ type fullMeta struct {
 	ManagedFrom string             `json:"managedFrom,omitempty"`
 }
 
-func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*ValidateResponse, error) {
+func Validate(cnx context.Context, client *ApiClient, ds model.DataStructure) (*ValidateResponse, error) {
 
 	body, err := json.Marshal(ds)
 	if err != nil {
@@ -99,7 +99,7 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func Validate(cnx context.Context, client *ApiClient, ds DataStructure) (*Valida
 	return &vresp, nil
 }
 
-func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatch bool, managedFrom string) (*PublishResponse, error) {
+func PublishDev(cnx context.Context, client *ApiClient, ds model.DataStructure, isPatch bool, managedFrom string) (*PublishResponse, error) {
 	// during first creation we have to publish first, otherwise metatdata patch fails with 404
 	res, err := publish(cnx, client, VALIDATED, DEV, ds, isPatch)
 	if err != nil {
@@ -132,7 +132,7 @@ func PublishDev(cnx context.Context, client *ApiClient, ds DataStructure, isPatc
 	return res, nil
 }
 
-func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure, managedFrom string) (*PublishResponse, error) {
+func PublishProd(cnx context.Context, client *ApiClient, ds model.DataStructure, managedFrom string) (*PublishResponse, error) {
 	err := metadataLock(cnx, client, &ds, managedFrom)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func PublishProd(cnx context.Context, client *ApiClient, ds DataStructure, manag
 	return publish(cnx, client, DEV, PROD, ds, false)
 }
 
-func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to DataStructureEnv, ds DataStructure, isPatch bool) (*PublishResponse, error) {
+func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to DataStructureEnv, ds model.DataStructure, isPatch bool) (*PublishResponse, error) {
 
 	dsData, err := ds.ParseData()
 	if err != nil {
@@ -179,7 +179,7 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ type ListResponse struct {
 	Vendor      string            `json:"vendor"`
 	Format      string            `json:"format"`
 	Name        string            `json:"name"`
-	Meta        DataStructureMeta `json:"meta"`
+	Meta        model.DataStructureMeta `json:"meta"`
 	Deployments []Deployment      `json:"deployments"`
 }
 
@@ -227,7 +227,7 @@ func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, er
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	}
 
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -309,14 +309,14 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	return deploys, nil
 }
 
-func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]DataStructure, error) {
+func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructure, error) {
 
 	listResp, err := GetDataStructureListing(cnx, client)
 	if err != nil {
 		return nil, err
 	}
 
-	var res []DataStructure
+	var res []model.DataStructure
 	var dsData []map[string]any
 	var skippedCount int
 	var includedLegacyCount int
@@ -334,7 +334,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 		if self, ok := ds["self"].(map[string]any); ok {
 			dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
 		} else {
-			return nil, fmt.Errorf("Wrong data structure self section %s", ds["self"])
+			return nil, fmt.Errorf("wrong data structure self section %s", ds["self"])
 		}
 	}
 
@@ -378,11 +378,11 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 						includedLegacyCount++
 						meta := dsResp.Meta
 						meta.SchemaType = "entity"
-						dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+						dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
 						res = append(res, dataStructure)
 					}
 				} else {
-					dataStructure := DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+					dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
 					res = append(res, dataStructure)
 				}
 			}
@@ -399,7 +399,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	return res, nil
 }
 
-func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
+func MetadateUpdate(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {
 
 	data, err := ds.ParseData()
 	if err != nil {
@@ -417,7 +417,7 @@ func MetadateUpdate(cnx context.Context, client *ApiClient, ds *DataStructure, m
 	return patchMeta(cnx, client, &data.Self, body)
 }
 
-func metadataLock(cnx context.Context, client *ApiClient, ds *DataStructure, managedFrom string) error {
+func metadataLock(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {
 
 	data, err := ds.ParseData()
 	if err != nil {
@@ -429,7 +429,7 @@ func metadataLock(cnx context.Context, client *ApiClient, ds *DataStructure, man
 	return patchMeta(cnx, client, &data.Self, body)
 }
 
-func patchMeta(cnx context.Context, client *ApiClient, ds *DataStructureSelf, fullMeta fullMeta) error {
+func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSelf, fullMeta fullMeta) error {
 
 	toHash := fmt.Sprintf("%s-%s-%s-%s", client.OrgId, ds.Vendor, ds.Name, ds.Format)
 	dsHash := sha256.Sum256([]byte(toHash))
@@ -456,7 +456,7 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *DataStructureSelf, fu
 	if resp.StatusCode != http.StatusOK {
 
 		rbody, err := io.ReadAll(resp.Body)
-		defer resp.Body.Close()
+		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}

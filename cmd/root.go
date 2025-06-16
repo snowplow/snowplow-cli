@@ -24,7 +24,8 @@ var RootCmd = &cobra.Command{
 	Short: "Snowplow CLI",
 	Long:  `Work with Snowplow from the command line`,
 	Example: `  $ snowplow-cli data-structures download
-  $ snowplow-cli ds validate`,
+  $ snowplow-cli ds validate
+  $ snowplow-cli mcp`,
 	Version: util.Version,
 }
 
@@ -49,4 +50,5 @@ Then on:
 	RootCmd.PersistentFlags().Bool("json-output", false, "Log output as json")
 	RootCmd.AddCommand(ds.DataStructuresCmd)
 	RootCmd.AddCommand(dp.DataProductsCmd)
+	RootCmd.AddCommand(McpCmd)
 }

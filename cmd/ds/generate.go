@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	. "github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -53,19 +53,20 @@ Example:
 		outFmt, _ := cmd.Flags().GetString("output-format")
 		event, _ := cmd.Flags().GetBool("event")
 		entity, _ := cmd.Flags().GetBool("entity")
+		isPlain, _ := cmd.Flags().GetBool("plain")
 
 		name := args[0]
 
 		if ok := nameRegexp.Match([]byte(name)); !ok {
-			LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
+			logging.LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
 		}
 
 		if ok := vendorRegexp.Match([]byte(vendor)); vendor != "" && !ok {
-			LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
+			logging.LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
 		}
 
 		if ok := outFmt == "json" || outFmt == "yaml"; !ok {
-			LogFatal(errors.New("unsupported output format. Was not yaml or json"))
+			logging.LogFatal(errors.New("unsupported output format. Was not yaml or json"))
 		}
 
 		outDir := filepath.Join(util.DataStructuresFolder, vendor)
@@ -75,7 +76,7 @@ Example:
 
 		outFile := filepath.Join(outDir, name+"."+outFmt)
 		if _, err := os.Stat(outFile); !os.IsNotExist(err) {
-			LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
+			logging.LogFatal(fmt.Errorf("file already exists, not writing %s", outFile))
 		}
 
 		var schemaType string
@@ -86,40 +87,49 @@ Example:
 			schemaType = "entity"
 		}
 
-		yamlOut := fmt.Sprintf(yamlTemplate, schemaType, vendor, name)
+		comment := ""
+		if !isPlain {
+
+			commentTemplate := `# You might not need a custom data structure.
+# Please have a look at the available list of out of the box events and entities:
+# https://docs.snowplow.io/docs/collecting-data/collecting-from-own-applications/snowplow-tracker-protocol
+# yaml-language-server: $schema=%s%s.json
+
+`
+			comment = fmt.Sprintf(commentTemplate, util.RepoRawFileURL, util.DataStructureResourceType)
+		}
+
+		yamlOut := fmt.Sprintf(yamlTemplate, comment, schemaType, vendor, name)
 
 		ds := model.DataStructure{}
 		err := yaml.Unmarshal([]byte(yamlOut), &ds)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		output := yamlOut
 		if outFmt == "json" {
 			jsonOut, err := json.MarshalIndent(ds, "", "  ")
 			if err != nil {
-				LogFatal(err)
+				logging.LogFatal(err)
 			}
 			output = string(jsonOut)
 		}
 
 		err = os.Mkdir(outDir, os.ModePerm)
 		if err != nil && !os.IsExist(err) {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 		err = os.WriteFile(outFile, []byte(output), 0644)
 		if err != nil {
-			LogFatal(err)
+			logging.LogFatal(err)
 		}
 
 		slog.Info("generate", "wrote", outFile)
 	},
 }
 
-var yamlTemplate = `# You might not need a custom data structure.
-# Please have a look at the available list of out of the box events and entities:
-# https://docs.snowplow.io/docs/collecting-data/collecting-from-own-applications/snowplow-tracker-protocol/
-apiVersion: v1
+var yamlTemplate = `%sapiVersion: v1
 resourceType: data-structure
 meta:
   hidden: false
@@ -147,4 +157,5 @@ Must conform to the regex pattern [a-zA-Z0-9-_.]+`)
 
 	generateCmd.Flags().Bool("event", true, "Generate data structure as an event")
 	generateCmd.Flags().Bool("entity", false, "Generate data structure as an entity")
+	generateCmd.Flags().Bool("plain", false, "Don't include any comments in yaml files")
 }

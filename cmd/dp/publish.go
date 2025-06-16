@@ -85,7 +85,10 @@ If no directory is provided then defaults to 'data-products' in the current dire
 
 		publish.LockChanged(changes, managedFrom)
 
-		validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, concurrentReq)
+		err = validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, concurrentReq)
+		if err != nil {
+			snplog.LogFatal(err)
+		}
 
 		err = publish.Publish(cnx, c, changes, dryRun)
 		if err != nil {

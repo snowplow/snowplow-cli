@@ -10,6 +10,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
+	"context"
 	"reflect"
 	"slices"
 	"testing"
@@ -74,7 +75,7 @@ func ReadLocalDataProducts_Test(t *testing.T) {
 			}},
 	}
 
-	result, err := ReadLocalDataProducts(input)
+	result, err := ReadLocalDataProducts(context.Background(), input)
 	if err != nil {
 		t.Errorf("ReadLocalDataProducts_Test error %v", err)
 	}
@@ -291,7 +292,7 @@ func Test_Purge(t *testing.T) {
 
 	mockApi := &mockPurgeApi{remoteResources: remote}
 
-	_ = Purge(mockApi, dp, true)
+	_ = Purge(context.Background(), mockApi, dp, true)
 
 	if !slices.Equal(mockApi.deletedSourceApps, []string{"purgeme"}) {
 		t.Fatal("deleted the wrong source apps")
@@ -316,7 +317,7 @@ func Test_PurgeNoCommit(t *testing.T) {
 
 	mockApi := &mockPurgeApi{remoteResources: remote}
 
-	_ = Purge(mockApi, dp, false)
+	_ = Purge(context.Background(), mockApi, dp, false)
 
 	if len(mockApi.deletedDataProducts) > 0 {
 		t.Fatal("deleted source apps")

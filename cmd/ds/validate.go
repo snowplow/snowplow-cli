@@ -11,14 +11,9 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package ds
 
 import (
-	"context"
 	"errors"
-	"log/slog"
 
-	changesPkg "github.com/snowplow/snowplow-cli/internal/changes"
-	"github.com/snowplow/snowplow-cli/internal/console"
-	. "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/util"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
@@ -31,63 +26,9 @@ var validateCmd = &cobra.Command{
 	Example: `  $ snowplow-cli ds validate
   $ snowplow-cli ds validate ./my-data-structures ./my-other-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {
-		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
-		apiKeySecret, _ := cmd.Flags().GetString("api-key")
-		host, _ := cmd.Flags().GetString("host")
-		org, _ := cmd.Flags().GetString("org-id")
-		ghOut, _ := cmd.Flags().GetBool("gh-annotate")
-
-		dataStructureFolders := []string{util.DataStructuresFolder}
-		if len(args) > 0 {
-			dataStructureFolders = args
-		}
-
-		dataStructuresLocal, err := util.DataStructuresFromPaths(dataStructureFolders)
-		slog.Info("validating from", "paths", dataStructureFolders)
+		err := validation.ValidateDataStructuresFromCmd(cmd.Context(), cmd, args)
 		if err != nil {
-			LogFatal(err)
-		}
-
-		errs := validation.ValidateLocalDs(dataStructuresLocal)
-		if len(errs) > 0 {
-			LogFatalMultiple(errs)
-		}
-
-		cnx := context.Background()
-
-		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
-		if err != nil {
-			LogFatal(err)
-		}
-
-		remotesListing, err := console.GetDataStructureListing(cnx, c)
-		if err != nil {
-			LogFatal(err)
-		}
-
-		changes, err := changesPkg.GetChanges(dataStructuresLocal, remotesListing, "DEV")
-		if err != nil {
-			LogFatal(err)
-		}
-
-		err = changesPkg.PrintChangeset(changes)
-		if err != nil {
-			LogFatal(err)
-		}
-
-		vr, err := validation.ValidateChanges(cnx, c, changes)
-		if err != nil {
-			LogFatal(err)
-		}
-
-		vr.Slog()
-
-		if ghOut {
-			vr.GithubAnnotate()
-		}
-
-		if !vr.Valid {
-			LogFatal(errors.New(vr.Message))
+			snplog.LogFatal(errors.New("validation failed"))
 		}
 	},
 }

@@ -16,11 +16,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
-	. "github.com/snowplow/snowplow-cli/internal/model"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,7 +33,7 @@ type Files struct {
 	ExtentionPreference    string
 }
 
-func (f Files) CreateDataStructures(dss []DataStructure) error {
+func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) error {
 	dataStructuresPath := filepath.Join(".", f.DataStructuresLocation)
 	for _, ds := range dss {
 		data, err := ds.ParseData()
@@ -45,7 +45,7 @@ func (f Files) CreateDataStructures(dss []DataStructure) error {
 		if err != nil {
 			return err
 		}
-		_, err = WriteSerializableToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference)
+		_, err = WriteResourceToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference, isPlain, DataStructureResourceType)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func createUniqueNames(idsToFileNames []idFileName) []idFileName {
 	return idToUniqueName
 }
 
-func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]CliResource[SourceAppData], error) {
+func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], isPlain bool) (map[string]model.CliResource[model.SourceAppData], error) {
 	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
 	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
 
@@ -92,7 +92,7 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 	}
 
 	var idToFileName []idFileName
-	idToSa := make(map[string]CliResource[SourceAppData])
+	idToSa := make(map[string]model.CliResource[model.SourceAppData])
 	for _, sa := range sas {
 		idToSa[sa.ResourceName] = sa
 		idToFileName = append(idToFileName, idFileName{Id: sa.ResourceName, FileName: sa.Data.Name})
@@ -100,11 +100,11 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 
 	uniqueNames := createUniqueNames(idToFileName)
 
-	var res = make(map[string]CliResource[SourceAppData])
+	var res = make(map[string]model.CliResource[model.SourceAppData])
 
 	for _, idToName := range uniqueNames {
 		sa := idToSa[idToName.Id]
-		abs, err := WriteSerializableToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference)
+		abs, err := WriteResourceToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference, isPlain, sa.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (f Files) CreateSourceApps(sas []CliResource[SourceAppData]) (map[string]Cl
 	return res, nil
 }
 
-func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (map[string]CliResource[DataProductCanonicalData], error) {
+func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanonicalData], isPlain bool) (map[string]model.CliResource[model.DataProductCanonicalData], error) {
 	dataProductsPath := filepath.Join(".", f.DataProductsLocation)
 	err := os.MkdirAll(dataProductsPath, os.ModePerm)
 
@@ -123,7 +123,7 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 	}
 
 	var idToFileName []idFileName
-	idToDp := make(map[string]CliResource[DataProductCanonicalData])
+	idToDp := make(map[string]model.CliResource[model.DataProductCanonicalData])
 	for _, dp := range dps {
 		idToDp[dp.ResourceName] = dp
 		idToFileName = append(idToFileName, idFileName{Id: dp.ResourceName, FileName: dp.Data.Name})
@@ -131,11 +131,11 @@ func (f Files) CreateDataProducts(dps []CliResource[DataProductCanonicalData]) (
 
 	uniqueNames := createUniqueNames(idToFileName)
 
-	var res = make(map[string]CliResource[DataProductCanonicalData])
+	var res = make(map[string]model.CliResource[model.DataProductCanonicalData])
 
 	for _, idToName := range uniqueNames {
 		dp := idToDp[idToName.Id]
-		abs, err := WriteSerializableToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference)
+		abs, err := WriteResourceToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference, isPlain, dp.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +179,7 @@ func (f Files) WriteImage(name string, dir string, image *model.Image) (string, 
 	return relativePath, err
 }
 
-func WriteSerializableToFile(body any, dir string, name string, ext string) (string, error) {
+func WriteSerializableToFile(body any, dir string, name string, ext string, yamlPrefix string) (string, error) {
 	var bytes []byte
 	var err error
 
@@ -187,6 +187,9 @@ func WriteSerializableToFile(body any, dir string, name string, ext string) (str
 		bytes, err = yaml.Marshal(body)
 		if err != nil {
 			return "", err
+		}
+		if yamlPrefix != "" {
+			bytes = append([]byte(yamlPrefix+"\n"), bytes...)
 		}
 	} else {
 		bytes, err = json.MarshalIndent(body, "", "  ")
@@ -204,4 +207,26 @@ func WriteSerializableToFile(body any, dir string, name string, ext string) (str
 	slog.Debug("wrote", "file", filePath)
 
 	return filePath, err
+}
+
+func WriteResourceToFile(body any, dir string, name string, ext string, isPlain bool, resourceType string) (string, error) {
+	if isPlain {
+		return WriteSerializableToFile(body, dir, name, ext, "")
+	} else {
+		prefix, err := getLspComment(resourceType)
+		if err != nil {
+			return "", err
+		}
+		return WriteSerializableToFile(body, dir, name, ext, prefix)
+	}
+}
+
+func getLspComment(resourceType string) (string, error) {
+	if slices.Contains([]string{DataStructureResourceType, DataProductResourceType, SourceApplicationResourceType}, resourceType) {
+		template := "# yaml-language-server: $schema=%s%s.json\n"
+		return fmt.Sprintf(template, RepoRawFileURL, resourceType), nil
+	} else {
+		return "", fmt.Errorf("value %s is not a valid resource type", resourceType)
+	}
+
 }

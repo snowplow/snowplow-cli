@@ -39,6 +39,7 @@ Example:
 	Example: `  $ snowplow-cli dp generate --source-app "Mobile app" --source-app "Web app" --data-product "Signup flow"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		outFmt, _ := cmd.Flags().GetString("output-format")
+		plain, _ := cmd.Flags().GetBool("plain")
 
 		sourceAppDirectory, _ := cmd.Flags().GetString("source-apps-directory")
 		sourceApps, _ := cmd.Flags().GetStringArray("source-app")
@@ -57,7 +58,8 @@ Example:
 
 		for _, app := range sourceApps {
 			appn := util.ResourceNameToFileName(app)
-			fpath, err := util.WriteSerializableToFile(buildSaTpl(app), sourceAppDirectory, appn, outFmt)
+			sa := buildSaTpl(app)
+			fpath, err := util.WriteResourceToFile(sa, sourceAppDirectory, appn, outFmt, plain, sa.ResourceType)
 			if err != nil {
 				snplog.LogFatal(err)
 			}
@@ -69,7 +71,8 @@ Example:
 			if err != nil {
 				snplog.LogFatal(err)
 			}
-			fpath, err := util.WriteSerializableToFile(buildDpTpl(app), dataproductDirectory, appn, outFmt)
+			dp := buildDpTpl(app)
+			fpath, err := util.WriteResourceToFile(dp, dataproductDirectory, appn, outFmt, plain, dp.ResourceType)
 			if err != nil {
 				snplog.LogFatal(err)
 			}
@@ -114,6 +117,7 @@ func init() {
 
 	generateCmd.Flags().StringArray("source-app", []string{}, "Name of source app to generate")
 	generateCmd.Flags().StringArray("data-product", []string{}, "Name of data product to generate")
+	generateCmd.Flags().Bool("plain", false, "Don't include any comments in yaml files")
 
 	generateCmd.MarkFlagsOneRequired("source-app", "data-product")
 }
