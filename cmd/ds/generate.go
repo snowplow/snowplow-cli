@@ -53,7 +53,7 @@ Example:
 		outFmt, _ := cmd.Flags().GetString("output-format")
 		event, _ := cmd.Flags().GetBool("event")
 		entity, _ := cmd.Flags().GetBool("entity")
-		noLsp, _ := cmd.Flags().GetBool("no-lsp")
+		isPlain, _ := cmd.Flags().GetBool("plain")
 
 		name := args[0]
 
@@ -87,12 +87,19 @@ Example:
 			schemaType = "entity"
 		}
 
-		lspComment := ""
-		if !noLsp {
-			lspComment = fmt.Sprintf("\n# yaml-language-server: $schema=%s%s.json", util.RepoRawFileURL, util.DataStructureResourceType)
+		comment := ""
+		if !isPlain {
+
+			commentTemplate := `# You might not need a custom data structure.
+# Please have a look at the available list of out of the box events and entities:
+# https://docs.snowplow.io/docs/collecting-data/collecting-from-own-applications/snowplow-tracker-protocol
+# yaml-language-server: $schema=%s%s.json
+
+`
+			comment = fmt.Sprintf(commentTemplate, util.RepoRawFileURL, util.DataStructureResourceType)
 		}
 
-		yamlOut := fmt.Sprintf(yamlTemplate, lspComment, schemaType, vendor, name)
+		yamlOut := fmt.Sprintf(yamlTemplate, comment, schemaType, vendor, name)
 
 		ds := model.DataStructure{}
 		err := yaml.Unmarshal([]byte(yamlOut), &ds)
@@ -122,11 +129,7 @@ Example:
 	},
 }
 
-var yamlTemplate = `# You might not need a custom data structure.
-# Please have a look at the available list of out of the box events and entities:
-# https://docs.snowplow.io/docs/collecting-data/collecting-from-own-applications/snowplow-tracker-protocol/%s
-
-apiVersion: v1
+var yamlTemplate = `%sapiVersion: v1
 resourceType: data-structure
 meta:
   hidden: false
@@ -154,5 +157,5 @@ Must conform to the regex pattern [a-zA-Z0-9-_.]+`)
 
 	generateCmd.Flags().Bool("event", true, "Generate data structure as an event")
 	generateCmd.Flags().Bool("entity", false, "Generate data structure as an entity")
-	generateCmd.Flags().Bool("no-lsp", false, "Disable LSP server functionality")
+	generateCmd.Flags().Bool("plain", false, "Don't include any comments in yaml files")
 }

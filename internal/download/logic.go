@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, noLsp bool) error {
+func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool) error {
 	res, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	sas := remoteSasToLocalResources(res.SourceApplication)
 
-	fileNameToSa, err := files.CreateSourceApps(sas, noLsp)
+	fileNameToSa, err := files.CreateSourceApps(sas, isPlain)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 		return err
 	}
 
-	_, err = files.CreateDataProducts(dps, noLsp)
+	_, err = files.CreateDataProducts(dps, isPlain)
 	if err != nil {
 		return err
 	}

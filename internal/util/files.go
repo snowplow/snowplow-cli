@@ -33,7 +33,7 @@ type Files struct {
 	ExtentionPreference    string
 }
 
-func (f Files) CreateDataStructures(dss []model.DataStructure, noLsp bool) error {
+func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) error {
 	dataStructuresPath := filepath.Join(".", f.DataStructuresLocation)
 	for _, ds := range dss {
 		data, err := ds.ParseData()
@@ -45,7 +45,7 @@ func (f Files) CreateDataStructures(dss []model.DataStructure, noLsp bool) error
 		if err != nil {
 			return err
 		}
-		_, err = WriteResourceToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference, noLsp, DataStructureResourceType)
+		_, err = WriteResourceToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference, isPlain, DataStructureResourceType)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func createUniqueNames(idsToFileNames []idFileName) []idFileName {
 	return idToUniqueName
 }
 
-func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], noLsp bool) (map[string]model.CliResource[model.SourceAppData], error) {
+func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], isPlain bool) (map[string]model.CliResource[model.SourceAppData], error) {
 	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
 	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
 
@@ -104,7 +104,7 @@ func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], no
 
 	for _, idToName := range uniqueNames {
 		sa := idToSa[idToName.Id]
-		abs, err := WriteResourceToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference, noLsp, sa.ResourceType)
+		abs, err := WriteResourceToFile(sa, sourceAppsPath, idToName.FileName, f.ExtentionPreference, isPlain, sa.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], no
 	return res, nil
 }
 
-func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanonicalData], noLsp bool) (map[string]model.CliResource[model.DataProductCanonicalData], error) {
+func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanonicalData], isPlain bool) (map[string]model.CliResource[model.DataProductCanonicalData], error) {
 	dataProductsPath := filepath.Join(".", f.DataProductsLocation)
 	err := os.MkdirAll(dataProductsPath, os.ModePerm)
 
@@ -135,7 +135,7 @@ func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanon
 
 	for _, idToName := range uniqueNames {
 		dp := idToDp[idToName.Id]
-		abs, err := WriteResourceToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference, noLsp, dp.ResourceType)
+		abs, err := WriteResourceToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference, isPlain, dp.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -209,8 +209,8 @@ func WriteSerializableToFile(body any, dir string, name string, ext string, yaml
 	return filePath, err
 }
 
-func WriteResourceToFile(body any, dir string, name string, ext string, noLsp bool, resourceType string) (string, error) {
-	if noLsp {
+func WriteResourceToFile(body any, dir string, name string, ext string, isPlain bool, resourceType string) (string, error) {
+	if isPlain {
 		return WriteSerializableToFile(body, dir, name, ext, "")
 	} else {
 		prefix, err := getLspComment(resourceType)
