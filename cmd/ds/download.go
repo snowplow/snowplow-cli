@@ -49,6 +49,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 		format, _ := cmd.Flags().GetString("output-format")
 		match, _ := cmd.Flags().GetStringArray("match")
 		includeLegacy, _ := cmd.Flags().GetBool("include-legacy")
+		plain, _ := cmd.Flags().GetBool("plain")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
@@ -68,7 +69,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
 
-		err = files.CreateDataStructures(dss)
+		err = files.CreateDataStructures(dss, plain)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -83,5 +84,5 @@ func init() {
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
 	downloadCmd.PersistentFlags().Bool("include-legacy", false, "Include legacy data structures with empty schemaType (will be set to 'entity')")
-
+	downloadCmd.PersistentFlags().Bool("plain", false, "Don't include any comments in yaml files")
 }
