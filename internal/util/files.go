@@ -34,20 +34,64 @@ type Files struct {
 }
 
 func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) error {
-	dataStructuresPath := filepath.Join(".", f.DataStructuresLocation)
+	var dataStructuresPath string
+	if filepath.IsAbs(f.DataStructuresLocation) {
+		dataStructuresPath = f.DataStructuresLocation
+	} else {
+		dataStructuresPath = filepath.Join(".", f.DataStructuresLocation)
+	}
+
+	vendorToSchemas := make(map[string][]model.DataStructure)
+	var vendorIds []idFileName
+
 	for _, ds := range dss {
 		data, err := ds.ParseData()
 		if err != nil {
 			return err
 		}
-		vendorPath := filepath.Join(dataStructuresPath, data.Self.Vendor)
-		err = os.MkdirAll(vendorPath, os.ModePerm)
+
+		vendor := data.Self.Vendor
+		vendorToSchemas[vendor] = append(vendorToSchemas[vendor], ds)
+
+		if len(vendorToSchemas[vendor]) == 1 {
+			vendorIds = append(vendorIds, idFileName{
+				Id:       vendor,
+				FileName: vendor,
+			})
+		}
+	}
+
+	uniqueVendors := createUniqueNames(vendorIds)
+	vendorMapping := make(map[string]string)
+	for _, uv := range uniqueVendors {
+		vendorMapping[uv.Id] = uv.FileName
+	}
+
+	for originalVendor, schemas := range vendorToSchemas {
+		uniqueVendorName := vendorMapping[originalVendor]
+		vendorPath := filepath.Join(dataStructuresPath, uniqueVendorName)
+
+		err := os.MkdirAll(vendorPath, os.ModePerm)
 		if err != nil {
 			return err
 		}
-		_, err = WriteResourceToFile(ds, vendorPath, data.Self.Name, f.ExtentionPreference, isPlain, DataStructureResourceType)
-		if err != nil {
-			return err
+
+		var schemaIds []idFileName
+		for _, ds := range schemas {
+			data, _ := ds.ParseData()
+			schemaIds = append(schemaIds, idFileName{
+				Id:       fmt.Sprintf("%s/%s", originalVendor, data.Self.Name),
+				FileName: data.Self.Name,
+			})
+		}
+
+		uniqueSchemas := createUniqueNames(schemaIds)
+
+		for i, ds := range schemas {
+			_, err = WriteResourceToFile(ds, vendorPath, uniqueSchemas[i].FileName, f.ExtentionPreference, isPlain, DataStructureResourceType)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

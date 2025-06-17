@@ -61,12 +61,12 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 			"schema": "string"},
 	}
 
-	dir := filepath.Join("../..", "out", "test-ds2")
+	dir := t.TempDir()
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
 	err := files.CreateDataStructures([]DataStructure{ds1, ds2}, false)
 
 	if err != nil {
-		t.Fatalf("Can't create directory %s", err)
+		t.Fatalf("CreateDataStructures failed: %s", err)
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -123,12 +123,12 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 			"schema": "string"},
 	}
 
-	dir := filepath.Join("../..", "out", "test-ds2")
+	dir := t.TempDir()
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
 	err := files.CreateDataStructures([]DataStructure{ds1, ds2}, false)
 
 	if err != nil {
-		t.Fatalf("Can't create directory %s", err)
+		t.Fatalf("CreateDataStructures failed: %s", err)
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -149,18 +149,18 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 
 func Test_createUniqueNames_OK(t *testing.T) {
 	input1 := []idFileName{
-		idFileName{Id: "id2", FileName: "NaMe"},
-		idFileName{Id: "id5", FileName: "hey"},
-		idFileName{Id: "id1", FileName: "Name"},
-		idFileName{Id: "id3", FileName: "Test"},
-		idFileName{Id: "id4", FileName: "🐌Hey"},
+		{Id: "id2", FileName: "NaMe"},
+		{Id: "id5", FileName: "hey"},
+		{Id: "id1", FileName: "Name"},
+		{Id: "id3", FileName: "Test"},
+		{Id: "id4", FileName: "🐌Hey"},
 	}
 	expected1 := []idFileName{
-		idFileName{Id: "id1", FileName: "name-1"},
-		idFileName{Id: "id2", FileName: "name-2"},
-		idFileName{Id: "id3", FileName: "test"},
-		idFileName{Id: "id4", FileName: "hey-1"},
-		idFileName{Id: "id5", FileName: "hey-2"},
+		{Id: "id1", FileName: "name-1"},
+		{Id: "id2", FileName: "name-2"},
+		{Id: "id3", FileName: "test"},
+		{Id: "id4", FileName: "hey-1"},
+		{Id: "id5", FileName: "hey-2"},
 	}
 
 	res := createUniqueNames(input1)
@@ -171,6 +171,94 @@ func Test_createUniqueNames_OK(t *testing.T) {
 
 	if !reflect.DeepEqual(res, expected1) {
 		t.Fatalf("Not expected result, expected: %+v, actual: %+v", expected1, res)
+	}
+}
+
+func TestCreateDataStructures_CaseInsensitiveConflicts(t *testing.T) {
+	extension := "yaml"
+
+	ds1 := DataStructure{
+		Meta: DataStructureMeta{Hidden: false, SchemaType: "event", CustomData: map[string]string{}},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "com.Example",
+				"name":    "Article",
+				"format":  "jsonschema",
+				"version": "1-0-0",
+			},
+			"schema": "string",
+		},
+	}
+
+	ds2 := DataStructure{
+		Meta: DataStructureMeta{Hidden: false, SchemaType: "event", CustomData: map[string]string{}},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "com.example",
+				"name":    "article",
+				"format":  "jsonschema",
+				"version": "1-0-0",
+			},
+			"schema": "string",
+		},
+	}
+
+	ds3 := DataStructure{
+		Meta: DataStructureMeta{Hidden: false, SchemaType: "event", CustomData: map[string]string{}},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "com.example",
+				"name":    "user",
+				"format":  "jsonschema",
+				"version": "1-0-0",
+			},
+			"schema": "string",
+		},
+	}
+
+	dir := t.TempDir()
+	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
+	err := files.CreateDataStructures([]DataStructure{ds1, ds2, ds3}, false)
+
+	if err != nil {
+		t.Fatalf("CreateDataStructures failed with case-insensitive vendor and schema name conflicts: %s", err)
+	}
+
+	vendorDirs := []string{}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Cannot read data structures directory after creating conflicting case vendors com.Example and com.example: %v", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			vendorDirs = append(vendorDirs, entry.Name())
+		}
+	}
+
+	if len(vendorDirs) != 2 {
+		t.Fatalf("Case-insensitive vendor conflicts not resolved properly - expected exactly 2 unique vendor directories for com.Example and com.example, got %d directories: %v", len(vendorDirs), vendorDirs)
+	}
+
+	for _, vendorDir := range vendorDirs {
+		vendorPath := filepath.Join(dir, vendorDir)
+		files, err := os.ReadDir(vendorPath)
+		if err != nil {
+			t.Fatalf("Cannot read vendor directory %s after resolving case conflicts: %v", vendorDir, err)
+		}
+
+		if len(files) == 0 {
+			t.Fatalf("Vendor directory %s is empty after creating data structures with case conflicts", vendorDir)
+		}
+
+		fileNames := make(map[string]bool)
+		for _, file := range files {
+			lowerName := strings.ToLower(file.Name())
+			if fileNames[lowerName] {
+				t.Fatalf("Case-insensitive filename conflict not resolved - found duplicate file %s in vendor directory %s after processing Article and article schemas", file.Name(), vendorDir)
+			}
+			fileNames[lowerName] = true
+		}
 	}
 }
 
@@ -195,12 +283,12 @@ func TestRespectsNoLsp(t *testing.T) {
 			"schema": "string"},
 	}
 
-	dir := filepath.Join("../..", "out", "test-ds3")
+	dir := t.TempDir()
 	files := Files{DataStructuresLocation: dir, ExtentionPreference: extension}
 	err := files.CreateDataStructures([]DataStructure{ds1}, false)
 
 	if err != nil {
-		t.Fatalf("Can't create directory %s", err)
+		t.Fatalf("CreateDataStructures failed: %s", err)
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -226,7 +314,7 @@ func TestRespectsNoLsp(t *testing.T) {
 	err = files.CreateDataStructures([]DataStructure{ds1}, true)
 
 	if err != nil {
-		t.Fatalf("Can't create directory %s", err)
+		t.Fatalf("CreateDataStructures failed: %s", err)
 	}
 
 	fileContent, err = os.ReadFile(filePath1)
