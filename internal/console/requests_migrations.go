@@ -21,6 +21,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 type destination struct {
@@ -28,30 +29,30 @@ type destination struct {
 }
 
 type apiError struct {
-	Message string
+	Message string `json:"message" yaml:"message"`
 }
 
 type migrationRequest struct {
-	DestinationType string            `json:"destinationType"`
+	DestinationType string                  `json:"destinationType"`
 	SourceSchemaKey model.DataStructureSelf `json:"sourceSchemaKey"`
-	TargetSchema    map[string]any    `json:"targetSchema"`
+	TargetSchema    map[string]any          `json:"targetSchema"`
 }
 
 type migrationResponse struct {
-	ChangeType string
-	Migrations []migration
+	ChangeType string      `json:"changeType" yaml:"changeType"`
+	Migrations []migration `json:"migrations" yaml:"migrations"`
 }
 
 type migration struct {
-	MigrationType string
-	ChangeType    string
-	Path          string
-	Message       string
+	MigrationType string `json:"migrationType" yaml:"migrationType"`
+	ChangeType    string `json:"changeType" yaml:"changeType"`
+	Path          string `json:"path" yaml:"path"`
+	Message       string `json:"message" yaml:"message"`
 }
 
 type MigrationReport struct {
-	SuggestedVersion string
-	Messages         []string
+	SuggestedVersion string   `json:"suggestedVersion" yaml:"suggestedVersion"`
+	Messages         []string `json:"messages" yaml:"messages"`
 }
 
 func fetchMigration(cnx context.Context, client *ApiClient, destination string, from model.DataStructureSelf, to map[string]any) (*migrationResponse, error) {
@@ -85,7 +86,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 
 	if resp.StatusCode != http.StatusOK {
 		var errMessage apiError
-		err = json.Unmarshal(rbody, &errMessage)
+		err = kjson.Unmarshal(rbody, &errMessage)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +94,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 	}
 
 	var migration migrationResponse
-	err = json.Unmarshal(rbody, &migration)
+	err = kjson.Unmarshal(rbody, &migration)
 	if err != nil {
 		return nil, err
 	}
@@ -123,14 +124,14 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 
 	if resp.StatusCode != http.StatusOK {
 		var errMessage apiError
-		err = json.Unmarshal(rbody, &errMessage)
+		err = kjson.Unmarshal(rbody, &errMessage)
 		if err != nil {
 			return nil, err
 		}
 		return nil, errors.New(errMessage.Message)
 	}
 	var destinations []destination
-	err = json.Unmarshal(rbody, &destinations)
+	err = kjson.Unmarshal(rbody, &destinations)
 	if err != nil {
 		return nil, err
 	}

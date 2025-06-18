@@ -25,6 +25,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image, bool, error) {
@@ -48,12 +49,12 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image
 }
 
 type ImageResource struct {
-	Id   string
-	Hash string
+	Id   string `json:"id" yaml:"id"`
+	Hash string `json:"hash" yaml:"hash"`
 }
 
 type imageLookup struct {
-	Items []ImageResource
+	Items []ImageResource `json:"items" yaml:"items"`
 }
 
 func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]string, error) {
@@ -68,7 +69,7 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]stri
 	defer util.LoggingCloser(cnx, resp.Body)
 
 	var lookup imageLookup
-	err = json.Unmarshal(rbody, &lookup)
+	err = kjson.Unmarshal(rbody, &lookup)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +85,8 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]stri
 }
 
 type imageUploadLinkResponse struct {
-	UploadURL string
-	Id        string
+	UploadURL string `json:"uploadURL" yaml:"uploadURL"`
+	Id        string `json:"id" yaml:"id"`
 }
 
 func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUploadLinkResponse, error) {
@@ -104,7 +105,7 @@ func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUpload
 	}
 
 	var createResp imageUploadLinkResponse
-	err = json.Unmarshal(rbody, &createResp)
+	err = kjson.Unmarshal(rbody, &createResp)
 	if err != nil {
 		return nil, err
 	}
@@ -163,13 +164,13 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 	}
 
 	var cfResp struct {
-		Success bool
+		Success bool `json:"success"`
 		Errors  []struct {
-			Code    int
-			Message string
-		}
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
 	}
-	err = json.Unmarshal(body, &cfResp)
+	err = kjson.Unmarshal(body, &cfResp)
 	if err != nil {
 		return err
 	}
@@ -207,8 +208,10 @@ func confirmImage(cnx context.Context, client *ApiClient, id string, hash string
 		return nil, err
 	}
 
-	var confirmResp struct{ VariantUrls map[string]string }
-	err = json.Unmarshal(body, &confirmResp)
+	var confirmResp struct {
+		VariantUrls map[string]string `json:"variantUrls"`
+	}
+	err = kjson.Unmarshal(body, &confirmResp)
 	if err != nil {
 		return nil, err
 	}

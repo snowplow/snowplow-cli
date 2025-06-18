@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	. "github.com/snowplow/snowplow-cli/internal/model"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func Test_NewClient_Ok(t *testing.T) {
@@ -58,7 +59,7 @@ func Test_Validate_Ok(t *testing.T) {
 				t.Error(err)
 			}
 			var ds DataStructure
-			_ = json.Unmarshal(b, &ds)
+			_ = kjson.Unmarshal(b, &ds)
 
 			if ds.Meta.SchemaType != "entity" {
 				t.Errorf("ds meta not as expected, got: %s", ds.Meta.SchemaType)
@@ -527,7 +528,7 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 
 	orgId := "00000000-0000-0000-0000-000000000000"
 	var ds DataStructure
-	_ = json.Unmarshal([]byte(`{
+	_ = kjson.Unmarshal([]byte(`{
 		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
 		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
 	}`), &ds)
@@ -550,7 +551,7 @@ func Test_MetadataUpdate_Fail(t *testing.T) {
 
 	orgId := "00000000-0000-0000-0000-000000000000"
 	var ds DataStructure
-	_ = json.Unmarshal([]byte(`{
+	_ = kjson.Unmarshal([]byte(`{
 		"meta": { "hidden": false, "schemaType": "event", "customMetadata": {} },
 		"data": { "self": { "name": "example", "vendor": "io.snowplow", "version": "1-0-0", "format": "jsonschema" } }
 	}`), &ds)

@@ -12,7 +12,6 @@ package util
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +26,7 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"gopkg.in/yaml.v3"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func DataStructuresFromPaths(paths []string) (map[string]model.DataStructure, error) {
@@ -87,7 +87,7 @@ func dataStructureFromFileName(f string) (*model.DataStructure, error) {
 	ds := model.DataStructure{}
 	switch filepath.Ext(file.Name()) {
 	case ".json":
-		err = json.Unmarshal(body, &ds)
+		err = kjson.Unmarshal(body, &ds)
 	case ".yaml", ".yml":
 		err = yaml.Unmarshal(body, &ds)
 	}
@@ -114,7 +114,7 @@ func dataFromFileName(f string) (map[string]any, error) {
 	ds := map[string]any{}
 	switch filepath.Ext(file.Name()) {
 	case ".json":
-		err = json.Unmarshal(body, &ds)
+		err = kjson.Unmarshal(body, &ds)
 	case ".yaml", ".yml":
 		err = yaml.Unmarshal(body, &ds)
 	}

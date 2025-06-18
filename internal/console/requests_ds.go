@@ -22,30 +22,32 @@ import (
 	"net/http"
 	"strings"
 
+	kjson "k8s.io/apimachinery/pkg/util/json"
+
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type msgResponse struct {
-	Message string
+	Message string `json:"message" yaml:"message"`
 }
 
 type pubResponse struct {
-	Success  bool
-	Errors   []string
-	Warnings []string
-	Info     []string
+	Success  bool     `json:"success" yaml:"success"`
+	Errors   []string `json:"errors" yaml:"errors"`
+	Warnings []string `json:"warnings" yaml:"warnings"`
+	Info     []string `json:"info" yaml:"info"`
 	msgResponse
 }
 
 type pubError struct {
-	Messages []string
+	Messages []string `json:"messages" yaml:"messages"`
 }
 
 type PublishResponse = pubResponse
 type ValidateResponse struct {
 	pubResponse
-	Valid bool
+	Valid bool `json:"valid" yaml:"valid"`
 }
 
 type PublishError = pubError
@@ -105,7 +107,7 @@ func Validate(cnx context.Context, client *ApiClient, ds model.DataStructure) (*
 	}
 
 	var vresp ValidateResponse
-	err = json.Unmarshal(rbody, &vresp)
+	err = kjson.Unmarshal(rbody, &vresp)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +187,7 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 	}
 
 	var dresp PublishResponse
-	err = json.Unmarshal(rbody, &dresp)
+	err = kjson.Unmarshal(rbody, &dresp)
 	if err != nil {
 		return nil, err
 	}
@@ -208,12 +210,12 @@ type Deployment struct {
 }
 
 type ListResponse struct {
-	Hash        string            `json:"hash"`
-	Vendor      string            `json:"vendor"`
-	Format      string            `json:"format"`
-	Name        string            `json:"name"`
+	Hash        string                  `json:"hash"`
+	Vendor      string                  `json:"vendor"`
+	Format      string                  `json:"format"`
+	Name        string                  `json:"name"`
 	Meta        model.DataStructureMeta `json:"meta"`
-	Deployments []Deployment      `json:"deployments"`
+	Deployments []Deployment            `json:"deployments"`
 }
 
 func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, error) {
@@ -233,7 +235,7 @@ func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, er
 	}
 
 	var list []string
-	err = json.Unmarshal(rbody, &list)
+	err = kjson.Unmarshal(rbody, &list)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +267,7 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 	}
 
 	var listResp []ListResponse
-	err = json.Unmarshal(rbody, &listResp)
+	err = kjson.Unmarshal(rbody, &listResp)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +303,7 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	}
 
 	var deploys []Deployment
-	err = json.Unmarshal(rbody, &deploys)
+	err = kjson.Unmarshal(rbody, &deploys)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +341,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 		return nil, err
 	}
 
-	err = json.Unmarshal(rbody, &dsData)
+	err = kjson.Unmarshal(rbody, &dsData)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +464,7 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}

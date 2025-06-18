@@ -11,11 +11,11 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package model
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
 	"gopkg.in/yaml.v3"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestDataStructureJsonParseSuccess(t *testing.T) {
@@ -58,7 +58,7 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
 			"schema": "string"},
 	}
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if !reflect.DeepEqual(expected, res) || err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n expected %#v", err, res, expected)
 	}
@@ -87,7 +87,7 @@ func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err == nil {
 		t.Fatal("Parsed data structure without schema")
 	}
@@ -151,7 +151,7 @@ func TestParseDataParses(t *testing.T) {
 				"format":  "string",
 				"version": "1-2-0",
 			},
-			"$schema":                "string",
+			"$schema":               "string",
 			"additionalPropperties": false},
 	}
 	expected := DataStructureData{
@@ -211,7 +211,7 @@ func TestDataStructureHash(t *testing.T) {
 
 	expectedHash := "3bbd73b8afe99e47d1b02d04750ba03704a95a511035910f718ac9fb6c401490"
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n ", err, res)
 	}
@@ -264,7 +264,7 @@ func TestDefaultApiVersion(t *testing.T) {
 			"schema": "string"},
 	}
 	res := DataStructure{ApiVersion: "v1"}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if !reflect.DeepEqual(expected, res) || err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n expected %#v", err, res, expected)
 	}

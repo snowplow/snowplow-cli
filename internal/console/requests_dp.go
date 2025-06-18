@@ -19,13 +19,15 @@ import (
 	"io"
 	"net/http"
 
+	kjson "k8s.io/apimachinery/pkg/util/json"
+
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type DataProductsAndRelatedResources struct {
-	DataProducts      []RemoteDataProduct
-	EventSpecs        []RemoteEventSpec
-	SourceApplication []RemoteSourceApplication
+	DataProducts      []RemoteDataProduct       `json:"dataProducts" yaml:"dataProducts"`
+	EventSpecs        []RemoteEventSpec         `json:"eventSpecs" yaml:"eventSpecs"`
+	SourceApplication []RemoteSourceApplication `json:"sourceApplication" yaml:"sourceApplication"`
 }
 
 type RemoteDataProduct struct {
@@ -143,7 +145,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 	}
 
 	var dpResponse dataProductsResponse
-	err = json.Unmarshal(rbody, &dpResponse)
+	err = kjson.Unmarshal(rbody, &dpResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +165,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 	}
 
 	var saResponse saData
-	err = json.Unmarshal(sarbody, &saResponse)
+	err = kjson.Unmarshal(sarbody, &saResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -189,15 +191,15 @@ const (
 )
 
 type CompatSource struct {
-	Source     string
-	Status     CompatStatus
-	Properties map[string]string
+	Source     string            `json:"source" yaml:"source"`
+	Status     CompatStatus      `json:"status" yaml:"status"`
+	Properties map[string]string `json:"properties" yaml:"properties"`
 }
 
 type CompatResult struct {
-	Status  string
-	Sources []CompatSource
-	Message string
+	Status  string         `json:"status" yaml:"status"`
+	Sources []CompatSource `json:"sources" yaml:"sources"`
+	Message string         `json:"message" yaml:"message"`
 }
 
 type CompatCheckable struct {
@@ -237,7 +239,7 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 	}
 
 	var cresp CompatResult
-	err = json.Unmarshal(rbody, &cresp)
+	err = kjson.Unmarshal(rbody, &cresp)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +269,7 @@ func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -296,7 +298,7 @@ func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -321,7 +323,7 @@ func DeleteSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -350,7 +352,7 @@ func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -380,7 +382,7 @@ func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -405,7 +407,7 @@ func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -437,7 +439,7 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -460,7 +462,7 @@ func getEventSpec(cnx context.Context, client *ApiClient, id string) (*RemoteEve
 	}
 
 	var dpResponse esData
-	err = json.Unmarshal(rbody, &dpResponse)
+	err = kjson.Unmarshal(rbody, &dpResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +504,7 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
@@ -527,7 +529,7 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 		}
 
 		var dresp msgResponse
-		err = json.Unmarshal(rbody, &dresp)
+		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
