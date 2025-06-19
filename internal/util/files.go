@@ -77,18 +77,21 @@ func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) err
 		}
 
 		var schemaIds []idFileName
+		idToDs := map[string]model.DataStructure{}
 		for _, ds := range schemas {
 			data, _ := ds.ParseData()
+			id := fmt.Sprintf("%s/%s", originalVendor, data.Self.Name)
 			schemaIds = append(schemaIds, idFileName{
-				Id:       fmt.Sprintf("%s/%s", originalVendor, data.Self.Name),
+				Id:       id,
 				FileName: data.Self.Name,
 			})
+			idToDs[id] = ds
 		}
 
 		uniqueSchemas := createUniqueNames(schemaIds)
 
-		for i, ds := range schemas {
-			_, err = WriteResourceToFile(ds, vendorPath, uniqueSchemas[i].FileName, f.ExtentionPreference, isPlain, DataStructureResourceType)
+		for _, schemaFile := range uniqueSchemas {
+			_, err = WriteResourceToFile(idToDs[schemaFile.Id], vendorPath, schemaFile.FileName, f.ExtentionPreference, isPlain, DataStructureResourceType)
 			if err != nil {
 				return err
 			}
