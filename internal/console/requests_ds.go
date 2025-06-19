@@ -87,13 +87,11 @@ func Validate(cnx context.Context, client *ApiClient, ds model.DataStructure) (*
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/validation-requests", client.BaseUrl), bytes.NewBuffer(body))
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return nil, err
 	}
+
+	addStandardHeaders(req, cnx, client)
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -162,9 +160,11 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/deployment-requests", client.BaseUrl), bytes.NewBuffer(body))
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
 	if isPatch {
 		q := req.URL.Query()
 		q.Add("patch", "true")
@@ -208,12 +208,12 @@ type Deployment struct {
 }
 
 type ListResponse struct {
-	Hash        string            `json:"hash"`
-	Vendor      string            `json:"vendor"`
-	Format      string            `json:"format"`
-	Name        string            `json:"name"`
+	Hash        string                  `json:"hash"`
+	Vendor      string                  `json:"vendor"`
+	Format      string                  `json:"format"`
+	Name        string                  `json:"name"`
 	Meta        model.DataStructureMeta `json:"meta"`
-	Deployments []Deployment      `json:"deployments"`
+	Deployments []Deployment            `json:"deployments"`
 }
 
 func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, error) {
@@ -247,13 +247,11 @@ func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, er
 
 func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return nil, err
 	}
+
+	addStandardHeaders(req, cnx, client)
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -278,13 +276,11 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 
 func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash string) ([]Deployment, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return nil, err
 	}
+
+	addStandardHeaders(req, cnx, client)
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -322,13 +318,11 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	var includedLegacyCount int
 
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/schemas/versions?latest=true", client.BaseUrl), nil)
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return nil, err
 	}
+
+	addStandardHeaders(req, cnx, client)
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -440,13 +434,11 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 	}
 	url := fmt.Sprintf("%s/data-structures/v1/%x/meta", client.BaseUrl, dsHash)
 	req, err := http.NewRequestWithContext(cnx, "PATCH", url, bytes.NewBuffer(body))
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return err
 	}
+
+	addStandardHeaders(req, cnx, client)
 
 	resp, err := client.Http.Do(req)
 	if err != nil {

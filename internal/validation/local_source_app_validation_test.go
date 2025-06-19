@@ -18,8 +18,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-
-
 func Test_ValidateSAMinimum(t *testing.T) {
 	mvSa := `
 apiVersion: v1
@@ -74,7 +72,6 @@ data:
 		t.Fatal("expected errors at /data/name")
 	}
 }
-
 
 func Test_ValidateSAEntitesSourcesOk(t *testing.T) {
 	mvSa := `
@@ -204,7 +201,7 @@ func Test_ValidateSAEntitiesSchemaDeployed(t *testing.T) {
 
 	t.Log(result)
 
-	for _, p := range []string{ expectedOne, expectedTwo } {
+	for _, p := range []string{expectedOne, expectedTwo} {
 		if _, ok := result[p]; !ok {
 			t.Fatalf("expected errors at %s", p)
 		}

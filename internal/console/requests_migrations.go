@@ -32,9 +32,9 @@ type apiError struct {
 }
 
 type migrationRequest struct {
-	DestinationType string            `json:"destinationType"`
+	DestinationType string                  `json:"destinationType"`
 	SourceSchemaKey model.DataStructureSelf `json:"sourceSchemaKey"`
-	TargetSchema    map[string]any    `json:"targetSchema"`
+	TargetSchema    map[string]any          `json:"targetSchema"`
 }
 
 type migrationResponse struct {
@@ -69,9 +69,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 		return nil, err
 	}
 
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	addStandardHeaders(req, cnx, client)
 
 	resp, err := client.Http.Do(req)
 	if err != nil {
@@ -103,13 +101,11 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 
 func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/destinations/v3", client.BaseUrl), nil)
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
-
 	if err != nil {
 		return nil, err
 	}
+
+	addStandardHeaders(req, cnx, client)
 
 	resp, err := client.Http.Do(req)
 	if err != nil {

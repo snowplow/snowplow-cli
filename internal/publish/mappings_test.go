@@ -245,8 +245,8 @@ func TestDpToDiff(t *testing.T) {
 
 func Test_saToDiff(t *testing.T) {
 	input := console.RemoteSourceApplication{
-		Id: "id",
-		LockStatus: "locked",
+		Id:          "id",
+		LockStatus:  "locked",
 		ManagedFrom: "somewhere",
 	}
 
