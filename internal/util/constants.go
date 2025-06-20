@@ -20,3 +20,5 @@ const DataProductResourceType = "data-product"
 const SourceApplicationResourceType = "source-application"
 
 const RepoRawFileURL = "https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/"
+
+type MCPSourceContextKey struct{}

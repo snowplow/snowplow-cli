@@ -153,6 +153,9 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 		return err
 	}
 	req.Header.Set("content-type", writer.FormDataContentType())
+
+	// Note: This is uploading to an external service (Cloudflare), not our API,
+	// so we don't add standard console headers here
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return err

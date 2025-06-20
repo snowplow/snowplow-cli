@@ -73,6 +73,10 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	req.Header.Add("X-API-KEY-ID", apiKeyId)
 	req.Header.Add("X-API-KEY", apiKeySecret)
 	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+
+	if fromMCP, ok := ctx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
+		req.Header.Add("X-SNOWPLOW-CLI-SOURCE", "mcp")
+	}
 	resp, err := h.Do(req)
 	if err != nil {
 		return nil, err
@@ -97,9 +101,12 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 
 func ConsoleRequest(method string, path string, client *ApiClient, cnx context.Context, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(cnx, method, path, body)
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	if err != nil {
+		return req, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+
 	return req, err
 }
 
@@ -109,4 +116,14 @@ func DoConsoleRequest(method string, path string, client *ApiClient, cnx context
 		return nil, err
 	}
 	return client.Http.Do(req)
+}
+
+func addStandardHeaders(req *http.Request, cnx context.Context, client *ApiClient) {
+	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	req.Header.Add("authorization", auth)
+	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+
+	if fromMCP, ok := cnx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
+		req.Header.Add("X-SNOWPLOW-CLI-SOURCE", "mcp")
+	}
 }

@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -80,6 +81,17 @@ event_completeness_checklist: |
   - focus_form, change_form, submit_form (if tracking forms)
   - screen_view (if tracking mobile apps)
   - link_click (if tracking navigation)
+
+canonical_property_shadowing_policy: |
+  Do NOT define custom fields in data structures that duplicate or conflict with Snowplow’s canonical (out-of-the-box) event properties
+  (e.g., collector_tstamp, user_id, app_id, page_url, etc.).
+  Exception:
+    - The provided 'page_view' and 'page_ping' schemas are intended for use in event specifications.
+    - These schemas are derived from canonical events and should be referenced in event specifications as needed.
+    - Do NOT redefine or duplicate these schema as custom data structures.
+  Rationale:
+    Shadowing canonical properties can cause confusion, data quality issues, and make downstream analytics more difficult.
+    The exception for 'page_view' and 'page_ping' ensures event specifications can use standard event types for consistency.
 
 implementation_pattern_emphasis: |
   Standard Pattern for Data Products:
@@ -200,15 +212,23 @@ var McpCmd = &cobra.Command{
     }
   }
 
-  VS Code:
+  VS Code '<workspace>/.vscode/mcp.json':
   {
-    "mcp": {
+    "servers": {
       ...
-      "servers": {
-        ...
-        "snowplow-cli": {
-          "command": "snowplow-cli", "args": ["mcp"]
-        }
+      "snowplow-cli": {
+        "type": "stdio",
+        "command": "snowplow-cli", "args": ["mcp"]
+      }
+    }
+  }
+
+  Cursor '<workspace>/.cursor/mcp.json':
+  {
+    "mcpServers": {
+      ...
+      "snowplow-cli": {
+        "command": "snowplow-cli", "args": ["mcp", "--base-directory", "."]
       }
     }
   }
@@ -236,6 +256,7 @@ func init() {
 	config.InitConsoleFlags(McpCmd)
 
 	McpCmd.Flags().Bool("dump-context", false, "Dumps the result of the get_context tool to stdout and exits.")
+	McpCmd.Flags().String("base-directory", "", "The base path to use for relative file lookups. Useful for clients that pass in relative file paths.")
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
@@ -305,7 +326,7 @@ func genUuid(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolRes
 	return mcp.NewToolResultText(strings.Join(result, ", ")), nil
 }
 
-func pathsFromArguments(args map[string]any) ([]string, error) {
+func pathsFromArguments(base string, args map[string]any) ([]string, error) {
 	paths, ok := args["paths"].([]any)
 	if !ok {
 		return nil, errors.New("file_path must be strings")
@@ -314,7 +335,7 @@ func pathsFromArguments(args map[string]any) ([]string, error) {
 	filePaths := []string{}
 	for _, p := range paths {
 		if fp, ok := p.(string); ok {
-			filePaths = append(filePaths, fp)
+			filePaths = append(filePaths, filepath.Join(base, fp))
 		}
 	}
 
@@ -329,10 +350,14 @@ func validateDataProductsHandler(cmd *cobra.Command) server.ToolHandlerFunc {
 		logLevel = slog.LevelDebug
 	}
 
+	baseDir, _ := cmd.Flags().GetString("base-directory")
+
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		ctx = context.WithValue(ctx, util.MCPSourceContextKey{}, true)
+
 		args := request.GetArguments()
 
-		paths, err := pathsFromArguments(args)
+		paths, err := pathsFromArguments(baseDir, args)
 		if err != nil {
 			return nil, errors.New("file_path must be strings")
 		}
@@ -367,10 +392,14 @@ func validateDataStructuresHandler(cmd *cobra.Command) server.ToolHandlerFunc {
 		logLevel = slog.LevelDebug
 	}
 
+	baseDir, _ := cmd.Flags().GetString("base-directory")
+
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		ctx = context.WithValue(ctx, util.MCPSourceContextKey{}, true)
+
 		args := request.GetArguments()
 
-		paths, err := pathsFromArguments(args)
+		paths, err := pathsFromArguments(baseDir, args)
 		if err != nil {
 			return nil, err
 		}
