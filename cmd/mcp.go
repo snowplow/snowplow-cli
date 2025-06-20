@@ -212,19 +212,20 @@ var McpCmd = &cobra.Command{
     }
   }
 
-  VS Code '.vscode/mcp.json':
+  VS Code '<workspace>/.vscode/mcp.json':
   {
     "servers": {
       ...
       "snowplow-cli": {
+        "type": "stdio",
         "command": "snowplow-cli", "args": ["mcp"]
       }
     }
   }
 
-  Cursor '.cursor/mcp.json':
+  Cursor '<workspace>/.cursor/mcp.json':
   {
-    "servers": {
+    "mcpServers": {
       ...
       "snowplow-cli": {
         "command": "snowplow-cli", "args": ["mcp", "--base-directory", "."]
