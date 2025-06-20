@@ -10,13 +10,13 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package publish
 
 import (
-	"encoding/json"
 	"reflect"
 	"sort"
 	"testing"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func intPtr(i int) *int {
@@ -203,7 +203,7 @@ func TestEsToDiff(t *testing.T) {
 
 	// Verify event JSON
 	var eventData map[string]interface{}
-	if err := json.Unmarshal([]byte(result.Event), &eventData); err != nil {
+	if err := kjson.Unmarshal([]byte(result.Event), &eventData); err != nil {
 		t.Fatalf("Failed to unmarshal event JSON: %v", err)
 	}
 }
@@ -245,8 +245,8 @@ func TestDpToDiff(t *testing.T) {
 
 func Test_saToDiff(t *testing.T) {
 	input := console.RemoteSourceApplication{
-		Id: "id",
-		LockStatus: "locked",
+		Id:          "id",
+		LockStatus:  "locked",
 		ManagedFrom: "somewhere",
 	}
 

@@ -11,9 +11,9 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package validation
 
 import (
-	"encoding/json"
 	"errors"
 	. "github.com/snowplow/snowplow-cli/internal/model"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 	"strings"
 	"testing"
 )
@@ -42,7 +42,7 @@ func Test_Correct(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -69,7 +69,7 @@ func Test_FailWithoutMeta(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -107,7 +107,7 @@ func Test_FailWithoutFullMeta(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -147,7 +147,7 @@ func Test_FailWithWrongSchemaType(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -186,7 +186,7 @@ func Test_FailWithWrongApiVersion(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -225,7 +225,7 @@ func Test_WithoutFullSelf(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}
@@ -264,7 +264,7 @@ func Test_DuplicateFile(t *testing.T) {
       }
     }`)
 	res := DataStructure{}
-	err := json.Unmarshal([]byte(jsonString), &res)
+	err := kjson.Unmarshal([]byte(jsonString), &res)
 	if err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed ", err)
 	}

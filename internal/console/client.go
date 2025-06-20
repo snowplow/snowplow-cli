@@ -12,7 +12,6 @@ package console
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 type ApiClient struct {
@@ -31,7 +31,7 @@ type ApiClient struct {
 }
 
 type tokenResponse struct {
-	AccessToken string
+	AccessToken string `json:"accessToken" yaml:"accessToken"`
 }
 
 type loggingRoundTripper struct {
@@ -87,7 +87,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	}
 
 	var token tokenResponse
-	err = json.Unmarshal(body, &token)
+	err = kjson.Unmarshal(body, &token)
 	if err != nil {
 		return nil, err
 	}

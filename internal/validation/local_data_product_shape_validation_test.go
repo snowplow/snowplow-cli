@@ -88,7 +88,7 @@ data:
 `
 
 var dpRulesTests = []struct {
-	in  string
+	in    string
 	valid bool
 }{
 	{`{ type: string }`, false},
@@ -112,7 +112,7 @@ func Test_ValidateDPShape_Rules(t *testing.T) {
 
 			_, ok := ValidateDPShape(input)
 
-			if ok != tt.valid { 
+			if ok != tt.valid {
 				t.Errorf("%s got: %v want: %v", tt.in, ok, tt.valid)
 			}
 		})
