@@ -45,5 +45,5 @@ The command takes the path to a data product file and adds the specified event s
 func init() {
 	DataProductsCmd.AddCommand(addEsCmd)
 	addEsCmd.Flags().StringArrayP("event-spec", "e", []string{}, "Name of event spec to add")
-	addEsCmd.MarkFlagRequired("event-spec")
+	addEsCmd.MarkFlagsOneRequired("event-spec")
 }
