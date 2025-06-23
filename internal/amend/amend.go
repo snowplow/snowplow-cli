@@ -3,7 +3,6 @@ package amend
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -14,11 +13,10 @@ import (
 	googleyaml "gopkg.in/yaml.v3"
 )
 
-func AddEventSpecsToFile(esNames []string, dpDir string, dpFileName string) error {
+func AddEventSpecsToFile(esNames []string, dpFileName string) error {
 
-	fullPath := filepath.Join(dpDir, dpFileName)
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return fmt.Errorf("file does not exist at %s", fullPath)
+	if _, err := os.Stat(dpFileName); os.IsNotExist(err) {
+		return fmt.Errorf("file does not exist at %s", dpFileName)
 	}
 
 	var eventSpecifications []model.EventSpecCanonical
@@ -30,7 +28,7 @@ func AddEventSpecsToFile(esNames []string, dpDir string, dpFileName string) erro
 		})
 	}
 
-	file, err := os.ReadFile(fullPath)
+	file, err := os.ReadFile(dpFileName)
 	if err != nil {
 		return err
 	}
@@ -40,7 +38,7 @@ func AddEventSpecsToFile(esNames []string, dpDir string, dpFileName string) erro
 		return err
 	}
 
-	if err := os.WriteFile(fullPath, output, 0644); err != nil {
+	if err := os.WriteFile(dpFileName, output, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

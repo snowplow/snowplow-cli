@@ -12,11 +12,9 @@ package dp
 
 import (
 	"log/slog"
-	"path/filepath"
 
 	"github.com/snowplow/snowplow-cli/internal/amend"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -26,31 +24,26 @@ var addEsCmd = &cobra.Command{
 	Aliases: []string{"add-es"},
 	Args:    cobra.ExactArgs(1),
 	Long: `Adds one or more event specifications to an existing data product file.
-
-The command takes the path to a data product file and adds the specified event specifications to it.
-Event specifications must exist in the data products directory before they can be added.
-Please note that the path is relative to the configured data-products directory, that defaults to ./data-products`,
-	Example: `  $ snowplow-cli dp add-event-spec my-data-product.yaml --event-specs "user_login" --event-specs "page_view"
-  $ snowplow-cli dp add-es ./products/analytics.yaml -e "checkout_completed" -e "item_purchased"`,
+The command takes the path to a data product file and adds the specified event specifications to it.`,
+	Example: `  $ snowplow-cli dp add-event-spec --event-spec user_login --event-spec page_view ./my-data-product.yaml
+  $ snowplow-cli dp add-es ./data-products/analytics.yaml -e "checkout_completed" -e "item_purchased"`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		esNames, _ := cmd.Flags().GetStringArray("event-specs")
-		dataproductDirectory, _ := cmd.Flags().GetString("data-products-directory")
+		esNames, _ := cmd.Flags().GetStringArray("event-spec")
 
 		dpFilePath := args[0]
-		dpFullPath := filepath.Join(dataproductDirectory, dpFilePath)
 
-		if err := amend.AddEventSpecsToFile(esNames, dataproductDirectory, dpFilePath); err != nil {
+		if err := amend.AddEventSpecsToFile(esNames, dpFilePath); err != nil {
 			snplog.LogFatal(err)
 		}
 
-		slog.Info("Successfully added event specifications", "count", len(esNames), "file", dpFullPath)
+		slog.Info("Successfully added event specifications", "count", len(esNames), "file", dpFilePath)
 
 	},
 }
 
 func init() {
 	DataProductsCmd.AddCommand(addEsCmd)
-	addEsCmd.Flags().StringArrayP("event-specs", "e", []string{}, "Name of event spec to add")
-	addEsCmd.Flags().String("data-products-directory", util.DataProductsFolder, "Directory to write data products to")
+	addEsCmd.Flags().StringArrayP("event-spec", "e", []string{}, "Name of event spec to add")
+	addEsCmd.MarkFlagRequired("event-spec")
 }
