@@ -24,7 +24,8 @@ var addEsCmd = &cobra.Command{
 	Aliases: []string{"add-es"},
 	Args:    cobra.ExactArgs(1),
 	Long: `Adds one or more event specifications to an existing data product file.
-The command takes the path to a data product file and adds the specified event specifications to it.`,
+The command takes the path to a data product file and adds the specified event specifications to it.
+The command will attempt to keep the formatting and comments of the original file intact, but it's a best effort approach. Some comments might be deleted, some formatting changes might occur.`,
 	Example: `  $ snowplow-cli dp add-event-spec --event-spec user_login --event-spec page_view ./my-data-product.yaml
   $ snowplow-cli dp add-es ./data-products/analytics.yaml -e "checkout_completed" -e "item_purchased"`,
 	Run: func(cmd *cobra.Command, args []string) {
