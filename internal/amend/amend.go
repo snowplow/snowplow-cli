@@ -1,6 +1,7 @@
 package amend
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,35 @@ import (
 	"github.com/tidwall/sjson"
 	googleyaml "gopkg.in/yaml.v3"
 )
+
+func PrintEventSpecsToStdout(esNames []string, ext string) error {
+	var bytes []byte
+	var err error
+
+	var eventSpecifications []model.EventSpecCanonical
+	for _, spec := range esNames {
+		eventSpecifications = append(eventSpecifications, model.EventSpecCanonical{
+			ResourceName: uuid.NewString(),
+			Name:         spec,
+			Entities:     model.EntitiesDef{},
+		})
+	}
+
+	if ext == "yaml" {
+		bytes, err = yaml.Marshal(eventSpecifications)
+		if err != nil {
+			return err
+		}
+	} else {
+		bytes, err = json.MarshalIndent(eventSpecifications, "", "  ")
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = fmt.Println(string(bytes))
+	return err
+}
 
 func AddEventSpecsToFile(esNames []string, dpFileName string) error {
 

@@ -22,9 +22,9 @@ var addEsCmd = &cobra.Command{
 	Use:     "add-event-spec {path}",
 	Short:   "Add new event spec to an existing data product",
 	Aliases: []string{"add-es"},
-	Args:    cobra.ExactArgs(1),
-	Long: `Adds one or more event specifications to an existing data product file.
-The command takes the path to a data product file and adds the specified event specifications to it.
+	Args:    cobra.RangeArgs(0, 1),
+	Long: `Adds one or more event specifications to an existing data product file, or print them to the stdout.
+The command takes the path to a data product file and adds the specified event specifications to it. When run without the argument - it will print generated event specs to the stdout.
 The command will attempt to keep the formatting and comments of the original file intact, but it's a best effort approach. Some comments might be deleted, some formatting changes might occur.`,
 	Example: `  $ snowplow-cli dp add-event-spec --event-spec user_login --event-spec page_view ./my-data-product.yaml
   $ snowplow-cli dp add-es ./data-products/analytics.yaml -e "checkout_completed" -e "item_purchased"`,
@@ -32,19 +32,25 @@ The command will attempt to keep the formatting and comments of the original fil
 
 		esNames, _ := cmd.Flags().GetStringArray("event-spec")
 
-		dpFilePath := args[0]
-
-		if err := amend.AddEventSpecsToFile(esNames, dpFilePath); err != nil {
-			snplog.LogFatal(err)
+		if len(args) == 0 {
+			format, _ := cmd.Flags().GetString("output-format")
+			if err := amend.PrintEventSpecsToStdout(esNames, format); err != nil {
+				snplog.LogFatal(err)
+			}
+		} else {
+			dpFilePath := args[0]
+			if err := amend.AddEventSpecsToFile(esNames, dpFilePath); err != nil {
+				snplog.LogFatal(err)
+			}
+			slog.Info("Successfully added event specifications", "count", len(esNames), "file", dpFilePath)
 		}
-
-		slog.Info("Successfully added event specifications", "count", len(esNames), "file", dpFilePath)
 
 	},
 }
 
 func init() {
 	DataProductsCmd.AddCommand(addEsCmd)
+	addEsCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of stdout output. Only applicable when the file in not specified. Json or yaml are supported")
 	addEsCmd.Flags().StringArrayP("event-spec", "e", []string{}, "Name of event spec to add")
 	addEsCmd.MarkFlagsOneRequired("event-spec")
 }
