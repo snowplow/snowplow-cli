@@ -197,10 +197,10 @@ type ContextData struct {
 
 var McpCmd = &cobra.Command{
 	Use:   "mcp",
-	Short: "Start MCP stdio server for Snowplow validation and context",
+	Short: "Start an MCP (Model Context Protocol) stdio server for Snowplow validation and context",
 	Long: `Start an MCP (Model Context Protocol) stdio server that provides tools for:
   - Validating Snowplow files (data-structures, data-products, source-applications)
-  - Providing context and schemas for Snowplow types`,
+  - Retrieving the built-in schema and rules that define how Snowplow data structures, data products, and source applications should be structured`,
 	Example: `
   Claude Desktop config:
   {
