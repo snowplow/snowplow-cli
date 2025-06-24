@@ -266,4 +266,3 @@ func Test_AddJson_Existing(t *testing.T) {
 		t.Fatalf("Result of adding the event specs is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
 	}
 }
-
