@@ -109,9 +109,8 @@ var docsCommand = &cobra.Command{
 
 		// Add front matter
 		combinedContent.WriteString("---\n")
-		combinedContent.WriteString("title: Command Reference\n")
+		combinedContent.WriteString("title: Command reference\n")
 		combinedContent.WriteString(fmt.Sprintf("date: %s\n", time.Now().Format("2006-01-02")))
-		combinedContent.WriteString("sidebar_label: Command Reference\n")
 		combinedContent.WriteString("sidebar_position: 1\n")
 		combinedContent.WriteString("---\n\n")
 
