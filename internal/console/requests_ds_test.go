@@ -749,7 +749,7 @@ func TestGetAllDataStructures_EmptySchemaType(t *testing.T) {
 		t.Fatal("includeLegacy=true should include legacy data structure with name 'old_event'")
 	}
 
-	if legacyDS.Meta.SchemaType != "entity" {
+	if legacyDS != nil && legacyDS.Meta.SchemaType != "entity" {
 		t.Errorf("legacy data structure with empty schemaType should be converted to 'entity': got '%s'", legacyDS.Meta.SchemaType)
 	}
 }
