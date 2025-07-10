@@ -11,12 +11,14 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -34,7 +36,57 @@ type rawAppConfig struct {
 	Console map[string]string
 }
 
+func loadEnvFiles(cmd *cobra.Command) error {
+	var envFilePaths []string
+	var isExplicitFile bool
+
+	if envFile, _ := cmd.Flags().GetString("env-file"); envFile != "" {
+		envFilePaths = append(envFilePaths, envFile)
+		isExplicitFile = true
+	} else {
+		cwd, err := os.Getwd()
+		if err == nil {
+			envFilePaths = append(envFilePaths, filepath.Join(cwd, ".env"))
+		}
+
+		home, err := os.UserHomeDir()
+		if err == nil {
+			envFilePaths = append(envFilePaths, filepath.Join(home, ".config", "snowplow", ".env"))
+		}
+
+		userConfigDir, err := os.UserConfigDir()
+		if err == nil {
+			envFilePaths = append(envFilePaths, filepath.Join(userConfigDir, "snowplow", ".env"))
+		}
+	}
+
+	slog.Debug("looking for .env files at", "paths", strings.Join(envFilePaths, "\n"))
+
+	for _, path := range envFilePaths {
+		if _, err := os.Stat(path); err == nil {
+			slog.Debug(".env file found at", "file", path)
+			if err := godotenv.Load(path); err != nil {
+				return fmt.Errorf("failed to load .env file %s: %w", path, err)
+			}
+			slog.Debug(".env file loaded successfully", "file", path)
+			return nil
+		} else {
+			slog.Debug(".env file not found at", "file", path, "err", err)
+			if isExplicitFile {
+				return fmt.Errorf("specified .env file not found: %s", path)
+			}
+		}
+	}
+
+	slog.Debug("no .env file found")
+	return nil
+}
+
 func InitConsoleConfig(cmd *cobra.Command) error {
+
+	if err := loadEnvFiles(cmd); err != nil {
+		return fmt.Errorf("failed to load .env file: %w", err)
+	}
 
 	var configBytes []byte
 	var err error
@@ -95,14 +147,47 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 		}
 	})
 
+	var missingVars []string
 	for _, f := range []string{"api-key-id", "api-key", "host", "org-id"} {
 		value, err := cmd.Flags().GetString(f)
 		if err != nil {
 			return err
 		}
 		if value == "" {
-			return fmt.Errorf(`config value "%s" not set`, f)
+			missingVars = append(missingVars, f)
 		}
+	}
+
+	if len(missingVars) > 0 {
+		var errorMsg strings.Builder
+		if len(missingVars) == 1 {
+			errorMsg.WriteString(fmt.Sprintf(`config value "%s" not set`, missingVars[0]))
+		} else {
+			errorMsg.WriteString(fmt.Sprintf(`config values not set: %s`, strings.Join(missingVars, ", ")))
+		}
+
+		errorMsg.WriteString(`
+
+Configuration can be provided via:
+  1. Command-line flags: --<name> <value>
+  2. Environment variables: SNOWPLOW_CONSOLE_<NAME>=<value>
+  3. Environment file (.env): SNOWPLOW_CONSOLE_<NAME>=<value>
+  4. Config file (snowplow.yml): console.<name>: <value>
+
+Required variables:`)
+
+		for _, v := range missingVars {
+			envName := strings.ReplaceAll(strings.ToUpper(v), "-", "_")
+			errorMsg.WriteString(fmt.Sprintf(`
+  %s: --%s or SNOWPLOW_CONSOLE_%s`, v, v, envName))
+		}
+
+		errorMsg.WriteString(`
+
+See 'snowplow-cli --help' for config file and .env file locations.
+Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/`)
+
+		return errors.New(errorMsg.String())
 	}
 
 	if err != nil {

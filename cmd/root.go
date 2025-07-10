@@ -22,7 +22,10 @@ import (
 var RootCmd = &cobra.Command{
 	Use:   "snowplow-cli",
 	Short: "Snowplow CLI",
-	Long:  `Work with Snowplow from the command line`,
+	Long: `Work with Snowplow from the command line
+
+Configuration required: org-id, api-key-id, api-key
+Get credentials: https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/`,
 	Example: `  $ snowplow-cli data-structures download
   $ snowplow-cli ds validate
   $ snowplow-cli mcp`,
@@ -43,6 +46,13 @@ Then on:
   Unix $XDG_CONFIG_HOME/snowplow/snowplow.yml
   Darwin $HOME/Library/Application Support/snowplow/snowplow.yml
   Windows %AppData%\snowplow\snowplow.yml`,
+	)
+	RootCmd.PersistentFlags().String("env-file", "",
+		`Environment file (.env). Defaults to .env in current directory
+Then on:
+  Unix $HOME/.config/snowplow/.env
+  Darwin $HOME/Library/Application Support/snowplow/.env
+  Windows %AppData%\snowplow\.env`,
 	)
 	RootCmd.PersistentFlags().Bool("debug", false, "Log output level to Debug")
 	RootCmd.PersistentFlags().BoolP("quiet", "q", false, "Log output level to Warn")
