@@ -7,7 +7,7 @@ on:
       - main
       - develop
 jobs:
-  scheduled-job:
+  download-and-validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,12 +18,12 @@ jobs:
           SNOWPLOW_CONSOLE_API_KEY_ID: ${{ secrets.SNP_ENGINEERING_KEY_ID }}
           SNOWPLOW_CONSOLE_API_KEY: ${{ secrets.SNP_ENGINEERING_KEY }}
           SNOWPLOW_CONSOLE_ORG_ID: ${{ secrets.SNP_ENGINEERING_ORG_ID }}
-      - name: donwload ds
-        run: go run main.go ds donwload && go run main.go ds donwload --output-format json
+      - name: download ds
+        run: go run main.go ds download && go run main.go ds download --output-format json
       - name: validate ds
         run: go run main.go ds validate
       - name: download dp
-        run: go run main.go dp donwload && go run main.go dp donwload --output-format json
+        run: go run main.go dp download && go run main.go dp download --output-format json
       - name: validate dp
         run: go run main.go dp validate
 
