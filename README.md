@@ -37,23 +37,67 @@ npx @snowplow/snowplow-cli --help
 
 ## Configuration
 
-Snowplow CLI requires configuration to use most of its functionality
+Snowplow CLI requires configuration to use most of its functionality. Configuration can be provided through multiple sources with the following precedence order (highest to lowest):
 
-### Create a config file
+1. **Command-line flags** (e.g., `--api-key`, `--org-id`)
+2. **Environment variables** (e.g., `SNOWPLOW_CONSOLE_API_KEY`, `SNOWPLOW_CONSOLE_ORG_ID`)
+3. **Environment (.env) files**
+4. **YAML configuration files**
+
+### Configuration Methods
+
+#### 1. YAML Configuration File
+
+Create a YAML config file:
 
 - Unix/Darwin: `mkdir -p ~/.config/snowplow && touch $HOME/.config/snowplow/snowplow.yml`
 <!-- TODO: Windows -->
 
-### Minimal configuration
+#### 2. Environment (.env) File
+
+Create a `.env` file in your current directory or specify a custom path with `--env-file`:
+
+```bash
+# .env file
+SNOWPLOW_CONSOLE_ORG_ID=********-****-****-****-************
+SNOWPLOW_CONSOLE_API_KEY_ID=********-****-****-****-************
+SNOWPLOW_CONSOLE_API_KEY=********-****-****-****-************
+```
+
+The CLI will automatically search for `.env` files in:
+- Current working directory (`.env`)
+- Config directories (`~/.config/snowplow/.env`)
+
+Or specify a custom path: `snowplow-cli --env-file /path/to/custom.env`
+
+#### 3. Environment Variables
+
+Set environment variables directly:
+
+```bash
+export SNOWPLOW_CONSOLE_ORG_ID=********-****-****-****-************
+export SNOWPLOW_CONSOLE_API_KEY_ID=********-****-****-****-************
+export SNOWPLOW_CONSOLE_API_KEY=********-****-****-****-************
+```
+
+### Minimal Configuration
 
 You will need to provide the console organization id, API key and API secret.
 You can find the instructions on how to get the API key and secret in the [documentation](https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/#credentials-ui-v3)
 
-Your `snowplow.yml` content should look like following
+**YAML format** (`snowplow.yml`):
 
 ```yaml
 console:
   org-id: ********-****-****-****-************
   api-key-id: ********-****-****-****-************
   api-key: ********-****-****-****-************
+```
+
+**Environment file format** (`.env`):
+
+```bash
+SNOWPLOW_CONSOLE_ORG_ID=********-****-****-****-************
+SNOWPLOW_CONSOLE_API_KEY_ID=********-****-****-****-************
+SNOWPLOW_CONSOLE_API_KEY=********-****-****-****-************
 ```
