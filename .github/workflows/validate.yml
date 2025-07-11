@@ -19,11 +19,11 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: download ds
-        run: go run main.go ds download && go run main.go ds download --output-format json
+        run: go run main.go ds download ./ds-yamls && go run main.go ds download --output-format json ./ds-jsons
       - name: validate ds
-        run: go run main.go ds validate
+        run: go run main.go ds validate ./ds-yamls && go run main.go ds validate ./ds-jsons
       - name: download dp
-        run: go run main.go dp download && go run main.go dp download --output-format json
+        run: go run main.go dp download ./dp-yamls && go run main.go dp download --output-format json ./dp-jsons
       - name: validate dp
-        run: go run main.go dp validate
+        run: go run main.go dp validate ./dp-yamls && go run main.go dp validate ./dp-jsons
 
