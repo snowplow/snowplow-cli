@@ -120,7 +120,7 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 		ExcludedSourceApplications: excludedSourceApps,
 		Name:                       remoteEs.Name,
 		Description:                remoteEs.Description,
-		Event:                      event,
+		Event:                      &event,
 		Entities:                   entities,
 		Triggers:                   triggers,
 	}

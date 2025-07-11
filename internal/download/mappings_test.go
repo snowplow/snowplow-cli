@@ -182,7 +182,7 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 				ResourceName:               sampleRemoteEs.Id,
 				ExcludedSourceApplications: nil,
 				Name:                       sampleRemoteEs.Name,
-				Event: model.SchemaRef{
+				Event: &model.SchemaRef{
 					Source:         sampleRemoteEs.Event.Source,
 					MinCardinality: nil,
 					MaxCardinality: nil,

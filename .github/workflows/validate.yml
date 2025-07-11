@@ -1,0 +1,25 @@
+name: Download and validate
+on:
+  schedule:
+    - cron: '0 0 * * 7'  # Runs every Monday at noon UTC
+  pull_request:
+    branches:
+      - main
+      - develop
+jobs:
+  scheduled-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: donwload ds
+        run: go run main.go ds donwload && go run main.go ds donwload --output-format json
+      - name: validate ds
+        run: go run main.go ds validate
+      - name: download dp
+        run: go run main.go dp donwload && go run main.go dp donwload --output-format json
+      - name: validate dp
+        run: go run main.go dp validate
+
