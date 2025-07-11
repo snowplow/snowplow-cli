@@ -32,7 +32,10 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	slog.Info("download", "msg", "wrote source applications", "count", len(sas))
 
-	saIdToRef := localSasToRefs(fileNameToSa, files.DataProductsLocation)
+	saIdToRef, err := localSasToRefs(fileNameToSa, files.DataProductsLocation)
+	if err != nil {
+		return err
+	}
 
 	esIdToRes := groupRemoteEsById(res.EventSpecs)
 
