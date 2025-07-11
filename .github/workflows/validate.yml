@@ -2,10 +2,6 @@ name: Download and validate
 on:
   schedule:
     - cron: '0 0 * * SUN'  # Runs every Monday at noon UTC
-  pull_request:
-    branches:
-      - main
-      - develop
 jobs:
   download-and-validate:
     runs-on: ubuntu-latest
