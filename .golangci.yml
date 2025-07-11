@@ -1,0 +1,10 @@
+version: "2"
+linters:
+  exclusions:
+    presets:
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - linters:
+          - errcheck
+        text: "Error return value of.*Printf.* is not checked"
