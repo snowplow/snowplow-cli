@@ -11,8 +11,8 @@ package download
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
@@ -120,7 +120,7 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 		ExcludedSourceApplications: excludedSourceApps,
 		Name:                       remoteEs.Name,
 		Description:                remoteEs.Description,
-		Event:                      event,
+		Event:                      &event,
 		Entities:                   entities,
 		Triggers:                   triggers,
 	}
@@ -150,12 +150,16 @@ func remoteDpToLocal(remoteDp console.RemoteDataProduct, saIdToRef map[string]mo
 	}
 }
 
-func localSasToRefs(fileNameToLocalSa map[string]model.CliResource[model.SourceAppData], dataProductsLocation string) map[string]model.Ref {
+func localSasToRefs(fileNameToLocalSa map[string]model.CliResource[model.SourceAppData], dataProductsLocation string) (map[string]model.Ref, error) {
 	var saIdToRef = make(map[string]model.Ref)
 	for path, sa := range fileNameToLocalSa {
-		saIdToRef[sa.ResourceName] = model.Ref{Ref: fmt.Sprintf(".%s", strings.TrimPrefix(path, dataProductsLocation))}
+		rel, err := filepath.Rel(dataProductsLocation, path)
+		if err != nil {
+			return nil, err
+		}
+		saIdToRef[sa.ResourceName] = model.Ref{Ref: fmt.Sprintf("./%s", rel)}
 	}
-	return saIdToRef
+	return saIdToRef, nil
 }
 
 func groupRemoteEsById(remoteEss []console.RemoteEventSpec) map[string]console.RemoteEventSpec {

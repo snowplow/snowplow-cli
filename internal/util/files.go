@@ -18,7 +18,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
 
@@ -221,7 +220,12 @@ func (f Files) WriteImage(name string, dir string, image *model.Image) (string, 
 
 	slog.Debug("wrote", "file", filePath)
 
-	relativePath := fmt.Sprintf(".%s", strings.TrimPrefix(filePath, f.DataProductsLocation))
+	rel, err := filepath.Rel(f.DataProductsLocation, filePath)
+	if err != nil {
+		return "", err
+	}
+
+	relativePath := fmt.Sprintf("./%s", rel)
 
 	return relativePath, err
 }

@@ -157,10 +157,10 @@ func Test_localSasToRefs_OK(t *testing.T) {
 	fileNamesToLocalSas := map[string]model.CliResource[model.SourceAppData]{
 		fmt.Sprintf("%s/source-apps/test.yaml", dpLocation): SaResource[0],
 	}
-	res := localSasToRefs(fileNamesToLocalSas, dpLocation)
+	res, err := localSasToRefs(fileNamesToLocalSas, dpLocation)
 
-	if !reflect.DeepEqual(sampleSaRefs, res) {
-		t.Errorf("Unexpected source app references expected:%+v got:%+v", sampleSaRefs, res)
+	if !reflect.DeepEqual(sampleSaRefs, res) || err != nil {
+		t.Errorf("Unexpected source app references expected:%+v got:%+v, \nerr:%s", sampleSaRefs, res, err)
 	}
 
 }
@@ -182,7 +182,7 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 				ResourceName:               sampleRemoteEs.Id,
 				ExcludedSourceApplications: nil,
 				Name:                       sampleRemoteEs.Name,
-				Event: model.SchemaRef{
+				Event: &model.SchemaRef{
 					Source:         sampleRemoteEs.Event.Source,
 					MinCardinality: nil,
 					MaxCardinality: nil,
