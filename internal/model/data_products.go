@@ -73,7 +73,6 @@ type EntitiesDef struct {
 func (e EntitiesDef) MarshalJSON() ([]byte, error) {
 	type Alias EntitiesDef
 
-	// Ensure slices are empty arrays, not nil
 	if e.Tracked == nil {
 		e.Tracked = []SchemaRef{}
 	}
@@ -114,7 +113,6 @@ type EventSpecCanonical struct {
 func (e EventSpecCanonical) MarshalJSON() ([]byte, error) {
 	type Alias EventSpecCanonical
 
-	// Create a copy and set Event to nil if it's empty
 	temp := Alias(e)
 	if temp.Event != nil && temp.Event.isEmpty() {
 		temp.Event = nil
@@ -126,7 +124,6 @@ func (e EventSpecCanonical) MarshalJSON() ([]byte, error) {
 func (e EventSpecCanonical) MarshalYAML() (any, error) {
 	type Alias EventSpecCanonical
 
-	// Create a copy and set Event to nil if it's empty
 	temp := Alias(e)
 	if temp.Event != nil && temp.Event.isEmpty() {
 		temp.Event = nil

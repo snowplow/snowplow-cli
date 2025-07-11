@@ -14,6 +14,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+        env:
+          SNOWPLOW_CONSOLE_API_KEY_ID: ${{ secrets.SNP_ENGINEERING_KEY_ID }}
+          SNOWPLOW_CONSOLE_API_KEY: ${{ secrets.SNP_ENGINEERING_KEY }}
+          SNOWPLOW_CONSOLE_ORG_ID: ${{ secrets.SNP_ENGINEERING_ORG_ID }}
       - name: donwload ds
         run: go run main.go ds donwload && go run main.go ds donwload --output-format json
       - name: validate ds
