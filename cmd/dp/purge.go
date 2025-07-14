@@ -70,7 +70,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 
 		cnx := context.Background()
 
-		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiOrgApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

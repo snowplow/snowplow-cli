@@ -57,7 +57,7 @@ var StatusCmd = &cobra.Command{
 			"org_id", orgID,
 			"host", host)
 
-		client, err := console.NewApiClient(ctx, host, apiKeyID, apiKey, orgID)
+		client, err := console.NewApiOrgApiClient(ctx, host, apiKeyID, apiKey, orgID)
 		if err != nil {
 			slog.Info("Status check failed: API connectivity error",
 				"error", err.Error(),
@@ -79,7 +79,7 @@ var StatusCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		var selectedOrg *Organization
+		var selectedOrg *console.Organization
 		for _, org := range organizations {
 			if org.ID == orgID {
 				selectedOrg = &org
@@ -106,7 +106,7 @@ var StatusCmd = &cobra.Command{
 	},
 }
 
-func getStatusOrganizations(ctx context.Context, client *console.ApiClient) ([]Organization, error) {
+func getStatusOrganizations(ctx context.Context, client *console.ApiClient) ([]console.Organization, error) {
 	baseAPIURL := client.BaseUrl[:strings.LastIndex(client.BaseUrl, "/organizations/")] + "/organizations"
 
 	resp, err := console.DoConsoleRequest("GET", baseAPIURL, client, ctx, nil)
@@ -119,7 +119,7 @@ func getStatusOrganizations(ctx context.Context, client *console.ApiClient) ([]O
 		return nil, fmt.Errorf("API error: %d", resp.StatusCode)
 	}
 
-	var organizations []Organization
+	var organizations []console.Organization
 	if err := json.NewDecoder(resp.Body).Decode(&organizations); err != nil {
 		return nil, fmt.Errorf("failed to parse organizations response: %w", err)
 	}
