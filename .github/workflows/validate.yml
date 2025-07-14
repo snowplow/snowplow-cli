@@ -1,7 +1,7 @@
 name: Download and validate
 on:
   schedule:
-    - cron: '0 0 * * SUN'  # Runs every Monday at noon UTC
+    - cron: '0 0 * * SUN'
 jobs:
   download-and-validate:
     runs-on: ubuntu-latest
