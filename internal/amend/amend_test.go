@@ -220,7 +220,7 @@ func Test_AddJson_Empty(t *testing.T) {
   "data": {
     "name": "xxx3",
     "sourceApplications": [],
-    "eventSpecifications": [{"resourceName":"%s","name":"%s","event":{},"entities":{}},{"resourceName":"%s","name":"%s","event":{},"entities":{}}]
+    "eventSpecifications": [{"resourceName":"%s","name":"%s","entities":{"tracked":[],"enriched":[]}},{"resourceName":"%s","name":"%s","entities":{"tracked":[],"enriched":[]}}]
   }
 }
 `, EventSpecs[0].ResourceName, EventSpecs[0].Name, EventSpecs[1].ResourceName, EventSpecs[1].Name)
@@ -242,7 +242,7 @@ func Test_AddJson_Existing(t *testing.T) {
   "data": {
     "name": "xxx3",
     "sourceApplications": [],
-    "eventSpecifications": [{"resourceName":"8f97ac29-5fee-432c-ba12-eb2469c3b55b","name":"existing","event":{},"entities":{}}]
+    "eventSpecifications": [{"resourceName":"8f97ac29-5fee-432c-ba12-eb2469c3b55b","name":"existing","entities":{"tracked":[],"enriched":[]}}]
   }
 }
 `
@@ -253,7 +253,7 @@ func Test_AddJson_Existing(t *testing.T) {
   "data": {
     "name": "xxx3",
     "sourceApplications": [],
-    "eventSpecifications": [{"resourceName":"8f97ac29-5fee-432c-ba12-eb2469c3b55b","name":"existing","event":{},"entities":{}},{"resourceName":"%s","name":"%s","event":{},"entities":{}},{"resourceName":"%s","name":"%s","event":{},"entities":{}}]
+    "eventSpecifications": [{"resourceName":"8f97ac29-5fee-432c-ba12-eb2469c3b55b","name":"existing","entities":{"tracked":[],"enriched":[]}},{"resourceName":"%s","name":"%s","entities":{"tracked":[],"enriched":[]}},{"resourceName":"%s","name":"%s","entities":{"tracked":[],"enriched":[]}}]
   }
 }
 `, EventSpecs[0].ResourceName, EventSpecs[0].Name, EventSpecs[1].ResourceName, EventSpecs[1].Name)

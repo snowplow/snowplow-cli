@@ -10,6 +10,10 @@
 
 package model
 
+import (
+	"encoding/json"
+)
+
 type EventSpec struct {
 	ResourceName               string
 	ExcludedSourceApplications []map[string]string `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
@@ -58,12 +62,25 @@ type SourceAppData struct {
 	Description  string       `yaml:"description,omitempty" json:"description,omitempty"`
 	Owner        string       `yaml:"owner,omitempty" json:"owner,omitempty"`
 	AppIds       []string     `yaml:"appIds" json:"appIds"`
-	Entities     *EntitiesDef `yaml:"entities" json:"entities"`
+	Entities     *EntitiesDef `yaml:"entities" json:"entities,omitempty"`
 }
 
 type EntitiesDef struct {
-	Tracked  []SchemaRef `yaml:"tracked" json:"tracked,omitempty"`
-	Enriched []SchemaRef `yaml:"enriched" json:"enriched,omitempty"`
+	Tracked  []SchemaRef `yaml:"tracked" json:"tracked"`
+	Enriched []SchemaRef `yaml:"enriched" json:"enriched"`
+}
+
+func (e EntitiesDef) MarshalJSON() ([]byte, error) {
+	type Alias EntitiesDef
+
+	if e.Tracked == nil {
+		e.Tracked = []SchemaRef{}
+	}
+	if e.Enriched == nil {
+		e.Enriched = []SchemaRef{}
+	}
+
+	return json.Marshal((Alias)(e))
 }
 
 type SchemaRef struct {
@@ -76,11 +93,11 @@ type SchemaRef struct {
 type DataProductCanonicalData struct {
 	ResourceName        string               `yaml:"-" json:"-"`
 	Name                string               `yaml:"name" json:"name"`
-	SourceApplications  []Ref                `yaml:"sourceApplications" json:"sourceApplications"`
+	SourceApplications  []Ref                `yaml:"sourceApplications" json:"sourceApplications,omitempty"`
 	Domain              string               `yaml:"domain,omitempty" json:"domain,omitempty"`
 	Owner               string               `yaml:"owner,omitempty" json:"owner,omitempty"`
 	Description         string               `yaml:"description,omitempty" json:"description,omitempty"`
-	EventSpecifications []EventSpecCanonical `yaml:"eventSpecifications" json:"eventSpecifications"`
+	EventSpecifications []EventSpecCanonical `yaml:"eventSpecifications" json:"eventSpecifications,omitempty"`
 }
 
 type EventSpecCanonical struct {
@@ -88,9 +105,41 @@ type EventSpecCanonical struct {
 	ExcludedSourceApplications []Ref       `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string      `yaml:"name" json:"name"`
 	Description                string      `yaml:"description,omitempty" json:"description,omitempty"`
-	Event                      SchemaRef   `yaml:"event,omitempty" json:"event,omitempty"`
+	Event                      *SchemaRef  `yaml:"event,omitempty" json:"event,omitempty"`
 	Entities                   EntitiesDef `yaml:"entities" json:"entities"`
 	Triggers                   []Trigger   `yaml:"triggers,omitempty" json:"triggers,omitempty"`
+}
+
+func (e EventSpecCanonical) MarshalJSON() ([]byte, error) {
+	type Alias EventSpecCanonical
+
+	temp := Alias(e)
+	if temp.Event != nil && temp.Event.isEmpty() {
+		temp.Event = nil
+	}
+
+	return json.Marshal(temp)
+}
+
+func (e EventSpecCanonical) MarshalYAML() (any, error) {
+	type Alias EventSpecCanonical
+
+	temp := Alias(e)
+	if temp.Event != nil && temp.Event.isEmpty() {
+		temp.Event = nil
+	}
+
+	return temp, nil
+}
+
+func (s *SchemaRef) isEmpty() bool {
+	if s == nil {
+		return true
+	}
+	return s.Source == "" &&
+		s.MinCardinality == nil &&
+		s.MaxCardinality == nil &&
+		len(s.Schema) == 0
 }
 
 type Ref struct {

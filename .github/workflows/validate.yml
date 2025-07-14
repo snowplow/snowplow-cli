@@ -1,0 +1,25 @@
+name: Download and validate
+on:
+  schedule:
+    - cron: '0 0 * * SUN'
+jobs:
+  download-and-validate:
+    runs-on: ubuntu-latest
+    env:
+      SNOWPLOW_CONSOLE_API_KEY_ID: ${{ secrets.SNP_ENGINEERING_KEY_ID }}
+      SNOWPLOW_CONSOLE_API_KEY: ${{ secrets.SNP_ENGINEERING_KEY }}
+      SNOWPLOW_CONSOLE_ORG_ID: ${{ secrets.SNP_ENGINEERING_ORG_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - name: download ds
+        run: go run main.go ds download ./ds-yamls && go run main.go ds download --output-format json ./ds-jsons
+      - name: validate ds
+        run: go run main.go ds validate ./ds-yamls && go run main.go ds validate ./ds-jsons
+      - name: download dp
+        run: go run main.go dp download ./dp-yamls && go run main.go dp download --output-format json ./dp-jsons
+      - name: validate dp
+        run: go run main.go dp validate ./dp-yamls && go run main.go dp validate ./dp-jsons
+
