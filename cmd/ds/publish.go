@@ -77,7 +77,7 @@ Changes to it will be published by this command.
 
 		cnx := context.Background()
 
-		c, err := console.NewApiOrgApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			logging.LogFatal(err)
 		}
@@ -167,7 +167,7 @@ environment will be published to your production environment.
 
 		cnx := context.Background()
 
-		c, err := console.NewApiOrgApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			logging.LogFatal(err)
 		}

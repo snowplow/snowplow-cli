@@ -50,9 +50,7 @@ func GetOrganizations(ctx context.Context, accessToken, consoleHost string) ([]O
 		return nil, err
 	}
 
-	defer func() {
-		err = resp.Body.Close()
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

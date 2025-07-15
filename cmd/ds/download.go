@@ -59,7 +59,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 
 		cnx := context.Background()
 
-		c, err := console.NewApiOrgApiClient(cnx, host, apiKeyId, apiKeySecret, org)
+		c, err := console.NewApiClient(cnx, host, apiKeyId, apiKeySecret, org)
 		if err != nil {
 			snplog.LogFatalMsg("client creation fail", err)
 		}

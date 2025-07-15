@@ -39,7 +39,7 @@ func Test_NewClient_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client, _ := NewApiOrgApiClient(cnx, server.URL, "apiKeyId", "apiKeySecret", "orgid")
+	client, _ := NewApiClient(cnx, server.URL, "apiKeyId", "apiKeySecret", "orgid")
 
 	if client.Jwt != "token" {
 		t.Errorf("jwt not ok, got: %s", client.Jwt)

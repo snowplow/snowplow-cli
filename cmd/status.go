@@ -57,7 +57,7 @@ var StatusCmd = &cobra.Command{
 			"org_id", orgID,
 			"host", host)
 
-		client, err := console.NewApiOrgApiClient(ctx, host, apiKeyID, apiKey, orgID)
+		client, err := console.NewApiClient(ctx, host, apiKeyID, apiKey, orgID)
 		if err != nil {
 			slog.Info("Status check failed: API connectivity error",
 				"error", err.Error(),

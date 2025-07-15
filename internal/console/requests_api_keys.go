@@ -26,7 +26,7 @@ import (
 
 type APIKeyResponse struct {
 	ID     string `json:"id"`
-	Secret string `json:"secret"`
+	Secret string `json:"key"`
 }
 
 type UserInfo struct {
@@ -116,9 +116,7 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = resp.Body.Close()
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -131,25 +129,11 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 		return nil, fmt.Errorf("API key creation failed: %s", string(body))
 	}
 
-	var apiResp map[string]any
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, err
+	var apiKeyResponse APIKeyResponse
+	if err := json.Unmarshal(body, &apiKeyResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
-
-	id, ok := apiResp["id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response: missing id field")
-	}
-
-	key, ok := apiResp["key"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid response: missing key field")
-	}
-
-	return &APIKeyResponse{
-		ID:     id,
-		Secret: key,
-	}, nil
+	return &apiKeyResponse, nil
 }
 
 func GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {

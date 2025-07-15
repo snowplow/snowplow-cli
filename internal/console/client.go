@@ -55,7 +55,7 @@ func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, err
 }
 
-func NewApiOrgApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecret string, orgid string) (*ApiClient, error) {
+func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecret string, orgid string) (*ApiClient, error) {
 
 	h := &http.Client{
 		Transport: &loggingRoundTripper{

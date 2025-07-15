@@ -28,7 +28,7 @@ func ValidateDataStructuresFromCmd(ctx context.Context, cmd *cobra.Command, path
 	org, _ := cmd.Flags().GetString("org-id")
 	ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 
-	c, err := console.NewApiOrgApiClient(ctx, host, apiKeyId, apiKeySecret, org)
+	c, err := console.NewApiClient(ctx, host, apiKeyId, apiKeySecret, org)
 	if err != nil {
 		return err
 	}

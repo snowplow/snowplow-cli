@@ -29,7 +29,7 @@ func ValidateDataProductsFromCmd(ctx context.Context, cmd *cobra.Command, paths 
 	full, _ := cmd.Flags().GetBool("full")
 	concurrentReq, _ := cmd.Flags().GetInt("concurrency")
 
-	c, err := console.NewApiOrgApiClient(ctx, host, apiKeyId, apiKeySecret, org)
+	c, err := console.NewApiClient(ctx, host, apiKeyId, apiKeySecret, org)
 	if err != nil {
 		return err
 	}
