@@ -291,7 +291,8 @@ func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
 	}
 }
 
-func getConfigPath() string {
+// getConfigPath is a variable holding the function to get config path (for testability)
+var getConfigPath = func() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "snowplow", "snowplow.yml")
 }

@@ -148,7 +148,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	green.Printf("\n✓ Logged in to Snowplow Console as %s\n", userInfo.Email)
+	green.Printf("✓ Logged in to Snowplow Console as %s\n", userInfo.Email)
 	green.Printf("✓ Authentication credentials saved\n")
 	if readOnly {
 		green.Printf("✓ API key created with read-only permissions for %s\n", selectedOrg.Name)
@@ -201,38 +201,14 @@ func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceA
 }
 
 func selectOrganization(organizations []console.Organization, jwtOrgID string) (*console.Organization, error) {
-	cyan := color.New(color.FgCyan)
-	yellow := color.New(color.FgYellow, color.Bold)
-
-	fmt.Printf("\n")
-	cyan.Printf("You have access to %d organizations:\n\n", len(organizations))
-
-	var defaultIndex = -1
-	for i, org := range organizations {
-		if org.ID == jwtOrgID {
-			defaultIndex = i
-			break
-		}
-	}
-
-	for i, org := range organizations {
-		if i == defaultIndex {
-			yellow.Printf("  %d. %s (default)\n", i+1, org.Name)
-		} else {
-			fmt.Printf("  %d. %s\n", i+1, org.Name)
-		}
-	}
-
-	fmt.Printf("\n")
-	if defaultIndex >= 0 {
-		fmt.Printf("Select organization [1-%d] (default: %d): ", len(organizations), defaultIndex+1)
-	} else {
-		fmt.Printf("Select organization [1-%d]: ", len(organizations))
-	}
-
+	defaultIndex := getDefaultIndex(organizations, jwtOrgID)
+	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
 	var input string
 	_, _ = fmt.Scanln(&input)
+	return selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+}
 
+func selectOrganizationForInput(organizations []console.Organization, jwtOrgID, input string, defaultIndex int) (*console.Organization, error) {
 	if input == "" && defaultIndex >= 0 {
 		return &organizations[defaultIndex], nil
 	}
@@ -247,6 +223,39 @@ func selectOrganization(organizations []console.Organization, jwtOrgID string) (
 	}
 
 	return &organizations[selection-1], nil
+}
+
+func displayAvailableOrgs(organizations []console.Organization, jwtOrgID string, defaultIndex int) {
+	cyan := color.New(color.FgCyan)
+	yellow := color.New(color.FgYellow, color.Bold)
+
+	fmt.Printf("\n")
+	cyan.Printf("You have access to %d organizations:\n\n", len(organizations))
+
+	for i, org := range organizations {
+		if i == defaultIndex {
+			yellow.Printf("  %d. %s (default)\n", i+1, org.Name)
+		} else {
+			fmt.Printf("  %d. %s\n", i+1, org.Name)
+		}
+	}
+
+	if defaultIndex >= 0 {
+		fmt.Printf("Select organization [1-%d] (default: %d): ", len(organizations), defaultIndex+1)
+	} else {
+		fmt.Printf("Select organization [1-%d]: ", len(organizations))
+	}
+}
+
+func getDefaultIndex(organizations []console.Organization, jwtOrgID string) int {
+	var defaultIndex = -1
+	for i, org := range organizations {
+		if org.ID == jwtOrgID {
+			defaultIndex = i
+			break
+		}
+	}
+	return defaultIndex
 }
 
 func handleAuthError(err error, clientID, auth0Domain string) {

@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package console
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -97,7 +98,7 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 
 	slog.Debug("API key request", "body", string(jsonBody))
 
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(jsonBody)))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
