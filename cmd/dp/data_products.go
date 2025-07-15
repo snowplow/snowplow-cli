@@ -29,7 +29,7 @@ var DataProductsCmd = &cobra.Command{
 			return err
 		}
 
-		if err := config.InitConsoleConfig(cmd); err != nil {
+		if err := config.InitConsoleConfig(cmd, false); err != nil {
 			slog.Error("config failure", "error", err)
 			os.Exit(1)
 		}

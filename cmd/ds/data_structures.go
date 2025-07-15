@@ -30,7 +30,7 @@ var DataStructuresCmd = &cobra.Command{
 		if err := snplog.InitLogging(cmd); err != nil {
 			return err
 		}
-		if err := config.InitConsoleConfig(cmd); err != nil {
+		if err := config.InitConsoleConfig(cmd, false); err != nil {
 			slog.Error("config failure", "error", err)
 			os.Exit(1)
 		}

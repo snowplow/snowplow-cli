@@ -33,7 +33,7 @@ var SetupCmd = &cobra.Command{
 			return err
 		}
 
-		if err := config.InitConsoleConfig(cmd); err != nil {
+		if err := config.InitConsoleConfig(cmd, true); err != nil {
 			return err
 		}
 
@@ -59,11 +59,16 @@ var SetupCmd = &cobra.Command{
 			return err
 		}
 
+		isDotenv, err := cmd.Flags().GetBool("dotenv")
+		if err != nil {
+			return err
+		}
+
 		if clientID == "" {
 			return fmt.Errorf("client-id is required. Use --client-id flag")
 		}
 
-		return setup.SetupConfig(clientID, auth0Domain, consoleHost, readOnly, ctx)
+		return setup.SetupConfig(clientID, auth0Domain, consoleHost, readOnly, isDotenv, ctx)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -76,4 +81,5 @@ func init() {
 	SetupCmd.Flags().String("client-id", "YOUR_PROD_CLIENT_ID_PLACEHOLDER", "Auth0 Client ID for device auth")
 	SetupCmd.Flags().String("auth0-domain", "id.snowplowanalytics.com", "Auth0 domain")
 	SetupCmd.Flags().Bool("read-only", false, "Create a read-only API key")
+	SetupCmd.Flags().Bool("dotenv", false, "Store as .env file in current working directory")
 }

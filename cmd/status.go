@@ -39,7 +39,7 @@ var StatusCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		if err := config.InitConsoleConfig(cmd); err != nil {
+		if err := config.InitConsoleConfig(cmd, false); err != nil {
 			slog.Info("Status check failed: configuration error",
 				"error", err.Error(),
 				"status", "not_configured",

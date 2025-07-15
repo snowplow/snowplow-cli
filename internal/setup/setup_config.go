@@ -23,14 +23,14 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/pkg/browser"
+	"github.com/snowplow/snowplow-cli/internal/config"
 	"github.com/snowplow/snowplow-cli/internal/console"
-	"github.com/snowplow/snowplow-cli/internal/util"
 	"golang.org/x/oauth2"
 )
 
 const snowplowAudience = "https://snowplowanalytics.com/api/"
 
-func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly bool, ctx context.Context) error {
+func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv bool, ctx context.Context) error {
 	slog.Debug("Starting Snowplow CLI setup",
 		"auth0-domain", auth0Domain,
 		"console-host", consoleHost,
@@ -109,6 +109,9 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly bool, ctx c
 		return fmt.Errorf("failed to get organization ID: %w", err)
 	}
 
+	fmt.Println("TEST HERE")
+	fmt.Println(consoleHost)
+
 	organizations, err := console.GetOrganizations(ctx, token.AccessToken, consoleHost)
 	if err != nil {
 		return fmt.Errorf("failed to fetch organizations: %w", err)
@@ -144,8 +147,8 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly bool, ctx c
 		return fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	slog.Debug("Saving configuration to file", "config-path", util.GetConfigPath())
-	if err := util.SaveConfig(selectedOrg.ID, apiKey.ID, apiKey.Secret, consoleHost); err != nil {
+	slog.Debug("Saving configuration to file", "config-path", config.GetConfigPath())
+	if err := config.PersistConfig(selectedOrg.ID, apiKey.ID, apiKey.Secret, consoleHost, isDotenv); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
@@ -156,7 +159,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly bool, ctx c
 	} else {
 		green.Printf("✓ API key created with admin permissions for %s\n", selectedOrg.Name)
 	}
-	green.Printf("✓ Configuration saved to %s\n", util.GetConfigPath())
+	green.Printf("✓ Configuration saved to %s\n", config.GetConfigPath())
 
 	return nil
 }
