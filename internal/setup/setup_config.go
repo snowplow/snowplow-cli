@@ -65,16 +65,18 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		authURL = deviceAuth.VerificationURI
 	}
 
-	fmt.Printf("- Press Enter to open ")
-	cyan.Printf("%s", authURL)
-	fmt.Printf(" in your browser...")
+	fmt.Printf("You must sign in to continue. Would you like to sign in (Y/n)?")
 
-	fmt.Scanln()
-
+	var openBrowser string
 	browserOpened := false
-	if err := browser.OpenURL(authURL); err == nil {
-		browserOpened = true
-		green.Printf("\n✓ Opened %s in your browser\n", auth0Domain)
+
+	_, _ = fmt.Scanln(&openBrowser)
+
+	if openBrowser == "" || strings.ToLower(openBrowser) == "y" {
+		if err := browser.OpenURL(authURL); err == nil {
+			browserOpened = true
+			green.Printf("\n✓ Opened %s in your browser\n", authURL)
+		}
 	}
 
 	if !browserOpened {
@@ -103,14 +105,10 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	green.Printf("\n✓ Authentication complete.\n")
 	slog.Debug("Authentication successful, proceeding to organization selection")
 
-	slog.Debug("Extracting organization ID from JWT token")
 	jwtOrgID, err := getOrgIDFromJWT(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to get organization ID: %w", err)
 	}
-
-	fmt.Println("TEST HERE")
-	fmt.Println(consoleHost)
 
 	organizations, err := console.GetOrganizations(ctx, token.AccessToken, consoleHost)
 	if err != nil {
@@ -136,7 +134,6 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
-	slog.Debug("Creating API key for organization", "org-id", selectedOrg.ID)
 	apiKey, err := console.CreateAPIKey(ctx, token.AccessToken, consoleHost, selectedOrg.ID, readOnly)
 	if err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
@@ -147,7 +144,6 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		return fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	slog.Debug("Saving configuration to file", "config-path", config.GetConfigPath())
 	if err := config.PersistConfig(selectedOrg.ID, apiKey.ID, apiKey.Secret, consoleHost, isDotenv); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
@@ -159,13 +155,12 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	} else {
 		green.Printf("✓ API key created with admin permissions for %s\n", selectedOrg.Name)
 	}
-	green.Printf("✓ Configuration saved to %s\n", config.GetConfigPath())
 
 	return nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
-	spinner := []string{"‚†ã", "‚†ô", "‚†π", "‚†∏", "‚†º", "‚†¥", "‚†¶", "‚†ß", "‚†á", "‚†è"}
+	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIndex := 0
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -205,13 +200,6 @@ func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceA
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func selectOrganization(organizations []console.Organization, jwtOrgID string) (*console.Organization, error) {
 	cyan := color.New(color.FgCyan)
 	yellow := color.New(color.FgYellow, color.Bold)
@@ -219,7 +207,7 @@ func selectOrganization(organizations []console.Organization, jwtOrgID string) (
 	fmt.Printf("\n")
 	cyan.Printf("You have access to %d organizations:\n\n", len(organizations))
 
-	var defaultIndex int = -1
+	var defaultIndex = -1
 	for i, org := range organizations {
 		if org.ID == jwtOrgID {
 			defaultIndex = i
@@ -243,7 +231,7 @@ func selectOrganization(organizations []console.Organization, jwtOrgID string) (
 	}
 
 	var input string
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 
 	if input == "" && defaultIndex >= 0 {
 		return &organizations[defaultIndex], nil
@@ -281,6 +269,7 @@ func handleAuthError(err error, clientID, auth0Domain string) {
 }
 
 func getOrgIDFromJWT(token string) (string, error) {
+	slog.Debug("Extracting organization ID from JWT token")
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("invalid JWT token format")

@@ -113,7 +113,9 @@ func getStatusOrganizations(ctx context.Context, client *console.ApiClient) ([]c
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("API error: %d", resp.StatusCode)

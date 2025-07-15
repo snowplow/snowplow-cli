@@ -36,6 +36,7 @@ type UserInfo struct {
 }
 
 func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, readOnly bool) (*APIKeyResponse, error) {
+	slog.Debug("Creating API key for organization", "org-id", orgID)
 	apiURL := fmt.Sprintf("%s/api/msc/v1/organizations/%s/credentials/v2/api-keys", consoleHost, orgID)
 
 	slog.Debug("Creating API key", "url", apiURL, "orgID", orgID)
@@ -115,7 +116,9 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

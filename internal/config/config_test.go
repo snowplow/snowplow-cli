@@ -21,7 +21,7 @@ import (
 func build() *cobra.Command {
 	var testCmd = &cobra.Command{
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := InitConsoleConfig(cmd); err != nil {
+			if err := InitConsoleConfig(cmd, false); err != nil {
 				return err
 			}
 

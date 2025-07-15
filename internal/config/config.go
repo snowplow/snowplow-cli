@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -48,7 +49,6 @@ func loadEnvFiles(cmd *cobra.Command) error {
 	} else {
 		cwd, err := os.Getwd()
 		if err == nil {
-			fmt.Println("IM HERE HAHHAHHA")
 			envFilePaths = append(envFilePaths, filepath.Join(cwd, ".env"))
 		}
 
@@ -207,7 +207,9 @@ func PersistConfig(orgID, apiKeyID, apiKeySecret, consoleHost string, isDotEnv b
 }
 
 func SaveConfig(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
-	configPath := GetConfigPath()
+	green := color.New(color.FgGreen)
+	configPath := getConfigPath()
+	slog.Debug("Saving configuration to file", "config-path", configPath)
 
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
@@ -254,31 +256,42 @@ func SaveConfig(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	green.Printf("✓ Configuration saved to %s\n", configPath)
+
 	return nil
 }
 
 func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
+	green := color.New(color.FgGreen)
+	dotenvPath := ".env"
+	slog.Debug("Saving configuration to dot env file", "config-path", dotenvPath)
 
-	existingDotenv, err := godotenv.Read()
-	if err != nil {
-		return err
+	var dotenvContent map[string]string
+	if existingContent, err := godotenv.Read(); err == nil {
+		dotenvContent = existingContent
+	} else {
+		dotenvContent = make(map[string]string)
 	}
 
-	existingDotenv["SNOWPLOW_CONSOLE_API_KEY"] = apiKeySecret
-	existingDotenv["SNOWPLOW_CONSOLE_API_KEY_ID"] = apiKeyID
-	existingDotenv["SNOWPLOW_CONSOLE_ORG_ID"] = orgID
+	dotenvContent["SNOWPLOW_CONSOLE_API_KEY"] = apiKeySecret
+	dotenvContent["SNOWPLOW_CONSOLE_API_KEY_ID"] = apiKeyID
+	dotenvContent["SNOWPLOW_CONSOLE_ORG_ID"] = orgID
 
 	// Only save host if it's not the default production value
 	if consoleHost != "https://console.snowplowanalytics.com" {
-		existingDotenv["SNOWPLOW_CONSOLE_HOST"] = consoleHost
+		dotenvContent["SNOWPLOW_CONSOLE_HOST"] = consoleHost
 	}
 
-	err = godotenv.Write(existingDotenv, ".env")
-
-	return err
+	err := godotenv.Write(dotenvContent, dotenvPath)
+	if err == nil {
+		green.Printf("✓ Configuration saved to %s\n", dotenvPath)
+		return nil
+	} else {
+		return err
+	}
 }
 
-func GetConfigPath() string {
+func getConfigPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "snowplow", "snowplow.yml")
 }

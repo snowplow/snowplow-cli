@@ -19,8 +19,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const snowplowAudience = "https://snowplowanalytics.com/api/"
-
 var SetupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Set up Snowplow CLI with device authentication",
