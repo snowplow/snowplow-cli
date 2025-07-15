@@ -273,13 +273,13 @@ func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
 		dotenvContent = make(map[string]string)
 	}
 
-	dotenvContent["SNOWPLOW_CONSOLE_API_KEY"] = apiKeySecret
-	dotenvContent["SNOWPLOW_CONSOLE_API_KEY_ID"] = apiKeyID
-	dotenvContent["SNOWPLOW_CONSOLE_ORG_ID"] = orgID
+	dotenvContent[toEnvName("api-key")] = apiKeySecret
+	dotenvContent[toEnvName("api-key-id")] = apiKeyID
+	dotenvContent[toEnvName("org-id")] = orgID
 
 	// Only save host if it's not the default production value
 	if consoleHost != "https://console.snowplowanalytics.com" {
-		dotenvContent["SNOWPLOW_CONSOLE_HOST"] = consoleHost
+		dotenvContent[toEnvName("host")] = consoleHost
 	}
 
 	err := godotenv.Write(dotenvContent, dotenvPath)
