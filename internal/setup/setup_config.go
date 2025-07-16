@@ -53,7 +53,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		oauth2.SetAuthURLParam("audience", snowplowAudience))
 	if err != nil {
 		handleAuthError(err, clientID, auth0Domain)
-		os.Exit(1)
+		return fmt.Errorf("failed to initiate device authentication flow: %w", err)
 	}
 
 	yellow := color.New(color.FgYellow, color.Bold)
