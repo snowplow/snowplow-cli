@@ -18,11 +18,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
+
+const envNamePrefix = "SNOWPLOW_CONSOLE_"
 
 func InitConsoleFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringP("api-key-id", "a", "", "BDP console api key id")
@@ -82,7 +85,7 @@ func loadEnvFiles(cmd *cobra.Command) error {
 	return nil
 }
 
-func InitConsoleConfig(cmd *cobra.Command) error {
+func InitConsoleConfig(cmd *cobra.Command, skipMissingCheck bool) error {
 
 	if err := loadEnvFiles(cmd); err != nil {
 		return fmt.Errorf("failed to load .env file: %w", err)
@@ -139,8 +142,7 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 	})
 
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		name := strings.ReplaceAll(strings.ToUpper(f.Name), "-", "_")
-		envName := "SNOWPLOW_CONSOLE_" + name
+		envName := toEnvName(f.Name)
 		if value, ok := os.LookupEnv(envName); err == nil && ok && value != "" {
 			err = cmd.Flags().Set(f.Name, value)
 			slog.Debug("config value found in env", "flag", f.Name, "env", envName)
@@ -158,7 +160,7 @@ func InitConsoleConfig(cmd *cobra.Command) error {
 		}
 	}
 
-	if len(missingVars) > 0 {
+	if len(missingVars) > 0 && !skipMissingCheck {
 		var errorMsg strings.Builder
 		if len(missingVars) == 1 {
 			errorMsg.WriteString(fmt.Sprintf(`config value "%s" not set`, missingVars[0]))
@@ -177,9 +179,8 @@ Configuration can be provided via:
 Required variables:`)
 
 		for _, v := range missingVars {
-			envName := strings.ReplaceAll(strings.ToUpper(v), "-", "_")
 			errorMsg.WriteString(fmt.Sprintf(`
-  %s: --%s or SNOWPLOW_CONSOLE_%s`, v, v, envName))
+  %s: --%s or SNOWPLOW_CONSOLE_%s`, v, v, toEnvName(v)))
 		}
 
 		errorMsg.WriteString(`
@@ -195,4 +196,107 @@ Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console
 	}
 
 	return nil
+}
+
+func PersistConfig(orgID, apiKeyID, apiKeySecret, consoleHost string, isDotEnv bool) error {
+	if isDotEnv {
+		return SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost)
+	} else {
+		return SaveConfig(orgID, apiKeyID, apiKeySecret, consoleHost)
+	}
+}
+
+func SaveConfig(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
+	green := color.New(color.FgGreen)
+	configPath := getConfigPath()
+	slog.Debug("Saving configuration to file", "config-path", configPath)
+
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	var existingConfig map[string]any
+	if existingData, err := os.ReadFile(configPath); err == nil {
+		if err := yaml.Unmarshal(existingData, &existingConfig); err != nil {
+			slog.Warn("Failed to parse existing config, creating new one", "error", err)
+			existingConfig = make(map[string]any)
+		}
+	} else {
+		existingConfig = make(map[string]any)
+	}
+
+	if existingConfig["console"] == nil {
+		existingConfig["console"] = make(map[string]any)
+	}
+
+	consoleConfig, ok := existingConfig["console"].(map[string]any)
+	if !ok {
+		consoleConfig = make(map[string]any)
+		existingConfig["console"] = consoleConfig
+	}
+
+	consoleConfig["api-key"] = apiKeySecret
+	consoleConfig["api-key-id"] = apiKeyID
+	consoleConfig["org-id"] = orgID
+
+	// Only save host if it's not the default production value
+	if consoleHost != "https://console.snowplowanalytics.com" {
+		consoleConfig["host"] = consoleHost
+	}
+
+	// Note: We don't save auth0-domain or client-id to config file
+	// These should be provided via environment variables or command line flags
+
+	data, err := yaml.Marshal(existingConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	green.Printf("✓ Configuration saved to %s\n", configPath)
+
+	return nil
+}
+
+func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
+	green := color.New(color.FgGreen)
+	dotenvPath := ".env"
+	slog.Debug("Saving configuration to dot env file", "config-path", dotenvPath)
+
+	var dotenvContent map[string]string
+	if existingContent, err := godotenv.Read(); err == nil {
+		dotenvContent = existingContent
+	} else {
+		dotenvContent = make(map[string]string)
+	}
+
+	dotenvContent[toEnvName("api-key")] = apiKeySecret
+	dotenvContent[toEnvName("api-key-id")] = apiKeyID
+	dotenvContent[toEnvName("org-id")] = orgID
+
+	// Only save host if it's not the default production value
+	if consoleHost != "https://console.snowplowanalytics.com" {
+		dotenvContent[toEnvName("host")] = consoleHost
+	}
+
+	err := godotenv.Write(dotenvContent, dotenvPath)
+	if err == nil {
+		green.Printf("✓ Configuration saved to %s\n", dotenvPath)
+		return nil
+	} else {
+		return err
+	}
+}
+
+// getConfigPath is a variable holding the function to get config path (for testability)
+var getConfigPath = func() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "snowplow", "snowplow.yml")
+}
+
+func toEnvName(s string) string {
+	return envNamePrefix + strings.ReplaceAll(strings.ToUpper(s), "-", "_")
 }

@@ -119,7 +119,11 @@ func DoConsoleRequest(method string, path string, client *ApiClient, cnx context
 }
 
 func addStandardHeaders(req *http.Request, cnx context.Context, client *ApiClient) {
-	auth := fmt.Sprintf("Bearer %s", client.Jwt)
+	addStandardHeadersWithJwt(req, cnx, client.Jwt)
+}
+
+func addStandardHeadersWithJwt(req *http.Request, cnx context.Context, jwt string) {
+	auth := fmt.Sprintf("Bearer %s", jwt)
 	req.Header.Add("authorization", auth)
 	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
 
