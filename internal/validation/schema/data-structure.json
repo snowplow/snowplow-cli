@@ -26,7 +26,6 @@
         },
         "type": "object",
         "properties": {},
-        "required": [],
         "additionalProperties": false
       }
     },
@@ -189,7 +188,7 @@
               "description": "The text content of the button."
             }
           },
-          "required": ["buttonId", "pageUrl"],
+          "required": ["buttonId"],
           "additionalProperties": false
         },
         {

@@ -36,7 +36,7 @@ type rawAppConfig struct {
 	Console map[string]string
 }
 
-func loadEnvFiles(cmd *cobra.Command) error {
+func loadEnvFiles(cmd *cobra.Command, baseDir string) error {
 	var envFilePaths []string
 	var isExplicitFile bool
 
@@ -44,9 +44,16 @@ func loadEnvFiles(cmd *cobra.Command) error {
 		envFilePaths = append(envFilePaths, envFile)
 		isExplicitFile = true
 	} else {
-		cwd, err := os.Getwd()
-		if err == nil {
-			envFilePaths = append(envFilePaths, filepath.Join(cwd, ".env"))
+		workingDir := baseDir
+		if workingDir == "" {
+			cwd, err := os.Getwd()
+			if err == nil {
+				workingDir = cwd
+			}
+		}
+
+		if workingDir != "" {
+			envFilePaths = append(envFilePaths, filepath.Join(workingDir, ".env"))
 		}
 
 		home, err := os.UserHomeDir()
@@ -83,8 +90,12 @@ func loadEnvFiles(cmd *cobra.Command) error {
 }
 
 func InitConsoleConfig(cmd *cobra.Command) error {
+	return InitConsoleConfigWithBaseDir(cmd, "")
+}
 
-	if err := loadEnvFiles(cmd); err != nil {
+func InitConsoleConfigWithBaseDir(cmd *cobra.Command, baseDir string) error {
+
+	if err := loadEnvFiles(cmd, baseDir); err != nil {
 		return fmt.Errorf("failed to load .env file: %w", err)
 	}
 

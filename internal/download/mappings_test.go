@@ -165,6 +165,23 @@ func Test_localSasToRefs_OK(t *testing.T) {
 
 }
 
+func Test_localSasToRefs_AbsolutePath(t *testing.T) {
+	dpLocation := "/tmp/data-products"
+
+	fileNamesToLocalSas := map[string]model.CliResource[model.SourceAppData]{
+		"/tmp/data-products/source-apps/test.yaml": SaResource[0],
+	}
+	res, err := localSasToRefs(fileNamesToLocalSas, dpLocation)
+
+	expectedRefs := map[string]model.Ref{
+		sampleSa1.Id: {Ref: "./source-apps/test.yaml"},
+	}
+
+	if !reflect.DeepEqual(expectedRefs, res) || err != nil {
+		t.Errorf("localSasToRefs with absolute data products path '%s' should generate relative refs './source-apps/test.yaml', expected:%+v got:%+v, err:%s", dpLocation, expectedRefs, res, err)
+	}
+}
+
 func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"})
 	expected := []model.CliResource[model.DataProductCanonicalData]{{

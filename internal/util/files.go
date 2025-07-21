@@ -33,13 +33,6 @@ type Files struct {
 }
 
 func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) error {
-	var dataStructuresPath string
-	if filepath.IsAbs(f.DataStructuresLocation) {
-		dataStructuresPath = f.DataStructuresLocation
-	} else {
-		dataStructuresPath = filepath.Join(".", f.DataStructuresLocation)
-	}
-
 	vendorToSchemas := make(map[string][]model.DataStructure)
 	var vendorIds []idFileName
 
@@ -68,7 +61,7 @@ func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) err
 
 	for originalVendor, schemas := range vendorToSchemas {
 		uniqueVendorName := vendorMapping[originalVendor]
-		vendorPath := filepath.Join(dataStructuresPath, uniqueVendorName)
+		vendorPath := filepath.Join(f.DataStructuresLocation, uniqueVendorName)
 
 		err := os.MkdirAll(vendorPath, os.ModePerm)
 		if err != nil {
@@ -130,7 +123,7 @@ func createUniqueNames(idsToFileNames []idFileName) []idFileName {
 }
 
 func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], isPlain bool) (map[string]model.CliResource[model.SourceAppData], error) {
-	sourceAppsPath := filepath.Join(".", f.DataProductsLocation, f.SourceAppsLocation)
+	sourceAppsPath := filepath.Join(f.DataProductsLocation, f.SourceAppsLocation)
 	err := os.MkdirAll(sourceAppsPath, os.ModePerm)
 
 	if err != nil {
@@ -161,8 +154,7 @@ func (f Files) CreateSourceApps(sas []model.CliResource[model.SourceAppData], is
 }
 
 func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanonicalData], isPlain bool) (map[string]model.CliResource[model.DataProductCanonicalData], error) {
-	dataProductsPath := filepath.Join(".", f.DataProductsLocation)
-	err := os.MkdirAll(dataProductsPath, os.ModePerm)
+	err := os.MkdirAll(f.DataProductsLocation, os.ModePerm)
 
 	if err != nil {
 		return nil, err
@@ -181,7 +173,7 @@ func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanon
 
 	for _, idToName := range uniqueNames {
 		dp := idToDp[idToName.Id]
-		abs, err := WriteResourceToFile(dp, dataProductsPath, idToName.FileName, f.ExtentionPreference, isPlain, dp.ResourceType)
+		abs, err := WriteResourceToFile(dp, f.DataProductsLocation, idToName.FileName, f.ExtentionPreference, isPlain, dp.ResourceType)
 		if err != nil {
 			return nil, err
 		}
@@ -192,23 +184,25 @@ func (f Files) CreateDataProducts(dps []model.CliResource[model.DataProductCanon
 }
 
 func (f Files) CreateImageFolder() (string, error) {
-	cwd, err := os.Getwd()
+	var dataProductsPath string
+	if filepath.IsAbs(f.DataProductsLocation) {
+		dataProductsPath = f.DataProductsLocation
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		dataProductsPath = filepath.Join(cwd, f.DataProductsLocation)
+	}
+
+	imagesPath := filepath.Join(dataProductsPath, f.ImagesLocation)
+	err := os.MkdirAll(imagesPath, os.ModePerm)
+
 	if err != nil {
 		return "", err
 	}
 
-	imagesPath := filepath.Join(cwd, f.DataProductsLocation, f.ImagesLocation)
-	err = os.MkdirAll(imagesPath, os.ModePerm)
-
-	if err != nil {
-		return "", err
-	}
-
-	relativePath, err := filepath.Rel(cwd, imagesPath)
-	if err != nil {
-		return "", err
-	}
-	return relativePath, nil
+	return imagesPath, nil
 }
 
 func (f Files) WriteImage(name string, dir string, image *model.Image) (string, error) {
@@ -220,7 +214,18 @@ func (f Files) WriteImage(name string, dir string, image *model.Image) (string, 
 
 	slog.Debug("wrote", "file", filePath)
 
-	rel, err := filepath.Rel(f.DataProductsLocation, filePath)
+	var dataProductsPath string
+	if filepath.IsAbs(f.DataProductsLocation) {
+		dataProductsPath = f.DataProductsLocation
+	} else {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		dataProductsPath = filepath.Join(cwd, f.DataProductsLocation)
+	}
+
+	rel, err := filepath.Rel(dataProductsPath, filePath)
 	if err != nil {
 		return "", err
 	}
