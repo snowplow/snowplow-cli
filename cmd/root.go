@@ -26,7 +26,8 @@ var RootCmd = &cobra.Command{
 
 Configuration required: org-id, api-key-id, api-key
 Get credentials: https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/`,
-	Example: `  $ snowplow-cli data-structures download
+	Example: `  $ snowplow-cli setup
+  $ snowplow-cli data-structures download
   $ snowplow-cli ds validate
   $ snowplow-cli mcp`,
 	Version: util.Version,
@@ -61,4 +62,6 @@ Then on:
 	RootCmd.AddCommand(ds.DataStructuresCmd)
 	RootCmd.AddCommand(dp.DataProductsCmd)
 	RootCmd.AddCommand(McpCmd)
+	RootCmd.AddCommand(SetupCmd)
+	RootCmd.AddCommand(StatusCmd)
 }
