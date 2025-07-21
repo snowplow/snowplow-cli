@@ -244,7 +244,8 @@ Setup options:
 `,
 	RunE: runMCPServer,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := config.InitConsoleConfig(cmd); err != nil {
+		baseDir, _ := cmd.Flags().GetString("base-directory")
+		if err := config.InitConsoleConfigWithBaseDir(cmd, baseDir); err != nil {
 			logging.LogFatal(err)
 		}
 
