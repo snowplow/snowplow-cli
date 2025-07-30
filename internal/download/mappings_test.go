@@ -284,3 +284,131 @@ func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
 	}
 
 }
+
+func Test_remoteDpToLocal_SourceAppOrderingConsistency(t *testing.T) {
+	saRefs := map[string]model.Ref{
+		"c-third":  {Ref: "./source-apps/third.yaml"},
+		"a-first":  {Ref: "./source-apps/first.yaml"},
+		"b-second": {Ref: "./source-apps/second.yaml"},
+	}
+
+	dp1 := console.RemoteDataProduct{
+		Id:                   "test-dp",
+		Name:                 "Test DP",
+		SourceApplicationIds: []string{"c-third", "a-first", "b-second"},
+		EventSpecs:           []console.EventSpecReference{},
+	}
+
+	dp2 := console.RemoteDataProduct{
+		Id:                   "test-dp",
+		Name:                 "Test DP",
+		SourceApplicationIds: []string{"b-second", "c-third", "a-first"},
+		EventSpecs:           []console.EventSpecReference{},
+	}
+
+	result1 := remoteDpToLocal(dp1, saRefs, map[string]console.RemoteEventSpec{}, map[string]string{})
+	result2 := remoteDpToLocal(dp2, saRefs, map[string]console.RemoteEventSpec{}, map[string]string{})
+
+	expectedRefs := []model.Ref{
+		{Ref: "./source-apps/first.yaml"},
+		{Ref: "./source-apps/second.yaml"},
+		{Ref: "./source-apps/third.yaml"},
+	}
+
+	if !reflect.DeepEqual(result1.SourceApplications, expectedRefs) {
+		t.Errorf("First result SourceApplications = %v, want %v", result1.SourceApplications, expectedRefs)
+	}
+
+	if !reflect.DeepEqual(result2.SourceApplications, expectedRefs) {
+		t.Errorf("Second result SourceApplications = %v, want %v", result2.SourceApplications, expectedRefs)
+	}
+
+	if !reflect.DeepEqual(result1.SourceApplications, result2.SourceApplications) {
+		t.Errorf("Results differ based on input order. Result1=%v, Result2=%v",
+			result1.SourceApplications, result2.SourceApplications)
+	}
+}
+
+func Test_remoteEsToLocal_ExclusionOrderingConsistency(t *testing.T) {
+	saRefs := map[string]model.Ref{
+		"exclude-b": {Ref: "./source-apps/exclude-b.yaml"},
+		"exclude-a": {Ref: "./source-apps/exclude-a.yaml"},
+		"include-x": {Ref: "./source-apps/include-x.yaml"},
+	}
+
+	es := console.RemoteEventSpec{
+		Id:                   "test-es",
+		Name:                 "Test ES",
+		SourceApplicationIds: []string{"include-x"},
+		Event: &console.EventWrapper{Event: console.Event{
+			Source: "iglu:test/schema/jsonschema/1-0-0",
+			Schema: map[string]any{},
+		}},
+		Entities: console.Entities{Tracked: []console.Entity{}, Enriched: []console.Entity{}},
+	}
+
+	dpSourceApps1 := []string{"exclude-b", "exclude-a", "include-x"}
+	dpSourceApps2 := []string{"include-x", "exclude-a", "exclude-b"}
+
+	result1 := remoteEsToLocal(es, saRefs, dpSourceApps1, map[string]string{})
+	result2 := remoteEsToLocal(es, saRefs, dpSourceApps2, map[string]string{})
+
+	expectedExclusions := []model.Ref{
+		{Ref: "./source-apps/exclude-a.yaml"},
+		{Ref: "./source-apps/exclude-b.yaml"},
+	}
+
+	if !reflect.DeepEqual(result1.ExcludedSourceApplications, expectedExclusions) {
+		t.Errorf("First result exclusions = %v, want %v", result1.ExcludedSourceApplications, expectedExclusions)
+	}
+
+	if !reflect.DeepEqual(result2.ExcludedSourceApplications, expectedExclusions) {
+		t.Errorf("Second result exclusions = %v, want %v", result2.ExcludedSourceApplications, expectedExclusions)
+	}
+
+	if !reflect.DeepEqual(result1.ExcludedSourceApplications, result2.ExcludedSourceApplications) {
+		t.Errorf("Exclusion results differ based on input order. Result1=%v, Result2=%v",
+			result1.ExcludedSourceApplications, result2.ExcludedSourceApplications)
+	}
+}
+
+func Test_remoteDpToLocal_EmptySourceApps(t *testing.T) {
+	dp := console.RemoteDataProduct{
+		Id:                   "test-dp",
+		Name:                 "Test DP",
+		SourceApplicationIds: []string{},
+		EventSpecs:           []console.EventSpecReference{},
+	}
+
+	result := remoteDpToLocal(dp, map[string]model.Ref{}, map[string]console.RemoteEventSpec{}, map[string]string{})
+
+	if len(result.SourceApplications) != 0 {
+		t.Errorf("Expected empty SourceApplications, got %v", result.SourceApplications)
+	}
+}
+
+func Test_remoteEsToLocal_NoExclusions(t *testing.T) {
+	saRefs := map[string]model.Ref{
+		"app1": {Ref: "./source-apps/app1.yaml"},
+		"app2": {Ref: "./source-apps/app2.yaml"},
+	}
+
+	es := console.RemoteEventSpec{
+		Id:                   "test-es",
+		Name:                 "Test ES",
+		SourceApplicationIds: []string{"app1", "app2"},
+		Event: &console.EventWrapper{Event: console.Event{
+			Source: "iglu:test/schema/jsonschema/1-0-0",
+			Schema: map[string]any{},
+		}},
+		Entities: console.Entities{Tracked: []console.Entity{}, Enriched: []console.Entity{}},
+	}
+
+	dpSourceApps := []string{"app2", "app1"}
+
+	result := remoteEsToLocal(es, saRefs, dpSourceApps, map[string]string{})
+
+	if len(result.ExcludedSourceApplications) != 0 {
+		t.Errorf("Expected no exclusions when ES includes all DP source apps, got %v", result.ExcludedSourceApplications)
+	}
+}

@@ -74,6 +74,7 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 	var excludedSourceApps []model.Ref
 
 	excludedIds := util.SetMinus(dataProductSourceAppIds, remoteEs.SourceApplicationIds)
+	sort.Strings(excludedIds)
 
 	for _, saId := range excludedIds {
 		ref := saIdToRef[saId]
@@ -128,7 +129,12 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 
 func remoteDpToLocal(remoteDp console.RemoteDataProduct, saIdToRef map[string]model.Ref, eventSpecIdToRes map[string]console.RemoteEventSpec, triggerIdsToImagePath map[string]string) model.DataProductCanonicalData {
 	var sourceApps []model.Ref
-	for _, saId := range remoteDp.SourceApplicationIds {
+
+	sortedSaIds := make([]string, len(remoteDp.SourceApplicationIds))
+	copy(sortedSaIds, remoteDp.SourceApplicationIds)
+	sort.Strings(sortedSaIds)
+
+	for _, saId := range sortedSaIds {
 		ref := saIdToRef[saId]
 		sourceApps = append(sourceApps, ref)
 	}
@@ -136,8 +142,7 @@ func remoteDpToLocal(remoteDp console.RemoteDataProduct, saIdToRef map[string]mo
 	var eventSpecs []model.EventSpecCanonical
 	for _, esId := range remoteDp.EventSpecs {
 		es := eventSpecIdToRes[esId.Id]
-		eventSpecs = append(eventSpecs, remoteEsToLocal(es, saIdToRef, remoteDp.SourceApplicationIds, triggerIdsToImagePath))
-
+		eventSpecs = append(eventSpecs, remoteEsToLocal(es, saIdToRef, sortedSaIds, triggerIdsToImagePath))
 	}
 	return model.DataProductCanonicalData{
 		ResourceName:        remoteDp.Id,
