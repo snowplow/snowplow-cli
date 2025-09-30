@@ -34,6 +34,14 @@ type DataStructure struct {
 	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
 }
 
+type DataStructureDraft struct {
+	ApiVersion   string            `yaml:"apiVersion" json:"apiVersion" validate:"required,oneof=v1"`
+	ResourceType string            `yaml:"resourceType" json:"resourceType" validate:"required,oneof=data-structure"`
+	Meta         DataStructureMeta `yaml:"meta" json:"meta" validate:"required"`
+	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
+	LastModified string            `yaml:"lastModified" json:"lastModified"`
+}
+
 func (ds DataStructure) GetContentHash() (string, error) {
 	byteBuffer := new(bytes.Buffer)
 	e := json.NewEncoder(byteBuffer)

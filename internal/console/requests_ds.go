@@ -276,6 +276,35 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 	return listResp, nil
 }
 
+func GetDataStructureDraftsListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1", client.BaseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp []ListResponse
+	err = kjson.Unmarshal(rbody, &listResp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
+	}
+	return listResp, nil
+}
+
 func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash string) ([]Deployment, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
 	if err != nil {
@@ -379,6 +408,105 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 					}
 				} else {
 					dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+					res = append(res, dataStructure)
+				}
+			}
+		}
+	}
+
+	if skippedCount > 0 {
+		slog.Info("skipped legacy data structures with empty schemaType", "count", skippedCount, "note", "use --include-legacy to include them")
+	}
+	if includedLegacyCount > 0 {
+		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
+	}
+
+	return res, nil
+}
+
+// SPO
+func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructureDraft, error) {
+
+	listResp, err := GetDataStructureDraftsListing(cnx, client)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []model.DataStructureDraft
+	var dsData []map[string]any
+	// var temp any
+	var skippedCount int
+	var includedLegacyCount int
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// SPO
+	println("xxxxxxx============")
+	fmt.Print("xxxxxxx============")
+
+	println(string(rbody))
+
+	fmt.Print("xxxxxxx============")
+
+	err = kjson.Unmarshal(rbody, &dsData)
+	// fmt.Print(temp)
+	if err != nil {
+		return nil, err
+	}
+
+	dsDataMap := map[string]map[string]any{}
+	for _, ds := range dsData {
+		if self, ok := ds["self"].(map[string]any); ok {
+			dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
+		} else {
+			return nil, fmt.Errorf("wrong data structure self section %s", ds["self"])
+		}
+	}
+
+	for _, dsResp := range listResp {
+		matched := false
+		for _, m := range match {
+			dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
+			if strings.HasPrefix(dsUri, m) {
+				matched = true
+			}
+
+			slog.Debug("fetching data structure", "match", m, "dsUri", dsUri, "result", matched)
+		}
+
+		if !matched && len(match) > 0 {
+			continue
+		}
+
+		for _, deployment := range dsResp.Deployments {
+			if deployment.Env == DEV {
+				if dsResp.Meta.SchemaType == "" {
+					if !includeLegacy {
+						skippedCount++
+						continue
+					} else {
+						includedLegacyCount++
+						meta := dsResp.Meta
+						meta.SchemaType = "entity"
+						dataStructure := model.DataStructureDraft{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
+						res = append(res, dataStructure)
+					}
+				} else {
+					dataStructure := model.DataStructureDraft{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
 					res = append(res, dataStructure)
 				}
 			}
