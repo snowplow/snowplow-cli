@@ -434,7 +434,6 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 
 	var res []model.DataStructureDraft
 	var dsData []map[string]any
-	// var temp any
 	var skippedCount int
 	var includedLegacyCount int
 
@@ -455,15 +454,11 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 	}
 
 	// SPO
-	println("xxxxxxx============")
-	fmt.Print("xxxxxxx============")
-
+	println("xxx=====body")
 	println(string(rbody))
-
-	fmt.Print("xxxxxxx============")
+	println("xxx=====body")
 
 	err = kjson.Unmarshal(rbody, &dsData)
-	// fmt.Print(temp)
 	if err != nil {
 		return nil, err
 	}
