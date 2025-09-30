@@ -80,7 +80,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			if err != nil {
 				snplog.LogFatalMsg("data structure drafts fetch failed", err)
 			}
-			slog.Info("xxx wrote data structures drafts", "count", len(dssDrafts))
+			slog.Info("wrote data structures drafts", "count", len(dssDrafts))
 		}
 
 		err = files.CreateDataStructures(dss, plain)

@@ -450,13 +450,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 		return nil, err
 	}
 
-	dsDataMap := map[string]map[string]any{}
 	for _, ds := range dsData {
-		self := ds["self"].(map[string]any)
-		dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
-	}
-
-	for _, ds := range dsDataMap {
 		dataStructure := model.DataStructureDraft{
 			ApiVersion:   "v1",
 			ResourceType: "data-structure",
