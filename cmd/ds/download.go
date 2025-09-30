@@ -12,9 +12,9 @@ package ds
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/download"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -52,6 +52,8 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 		plain, _ := cmd.Flags().GetBool("plain")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
+		includeDrafts, _ := cmd.Flags().GetBool("include-drafts")
+
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
@@ -64,23 +66,22 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			snplog.LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := console.GetAllDataStructures(cnx, c, match, includeLegacy)
+		allDss, err := download.GetDataStructuresWithOptions(cnx, c, includeDrafts, match, includeLegacy)
 		if err != nil {
 			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
 
-		err = files.CreateDataStructures(dss, plain)
+		err = files.CreateDataStructures(allDss, plain)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
-
-		slog.Info("wrote data structures", "count", len(dss))
 	},
 }
 
 func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
 
+	downloadCmd.PersistentFlags().Bool("include-drafts", false, "Include drafts data structures")
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
 	downloadCmd.PersistentFlags().Bool("include-legacy", false, "Include legacy data structures with empty schemaType (will be set to 'entity')")

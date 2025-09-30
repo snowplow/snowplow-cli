@@ -173,9 +173,6 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		req.URL.RawQuery = q.Encode()
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -390,6 +387,64 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	}
 	if includedLegacyCount > 0 {
 		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
+	}
+
+	return res, nil
+}
+
+func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string) ([]model.DataStructure, error) {
+	var res []model.DataStructure
+	var dsData []map[string]any
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = kjson.Unmarshal(rbody, &dsData)
+	if err != nil {
+		return nil, err
+	}
+
+	noFilter := len(match) == 0
+	for _, ds := range dsData {
+		dataStructure := model.DataStructure{
+			ApiVersion:   "v1",
+			ResourceType: "data-structure",
+			Meta: model.DataStructureMeta{
+				Hidden:     false,
+				SchemaType: "entity",
+				CustomData: map[string]string{},
+			},
+			Data: ds,
+		}
+		if noFilter {
+			res = append(res, dataStructure)
+		} else {
+			if self, ok := ds["self"].(map[string]any); ok {
+				dsUri := fmt.Sprintf("%s/%s/%s", self["vendor"], self["name"], self["format"])
+				matched := false
+				for _, m := range match {
+					if strings.HasPrefix(dsUri, m) {
+						matched = true
+					}
+				}
+				if matched {
+					res = append(res, dataStructure)
+				}
+			}
+		}
 	}
 
 	return res, nil
