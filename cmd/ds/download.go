@@ -52,6 +52,11 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 		plain, _ := cmd.Flags().GetBool("plain")
 		files := util.Files{DataStructuresLocation: dataStructuresFolder, ExtentionPreference: format}
 
+		_, err := cmd.Flags().GetBool("include-drafts")
+		if err != nil {
+			snplog.LogFatalMsg("failed to include drafts", err)
+		}
+
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key")
 		host, _ := cmd.Flags().GetString("host")
@@ -80,6 +85,8 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 
 func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
+
+	downloadCmd.PersistentFlags().Bool("include-drafts", true, "Include drafts data structures")
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
