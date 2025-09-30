@@ -395,6 +395,48 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	return res, nil
 }
 
+func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructure, error) {
+	var res []model.DataStructure
+	var dsData []map[string]any
+
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = kjson.Unmarshal(rbody, &dsData)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ds := range dsData {
+		dataStructure := model.DataStructure{
+			ApiVersion:   "v1",
+			ResourceType: "data-structure",
+			Meta: model.DataStructureMeta{
+				Hidden:     false,
+				SchemaType: "entity",
+				CustomData: map[string]string{},
+			},
+			Data: ds,
+		}
+		res = append(res, dataStructure)
+	}
+
+	return res, nil
+}
+
 func MetadateUpdate(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {
 
 	data, err := ds.ParseData()
