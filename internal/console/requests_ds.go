@@ -426,16 +426,8 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 
 // SPO
 func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructureDraft, error) {
-
-	listResp, err := GetDataStructureDraftsListing(cnx, client)
-	if err != nil {
-		return nil, err
-	}
-
 	var res []model.DataStructureDraft
 	var dsData []map[string]any
-	var skippedCount int
-	var includedLegacyCount int
 
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
 	if err != nil {
@@ -453,11 +445,6 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 		return nil, err
 	}
 
-	// SPO
-	println("xxx=====body")
-	println(string(rbody))
-	println("xxx=====body")
-
 	err = kjson.Unmarshal(rbody, &dsData)
 	if err != nil {
 		return nil, err
@@ -465,54 +452,22 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 
 	dsDataMap := map[string]map[string]any{}
 	for _, ds := range dsData {
-		if self, ok := ds["self"].(map[string]any); ok {
-			dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
-		} else {
-			return nil, fmt.Errorf("wrong data structure self section %s", ds["self"])
-		}
+		self := ds["self"].(map[string]any)
+		dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
 	}
 
-	for _, dsResp := range listResp {
-		matched := false
-		for _, m := range match {
-			dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
-			if strings.HasPrefix(dsUri, m) {
-				matched = true
-			}
-
-			slog.Debug("fetching data structure", "match", m, "dsUri", dsUri, "result", matched)
+	for _, ds := range dsDataMap {
+		dataStructure := model.DataStructureDraft{
+			ApiVersion:   "v1",
+			ResourceType: "data-structure",
+			Meta: model.DataStructureMeta{
+				Hidden:     false,
+				SchemaType: "entity",
+				CustomData: map[string]string{},
+			},
+			Data: ds,
 		}
-
-		if !matched && len(match) > 0 {
-			continue
-		}
-
-		for _, deployment := range dsResp.Deployments {
-			if deployment.Env == DEV {
-				if dsResp.Meta.SchemaType == "" {
-					if !includeLegacy {
-						skippedCount++
-						continue
-					} else {
-						includedLegacyCount++
-						meta := dsResp.Meta
-						meta.SchemaType = "entity"
-						dataStructure := model.DataStructureDraft{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
-						res = append(res, dataStructure)
-					}
-				} else {
-					dataStructure := model.DataStructureDraft{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
-					res = append(res, dataStructure)
-				}
-			}
-		}
-	}
-
-	if skippedCount > 0 {
-		slog.Info("skipped legacy data structures with empty schemaType", "count", skippedCount, "note", "use --include-legacy to include them")
-	}
-	if includedLegacyCount > 0 {
-		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
+		res = append(res, dataStructure)
 	}
 
 	return res, nil
