@@ -74,16 +74,20 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
 
+		allDss := dss
 		// SPO
 		if includeDrafts {
 			dssDrafts, err := console.GetAllDataStructuresDrafts(cnx, c, match, includeLegacy)
 			if err != nil {
 				snplog.LogFatalMsg("data structure drafts fetch failed", err)
 			}
+			allDss = append(allDss, dssDrafts...)
+
 			slog.Info("wrote data structures drafts", "count", len(dssDrafts))
+
 		}
 
-		err = files.CreateDataStructures(dss, plain)
+		err = files.CreateDataStructures(allDss, plain)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -95,7 +99,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
 
-	downloadCmd.PersistentFlags().Bool("include-drafts", true, "Include drafts data structures")
+	downloadCmd.PersistentFlags().Bool("include-drafts", false, "Include drafts data structures")
 
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")

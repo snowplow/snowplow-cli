@@ -425,8 +425,8 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 }
 
 // SPO
-func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructureDraft, error) {
-	var res []model.DataStructureDraft
+func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructure, error) {
+	var res []model.DataStructure
 	var dsData []map[string]any
 
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
@@ -451,7 +451,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 	}
 
 	for _, ds := range dsData {
-		dataStructure := model.DataStructureDraft{
+		dataStructure := model.DataStructure{
 			ApiVersion:   "v1",
 			ResourceType: "data-structure",
 			Meta: model.DataStructureMeta{

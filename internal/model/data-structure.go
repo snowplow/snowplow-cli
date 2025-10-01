@@ -32,14 +32,7 @@ type DataStructure struct {
 	ResourceType string            `yaml:"resourceType" json:"resourceType" validate:"required,oneof=data-structure"`
 	Meta         DataStructureMeta `yaml:"meta" json:"meta" validate:"required"`
 	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
-}
-
-type DataStructureDraft struct {
-	ApiVersion   string            `yaml:"apiVersion" json:"apiVersion" validate:"required,oneof=v1"`
-	ResourceType string            `yaml:"resourceType" json:"resourceType" validate:"required,oneof=data-structure"`
-	Meta         DataStructureMeta `yaml:"meta" json:"meta" validate:"required"`
-	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
-	LastModified string            `yaml:"lastModified" json:"lastModified"`
+	LastModified string            `yaml:"lastModified,omitempty" json:"lastModified,omitempty"`
 }
 
 func (ds DataStructure) GetContentHash() (string, error) {
