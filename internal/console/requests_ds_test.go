@@ -567,7 +567,7 @@ func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	result, err := GetAllDataStructuresDrafts(cnx, client, []string{}, false)
+	result, err := GetAllDataStructuresDrafts(cnx, client, []string{})
 	if err != nil {
 		t.Error(err)
 	}
