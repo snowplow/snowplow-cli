@@ -395,7 +395,6 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	return res, nil
 }
 
-// SPO
 func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructure, error) {
 	var res []model.DataStructure
 	var dsData []map[string]any
