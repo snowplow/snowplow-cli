@@ -77,7 +77,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 		allDss := dss
 
 		if includeDrafts {
-			dssDrafts, err := console.GetAllDataStructuresDrafts(cnx, c, match, includeLegacy)
+			dssDrafts, err := console.GetAllDataStructuresDrafts(cnx, c, match)
 			if err != nil {
 				snplog.LogFatalMsg("data structure drafts fetch failed", err)
 			}
