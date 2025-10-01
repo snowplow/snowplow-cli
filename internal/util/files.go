@@ -33,6 +33,10 @@ type Files struct {
 }
 
 func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) error {
+	return f.CreateDataStructuresWithVersions(dss, isPlain, false)
+}
+
+func (f Files) CreateDataStructuresWithVersions(dss []model.DataStructure, isPlain bool, includeVersions bool) error {
 	vendorToSchemas := make(map[string][]model.DataStructure)
 	var vendorIds []idFileName
 
@@ -73,9 +77,16 @@ func (f Files) CreateDataStructures(dss []model.DataStructure, isPlain bool) err
 		for _, ds := range schemas {
 			data, _ := ds.ParseData()
 			id := fmt.Sprintf("%s/%s", originalVendor, data.Self.Name)
+
+			// Generate filename with or without version
+			fileName := data.Self.Name
+			if includeVersions {
+				fileName = fmt.Sprintf("%s_%s", data.Self.Name, data.Self.Version)
+			}
+
 			schemaIds = append(schemaIds, idFileName{
 				Id:       id,
-				FileName: data.Self.Name,
+				FileName: fileName,
 			})
 			idToDs[id] = ds
 		}

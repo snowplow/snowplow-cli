@@ -172,10 +172,6 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		q.Add("patch", "true")
 		req.URL.RawQuery = q.Encode()
 	}
-
-	if err != nil {
-		return nil, err
-	}
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -465,4 +461,197 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 	}
 
 	return nil
+}
+
+// GenerateDataStructureHash generates a SHA-256 hash for a data structure
+// based on organization ID, vendor, name, and format as per Snowplow API documentation
+func GenerateDataStructureHash(orgId, vendor, name, format string) string {
+	// Concatenate with dashes as separator: orgId-vendor-name-format
+	concatenated := fmt.Sprintf("%s-%s-%s-%s", orgId, vendor, name, format)
+
+	// Hash with SHA-256
+	hasher := sha256.New()
+	hasher.Write([]byte(concatenated))
+	hash := hasher.Sum(nil)
+
+	// Return as hex string
+	return fmt.Sprintf("%x", hash)
+}
+
+// GetSpecificDataStructure retrieves a specific data structure by its hash
+func GetSpecificDataStructure(cnx context.Context, client *ApiClient, dsHash string) (*model.DataStructure, error) {
+	// First get the listing to get metadata and deployments
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s", client.BaseUrl, dsHash), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to retrieve data structure: status %d", resp.StatusCode)
+	}
+
+	// Parse the listing response
+	var listingResp struct {
+		Hash        string                  `json:"hash"`
+		Vendor      string                  `json:"vendor"`
+		Name        string                  `json:"name"`
+		Format      string                  `json:"format"`
+		Meta        model.DataStructureMeta `json:"meta"`
+		Deployments []Deployment            `json:"deployments"`
+	}
+
+	err = kjson.Unmarshal(rbody, &listingResp)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the latest version in DEV environment
+	var latestVersion string
+	for _, deployment := range listingResp.Deployments {
+		if deployment.Env == DEV {
+			latestVersion = deployment.Version
+			break
+		}
+	}
+
+	if latestVersion == "" {
+		return nil, fmt.Errorf("no deployment found in DEV environment")
+	}
+
+	// Now get the actual schema data using the same approach as bulk download
+	return GetSpecificDataStructureVersion(cnx, client, dsHash, latestVersion)
+}
+
+// GetSpecificDataStructureVersion retrieves a specific version of a data structure
+func GetSpecificDataStructureVersion(cnx context.Context, client *ApiClient, dsHash, version string) (*model.DataStructure, error) {
+	// First get the listing to get metadata
+	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s", client.BaseUrl, dsHash), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req, cnx, client)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	rbody, err := io.ReadAll(resp.Body)
+	defer util.LoggingCloser(cnx, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to retrieve data structure: status %d", resp.StatusCode)
+	}
+
+	// Parse the listing response
+	var listingResp struct {
+		Hash        string                  `json:"hash"`
+		Vendor      string                  `json:"vendor"`
+		Name        string                  `json:"name"`
+		Format      string                  `json:"format"`
+		Meta        model.DataStructureMeta `json:"meta"`
+		Deployments []Deployment            `json:"deployments"`
+	}
+
+	err = kjson.Unmarshal(rbody, &listingResp)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now get the actual schema data using the bulk download approach
+	// We need to get all schema versions and find the one we want
+	req2, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/schemas/versions", client.BaseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	addStandardHeaders(req2, cnx, client)
+	resp2, err := client.Http.Do(req2)
+	if err != nil {
+		return nil, err
+	}
+	rbody2, err := io.ReadAll(resp2.Body)
+	defer util.LoggingCloser(cnx, resp2.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp2.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to retrieve schema versions: status %d", resp2.StatusCode)
+	}
+
+	var dsData []map[string]any
+	err = kjson.Unmarshal(rbody2, &dsData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the specific version we want
+	key := fmt.Sprintf("%s-%s-%s-%s", listingResp.Vendor, listingResp.Name, listingResp.Format, version)
+	var schemaData map[string]any
+	for _, ds := range dsData {
+		if self, ok := ds["self"].(map[string]any); ok {
+			dsKey := fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])
+			if dsKey == key {
+				schemaData = ds
+				break
+			}
+		}
+	}
+
+	if schemaData == nil {
+		return nil, fmt.Errorf("schema data not found for version %s", version)
+	}
+
+	// Construct the data structure
+	ds := model.DataStructure{
+		ApiVersion:   "v1",
+		ResourceType: "data-structure",
+		Meta:         listingResp.Meta,
+		Data:         schemaData,
+	}
+
+	return &ds, nil
+}
+
+// GetAllDataStructureVersions downloads all versions of a specific data structure
+func GetAllDataStructureVersions(cnx context.Context, client *ApiClient, dsHash string, envFilter string) ([]model.DataStructure, error) {
+	// First get all deployments for this data structure
+	deployments, err := GetDataStructureDeployments(cnx, client, dsHash)
+	if err != nil {
+		return nil, err
+	}
+
+	var dataStructures []model.DataStructure
+
+	// Download each version, filtering by environment if specified
+	for _, deployment := range deployments {
+		// Filter by environment if specified
+		if envFilter != "" && string(deployment.Env) != envFilter {
+			continue
+		}
+
+		ds, err := GetSpecificDataStructureVersion(cnx, client, dsHash, deployment.Version)
+		if err != nil {
+			// Log error but continue with other versions
+			slog.Warn("failed to download version", "version", deployment.Version, "env", deployment.Env, "error", err)
+			continue
+		}
+		dataStructures = append(dataStructures, *ds)
+	}
+
+	return dataStructures, nil
 }
