@@ -173,9 +173,6 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		req.URL.RawQuery = q.Encode()
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
@@ -431,7 +428,22 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 			},
 			Data: ds,
 		}
-		res = append(res, dataStructure)
+		if len(match) == 0 {
+			res = append(res, dataStructure)
+		} else {
+			if self, ok := ds["self"].(map[string]any); ok {
+				dsUri := fmt.Sprintf("%s/%s/%s", self["vendor"], self["name"], self["format"])
+				matched := false
+				for _, m := range match {
+					if strings.Contains(dsUri, m) {
+						matched = true
+					}
+				}
+				if matched {
+					res = append(res, dataStructure)
+				}
+			}
+		}
 	}
 
 	return res, nil
