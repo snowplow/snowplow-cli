@@ -436,7 +436,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 				dsUri := fmt.Sprintf("%s/%s/%s", self["vendor"], self["name"], self["format"])
 				matched := false
 				for _, m := range match {
-					if strings.Contains(dsUri, m) {
+					if strings.HasPrefix(dsUri, m) {
 						matched = true
 					}
 				}
