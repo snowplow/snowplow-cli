@@ -515,6 +515,68 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	}
 }
 
+func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
+
+				resp := `[
+						{
+							"type": "object",
+							"properties": {},
+							"description": "",
+							"additionalProperties": false,
+							"self": {
+							"vendor": "com.snplow.msc.aws",
+							"name": "di_test_unified_entity",
+							"format": "jsonschema",
+							"version": "1-0-0"
+							},
+							"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+						},
+						{
+							"type": "object",
+							"properties": {},
+							"description": "fdsafa",
+							"additionalProperties": false,
+							"self": {
+							"vendor": "com.snplow.msc.aws",
+							"name": "testjvdraft2",
+							"format": "jsonschema",
+							"version": "1-0-0"
+							},
+							"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+						}	
+				]`
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
+			}
+		default:
+			t.Errorf("Unexpected request, got: %s", r.URL.Path)
+			return
+		}
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := GetAllDataStructuresDrafts(cnx, client, []string{}, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("Unexpected number of results, expected 2, got: %d", len(result))
+	}
+}
+
 func Test_MetadataUpdate_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/20308fa345d397de04f26a34a6083744d06ae1aeb673e1658b0b50a7a86ea395/meta" {
