@@ -276,35 +276,6 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 	return listResp, nil
 }
 
-func GetDataStructureDraftsListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1", client.BaseUrl), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	addStandardHeaders(req, cnx, client)
-	resp, err := client.Http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var listResp []ListResponse
-	err = kjson.Unmarshal(rbody, &listResp)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
-	}
-	return listResp, nil
-}
-
 func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash string) ([]Deployment, error) {
 	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
 	if err != nil {
