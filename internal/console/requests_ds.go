@@ -417,6 +417,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 		return nil, err
 	}
 
+	noFilter := len(match) == 0
 	for _, ds := range dsData {
 		dataStructure := model.DataStructure{
 			ApiVersion:   "v1",
@@ -428,7 +429,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 			},
 			Data: ds,
 		}
-		if len(match) == 0 {
+		if noFilter {
 			res = append(res, dataStructure)
 		} else {
 			if self, ok := ds["self"].(map[string]any); ok {
