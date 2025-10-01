@@ -550,7 +550,7 @@ func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
 							"version": "1-0-0"
 							},
 							"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
-						}	
+						}
 				]`
 
 				w.WriteHeader(http.StatusOK)
