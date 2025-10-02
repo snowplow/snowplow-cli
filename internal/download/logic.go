@@ -10,11 +10,12 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package download
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
-	"golang.org/x/net/context"
 )
 
 func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool) error {
@@ -83,4 +84,27 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 		slog.Debug("download", "msg", "wrote trigger images", "count", len(triggerIdToFilePath))
 	}
 	return triggerIdToFilePath, nil
+}
+
+func GetDataStructuresWithOptions(ctx context.Context, client *console.ApiClient, includeDrafts bool, match []string, includeLegacy bool) ([]model.DataStructure, error) {
+	dss, err := console.GetAllDataStructures(ctx, client, match, includeLegacy)
+	if err != nil {
+		return nil, err
+	}
+
+	allDss := dss
+
+	if includeDrafts {
+		dssDrafts, err := console.GetAllDataStructuresDrafts(ctx, client, match)
+		if err != nil {
+			return nil, err
+		}
+		allDss = append(allDss, dssDrafts...)
+
+		slog.Info("fetched data structures drafts", "count", len(dssDrafts))
+	}
+
+	slog.Info("fetched data structures", "count", len(dss))
+
+	return allDss, nil
 }

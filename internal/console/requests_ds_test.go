@@ -515,6 +515,68 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	}
 }
 
+func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
+
+				resp := `[
+						{
+							"type": "object",
+							"properties": {},
+							"description": "",
+							"additionalProperties": false,
+							"self": {
+							"vendor": "com.snplow.msc.aws",
+							"name": "di_test_unified_entity",
+							"format": "jsonschema",
+							"version": "1-0-0"
+							},
+							"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+						},
+						{
+							"type": "object",
+							"properties": {},
+							"description": "",
+							"additionalProperties": false,
+							"self": {
+							"vendor": "com.snplow.msc.aws",
+							"name": "testjvdraft2",
+							"format": "jsonschema",
+							"version": "1-0-0"
+							},
+							"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+						}
+				]`
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
+			}
+		default:
+			t.Errorf("Unexpected request, got: %s", r.URL.Path)
+			return
+		}
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	result, err := GetAllDataStructuresDrafts(cnx, client, []string{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("Unexpected number of results, expected 2, got: %d", len(result))
+	}
+}
+
 func Test_MetadataUpdate_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/20308fa345d397de04f26a34a6083744d06ae1aeb673e1658b0b50a7a86ea395/meta" {
@@ -657,6 +719,130 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 
 	if data, _ := res[0].ParseData(); data.Self.Name != "event" {
 		t.Errorf("unexpected data structure: %+v", data.Self)
+	}
+}
+
+func TestGetAllDataStructuresDrafts_Matching(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
+
+				resp := `[
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "com.acme",
+							"name": "draft_event",
+							"format": "jsonschema",
+							"version": "1-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					},
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "org.example",
+							"name": "draft_purchase",
+							"format": "jsonschema",
+							"version": "1-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					},
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "com.acme",
+							"name": "another_draft",
+							"format": "jsonschema",
+							"version": "2-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					}
+				]`
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
+			}
+		default:
+			t.Errorf("Unexpected request, got: %s", r.URL.Path)
+			return
+		}
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	// Test with single match filter - should match 1 draft with specific name prefix
+	match := []string{"com.acme/draft_event"}
+	result, err := GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 matching draft with 'com.acme/draft_event' prefix, got: %d", len(result))
+	}
+
+	if len(result) == 1 {
+		data, _ := result[0].ParseData()
+		if data.Self.Name != "draft_event" {
+			t.Errorf("unexpected name in matched draft: got %s, expected draft_event", data.Self.Name)
+		}
+	}
+
+	// Test with match filter that matches all "com.acme" - should match 2 drafts
+	match = []string{"com.acme"}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 matching drafts with 'com.acme' prefix, got: %d", len(result))
+	}
+
+	// Test with specific match - should match only 1 draft
+	match = []string{"org.example/draft_purchase"}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 matching draft with 'org.example/draft_purchase', got: %d", len(result))
+	}
+
+	if len(result) == 1 {
+		data, _ := result[0].ParseData()
+		if data.Self.Name != "draft_purchase" {
+			t.Errorf("expected draft_purchase, got: %s", data.Self.Name)
+		}
+	}
+
+	// Test with no match - should return all 3 drafts
+	match = []string{}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 3 {
+		t.Errorf("expected 3 drafts when no match filter provided, got: %d", len(result))
 	}
 }
 
