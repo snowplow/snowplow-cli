@@ -12,9 +12,9 @@ package ds
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/download"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -69,30 +69,15 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			snplog.LogFatalMsg("client creation fail", err)
 		}
 
-		dss, err := console.GetAllDataStructures(cnx, c, match, includeLegacy)
+		allDss, err := download.FetchAllDataStructures(cnx, c, includeDrafts, match, includeLegacy)
 		if err != nil {
 			snplog.LogFatalMsg("data structure fetch failed", err)
-		}
-
-		allDss := dss
-
-		if includeDrafts {
-			dssDrafts, err := console.GetAllDataStructuresDrafts(cnx, c, match)
-			if err != nil {
-				snplog.LogFatalMsg("data structure drafts fetch failed", err)
-			}
-			allDss = append(allDss, dssDrafts...)
-
-			slog.Info("wrote data structures drafts", "count", len(dssDrafts))
-
 		}
 
 		err = files.CreateDataStructures(allDss, plain)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
-
-		slog.Info("wrote data structures", "count", len(dss))
 	},
 }
 
