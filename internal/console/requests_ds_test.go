@@ -722,6 +722,130 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 	}
 }
 
+func TestGetAllDataStructuresDrafts_Matching(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
+			{
+				if r.Header.Get("authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				}
+
+				resp := `[
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "com.acme",
+							"name": "draft_event",
+							"format": "jsonschema",
+							"version": "1-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					},
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "org.example",
+							"name": "draft_purchase",
+							"format": "jsonschema",
+							"version": "1-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					},
+					{
+						"type": "object",
+						"properties": {},
+						"description": "",
+						"additionalProperties": false,
+						"self": {
+							"vendor": "com.acme",
+							"name": "another_draft",
+							"format": "jsonschema",
+							"version": "2-0-0"
+						},
+						"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+					}
+				]`
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, resp)
+				return
+			}
+		default:
+			t.Errorf("Unexpected request, got: %s", r.URL.Path)
+			return
+		}
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	// Test with single match filter - should match 1 draft with specific name prefix
+	match := []string{"com.acme/draft_event"}
+	result, err := GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 matching draft with 'com.acme/draft_event' prefix, got: %d", len(result))
+	}
+
+	if len(result) == 1 {
+		data, _ := result[0].ParseData()
+		if data.Self.Name != "draft_event" {
+			t.Errorf("unexpected name in matched draft: got %s, expected draft_event", data.Self.Name)
+		}
+	}
+
+	// Test with match filter that matches all "com.acme" - should match 2 drafts
+	match = []string{"com.acme"}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 2 {
+		t.Errorf("expected 2 matching drafts with 'com.acme' prefix, got: %d", len(result))
+	}
+
+	// Test with specific match - should match only 1 draft
+	match = []string{"org.example/draft_purchase"}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 matching draft with 'org.example/draft_purchase', got: %d", len(result))
+	}
+
+	if len(result) == 1 {
+		data, _ := result[0].ParseData()
+		if data.Self.Name != "draft_purchase" {
+			t.Errorf("expected draft_purchase, got: %s", data.Self.Name)
+		}
+	}
+
+	// Test with no match - should return all 3 drafts
+	match = []string{}
+	result, err = GetAllDataStructuresDrafts(cnx, client, match)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(result) != 3 {
+		t.Errorf("expected 3 drafts when no match filter provided, got: %d", len(result))
+	}
+}
+
 func TestGetAllDataStructures_EmptySchemaType(t *testing.T) {
 	mockListings := []ListResponse{
 		{
