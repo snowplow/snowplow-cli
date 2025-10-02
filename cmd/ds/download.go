@@ -85,7 +85,6 @@ func init() {
 	DataStructuresCmd.AddCommand(downloadCmd)
 
 	downloadCmd.PersistentFlags().Bool("include-drafts", false, "Include drafts data structures")
-
 	downloadCmd.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCmd.PersistentFlags().StringArrayP("match", "", []string{}, "Match for specific data structure to download (eg. --match com.example/event_name or --match com.example)")
 	downloadCmd.PersistentFlags().Bool("include-legacy", false, "Include legacy data structures with empty schemaType (will be set to 'entity')")
