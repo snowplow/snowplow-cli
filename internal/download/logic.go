@@ -86,10 +86,6 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 	return triggerIdToFilePath, nil
 }
 
-// FetchAllDataStructures retrieves all data structures from the API, including drafts if requested.
-// It accepts includeDrafts to fetch draft data structures, match filters for selective download,
-// and includeLegacy to include legacy data structures with empty schemaType.
-// Returns a combined slice of all data structures (published and drafts if requested).
 func FetchAllDataStructures(ctx context.Context, client *console.ApiClient, includeDrafts bool, match []string, includeLegacy bool) ([]model.DataStructure, error) {
 	dss, err := console.GetAllDataStructures(ctx, client, match, includeLegacy)
 	if err != nil {
