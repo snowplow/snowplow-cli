@@ -86,7 +86,7 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 	return triggerIdToFilePath, nil
 }
 
-func FetchAllDataStructures(ctx context.Context, client *console.ApiClient, includeDrafts bool, match []string, includeLegacy bool) ([]model.DataStructure, error) {
+func GetDataStructuresWithOptions(ctx context.Context, client *console.ApiClient, includeDrafts bool, match []string, includeLegacy bool) ([]model.DataStructure, error) {
 	dss, err := console.GetAllDataStructures(ctx, client, match, includeLegacy)
 	if err != nil {
 		return nil, err

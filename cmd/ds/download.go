@@ -69,7 +69,7 @@ Use --include-legacy to include them (they will be set to 'entity' schemaType).`
 			snplog.LogFatalMsg("client creation fail", err)
 		}
 
-		allDss, err := download.FetchAllDataStructures(cnx, c, includeDrafts, match, includeLegacy)
+		allDss, err := download.GetDataStructuresWithOptions(cnx, c, includeDrafts, match, includeLegacy)
 		if err != nil {
 			snplog.LogFatalMsg("data structure fetch failed", err)
 		}
