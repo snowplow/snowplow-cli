@@ -47,6 +47,48 @@ jobs:
             - Security concerns
             - Test coverage
 
+            Code Quality & Best Practices:
+            - Idiomatic Go patterns and conventions
+            - Error handling (proper error wrapping, sentinel errors, custom error types)
+            - Exported vs unexported identifiers and package API design
+            - Interface usage and composition over inheritance
+            - Proper use of context.Context for cancellation and timeouts
+            - Naming conventions (camelCase, descriptive names, standard abbreviations)
+
+            Potential Bugs & Issues:
+            - Race conditions and concurrency safety
+            - Nil pointer dereferences
+            - Goroutine leaks and proper cleanup
+            - Panic scenarios and recovery handling
+            - Resource leaks (file handles, connections, channels)
+            - Deadlock possibilities
+            - Incorrect use of defer, mutex, or channels
+
+            Performance Considerations:
+            - Unnecessary heap allocations
+            - Efficient use of slices, maps, and data structures
+            - String concatenation vs strings.Builder
+            - Goroutine overhead and pooling strategies
+            - Sync.Pool usage where appropriate
+            - Buffer reuse and memory management
+
+            Security Concerns:
+            - Input validation and sanitization
+            - SQL injection prevention (parameterized queries)
+            - Path traversal vulnerabilities
+            - Proper use of crypto packages (crypto/* not crypto/md5 for security)
+            - Race conditions in security-critical code
+            - Secure random number generation
+
+            Test Coverage:
+            - Table-driven test patterns
+            - Test coverage percentage and edge cases
+            - Proper use of t.Helper() and subtests
+            - Benchmark tests for performance-critical code
+            - Example tests for documentation
+            - Integration vs unit test balance
+            - Mock/interface usage for testability
+
             Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
