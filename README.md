@@ -101,3 +101,13 @@ SNOWPLOW_CONSOLE_ORG_ID=********-****-****-****-************
 SNOWPLOW_CONSOLE_API_KEY_ID=********-****-****-****-************
 SNOWPLOW_CONSOLE_API_KEY=********-****-****-****-************
 ```
+
+### Claude Code Git Hub Actions Integration
+
+The repository also includes a GitHub Actions workflow (`.github/workflows/claude.yml`) that enables direct integration with Claude for automated code assistance. The workflow is triggered when:
+
+- Someone mentions `@claude` in issue comments, pull request review comments, or pull request reviews
+- An issue is opened or assigned that contains `@claude` in the title or body
+
+This integration allows team members to request Claude's assistance directly within GitHub issues and pull requests for code reviews, bug fixes, and development tasks. Claude has permissions to read CI results, write to pull requests, and manage issues as needed for collaborative development.
+
