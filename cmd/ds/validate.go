@@ -28,7 +28,7 @@ var validateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		err := validation.ValidateDataStructuresFromCmd(cmd.Context(), cmd, args)
 		if err != nil {
-			snplog.LogFatal(errors.New("validation failed"))
+			snplog.LogFatal(errors.New("validation failed: " + err.Error()))
 		}
 	},
 }
