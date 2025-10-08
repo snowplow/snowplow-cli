@@ -1,0 +1,99 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # Optional: Only run on specific file changes
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
+
+jobs:
+  claude-review:
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Please review this pull request and provide feedback on:
+            - Code quality and best practices
+            - Potential bugs or issues
+            - Performance considerations
+            - Security concerns
+            - Test coverage
+
+            Code Quality & Best Practices:
+            - Idiomatic Go patterns and conventions
+            - Error handling (proper error wrapping, sentinel errors, custom error types)
+            - Exported vs unexported identifiers and package API design
+            - Interface usage and composition over inheritance
+            - Proper use of context.Context for cancellation and timeouts
+            - Naming conventions (camelCase, descriptive names, standard abbreviations)
+
+            Potential Bugs & Issues:
+            - Race conditions and concurrency safety
+            - Nil pointer dereferences
+            - Goroutine leaks and proper cleanup
+            - Panic scenarios and recovery handling
+            - Resource leaks (file handles, connections, channels)
+            - Deadlock possibilities
+            - Incorrect use of defer, mutex, or channels
+
+            Performance Considerations:
+            - Unnecessary heap allocations
+            - Efficient use of slices, maps, and data structures
+            - String concatenation vs strings.Builder
+            - Goroutine overhead and pooling strategies
+            - Sync.Pool usage where appropriate
+            - Buffer reuse and memory management
+
+            Security Concerns:
+            - Input validation and sanitization
+            - SQL injection prevention (parameterized queries)
+            - Path traversal vulnerabilities
+            - Proper use of crypto packages (crypto/* not crypto/md5 for security)
+            - Race conditions in security-critical code
+            - Secure random number generation
+
+            Test Coverage:
+            - Table-driven test patterns
+            - Test coverage percentage and edge cases
+            - Proper use of t.Helper() and subtests
+            - Benchmark tests for performance-critical code
+            - Example tests for documentation
+            - Integration vs unit test balance
+            - Mock/interface usage for testability
+
+            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+
+            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
