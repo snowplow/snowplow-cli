@@ -11,7 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package ds
 
 import (
-	"errors"
+	"fmt"
 
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/validation"
@@ -28,7 +28,7 @@ var validateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		err := validation.ValidateDataStructuresFromCmd(cmd.Context(), cmd, args)
 		if err != nil {
-			snplog.LogFatal(errors.New("validation failed"))
+			snplog.LogFatal(fmt.Errorf("validation failed: %w", err))
 		}
 	},
 }
