@@ -1,5 +1,6 @@
 # Snowplow CLI
 
+test ci
 `snowplow-cli` means to bring Snowplow Console into the command line
 
 <!-- TODO: Add screenshot -->
