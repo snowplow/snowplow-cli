@@ -89,7 +89,7 @@
       "additionalProperties": false,
       "properties": {
         "hidden": {
-          "description": "If true, this data structure will be hidden in the BDP Console.",
+          "description": "If true, this data structure will be hidden in the CDI Console.",
           "type": "boolean"
         },
         "schemaType": {

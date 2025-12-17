@@ -29,7 +29,7 @@ var publishCmd = &cobra.Command{
 	Short:   "Publishing commands for data structures",
 	Long: `Publishing commands for data structures
 
-Publish local data structures to BDP console.
+Publish local data structures to CDI console.
 `,
 }
 
@@ -37,9 +37,9 @@ var devCmd = &cobra.Command{
 	Use:   "dev [paths...] default: [./data-structures]",
 	Short: "Publish data structures to your development environment",
 	Args:  cobra.ArbitraryArgs,
-	Long: `Publish modified data structures to BDP Console and your development environment
+	Long: `Publish modified data structures to CDI Console and your development environment
 
-The 'meta' section of a data structure is not versioned within BDP Console.
+The 'meta' section of a data structure is not versioned within CDI Console.
 Changes to it will be published by this command.
 	`,
 	Example: `  $ snowplow-cli ds publish dev

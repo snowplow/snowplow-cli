@@ -4,7 +4,7 @@
 
 <!-- TODO: Add screenshot -->
 
-Snowplow CLI is available for [Snowplow BDP](https://docs.snowplow.io/docs/feature-comparison/) clients
+Snowplow CLI is available for [Snowplow CDI](https://docs.snowplow.io/docs/feature-comparison/) clients
 
 ## Documentation
 

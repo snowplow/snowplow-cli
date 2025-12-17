@@ -20,9 +20,9 @@ import (
 
 var validateCmd = &cobra.Command{
 	Use:   "validate [paths...] default: [./data-structures]",
-	Short: "Validate data structures with BDP Console",
+	Short: "Validate data structures with CDI Console",
 	Args:  cobra.ArbitraryArgs,
-	Long:  `Sends all data structures from <path> for validation by BDP Console.`,
+	Long:  `Sends all data structures from <path> for validation by CDI Console.`,
 	Example: `  $ snowplow-cli ds validate
   $ snowplow-cli ds validate ./my-data-structures ./my-other-data-structures`,
 	Run: func(cmd *cobra.Command, args []string) {

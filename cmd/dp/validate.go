@@ -23,9 +23,9 @@ import (
 
 var validateCmd = &cobra.Command{
 	Use:   "validate [paths...]",
-	Short: "Validate data products and source applications with BDP Console",
+	Short: "Validate data products and source applications with CDI Console",
 	Args:  cobra.ArbitraryArgs,
-	Long:  `Sends all data products and source applications from <path> for validation by BDP Console.`,
+	Long:  `Sends all data products and source applications from <path> for validation by CDI Console.`,
 	Example: `  $ snowplow-cli dp validate ./data-products ./source-applications
   $ snowplow-cli dp validate ./src`,
 	Run: func(cmd *cobra.Command, args []string) {

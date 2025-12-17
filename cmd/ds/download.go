@@ -22,9 +22,9 @@ import (
 
 var downloadCmd = &cobra.Command{
 	Use:   "download {directory ./data-structures}",
-	Short: "Download all data structures from BDP Console",
+	Short: "Download all data structures from CDI Console",
 	Args:  cobra.MaximumNArgs(1),
-	Long: `Downloads the latest versions of all data structures from BDP Console.
+	Long: `Downloads the latest versions of all data structures from CDI Console.
 
 Will retrieve schema contents from your development environment.
 If no directory is provided then defaults to 'data-structures' in the current directory.
