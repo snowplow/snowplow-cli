@@ -26,8 +26,8 @@ import (
 
 var publishCommand = &cobra.Command{
 	Use:   "publish {directory ./data-products}",
-	Short: "Publish all data products, event specs and source apps to BDP Console",
-	Long: `Publish the local version versions of all data products, event specs and source apps from BDP Console.
+	Short: "Publish all data products, event specs and source apps to CDI Console",
+	Long: `Publish the local version versions of all data products, event specs and source apps from CDI Console.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp publish

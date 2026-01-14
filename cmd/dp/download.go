@@ -22,9 +22,9 @@ import (
 
 var downloadCommand = &cobra.Command{
 	Use:   "download {directory ./data-products}",
-	Short: "Download all data products, event specs and source apps from BDP Console",
+	Short: "Download all data products, event specs and source apps from CDI Console",
 	Args:  cobra.MaximumNArgs(1),
-	Long: `Downloads the latest versions of all data products, event specs and source apps from BDP Console.
+	Long: `Downloads the latest versions of all data products, event specs and source apps from CDI Console.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp download
