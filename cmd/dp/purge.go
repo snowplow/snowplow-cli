@@ -17,7 +17,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/publish"
+	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +75,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = publish.Purge(cnx, purgeApi{c, cnx}, files, yes)
+		err = release.Purge(cnx, purgeApi{c, cnx}, files, yes)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

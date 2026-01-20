@@ -156,6 +156,7 @@ func MaybeResourcesfromPaths(paths []string) (map[string]map[string]any, error) 
 }
 
 func ResourceNameToFileName(s string) string {
+	maxLength := 200
 	reservedWindowsNamesRegex := regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
 	allPrintableAsciiNegates := regexp.MustCompile("[^ -~]")
 	invalidPathCharacters := regexp.MustCompile("[ /]")
@@ -163,6 +164,11 @@ func ResourceNameToFileName(s string) string {
 	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
 	if len(res) == 0 {
 		return "unnamed"
+	}
+	// truncated length to avoid FS name length limts
+	if len(res) > maxLength {
+		suffix := "...(truncated)"
+		res = res[:maxLength-len(suffix)] + suffix
 	}
 	return res
 }

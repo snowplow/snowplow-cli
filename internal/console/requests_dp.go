@@ -539,3 +539,42 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 	}
 	return nil
 }
+
+type BatchPublishRequest struct {
+	EventSpecIds []string `json:"eventSpecIds"`
+}
+
+func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds []string) error {
+	if len(eventSpecIds) == 0 {
+		return nil
+	}
+
+	reqBody := BatchPublishRequest{EventSpecIds: eventSpecIds}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1/publish", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusAccepted {
+		rbody, err := io.ReadAll(resp.Body)
+		defer util.LoggingCloser(cnx, resp.Body)
+		if err != nil {
+			return err
+		}
+
+		var dresp msgResponse
+		err = kjson.Unmarshal(rbody, &dresp)
+		if err != nil {
+			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		return fmt.Errorf("batch publish failed: %s", dresp.Message)
+	}
+
+	return nil
+}

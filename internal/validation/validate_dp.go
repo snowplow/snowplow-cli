@@ -15,7 +15,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/publish"
+	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +57,7 @@ func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClie
 		return err
 	}
 
-	changes, err := publish.FindChanges(ctx, client, files)
+	changes, err := release.FindChanges(ctx, client, files)
 	if err != nil {
 		return err
 	}

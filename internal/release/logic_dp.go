@@ -7,7 +7,7 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
-package publish
+package release
 
 import (
 	"crypto/sha256"
@@ -41,15 +41,16 @@ type TriggerImageReference struct {
 }
 
 type DataProductChangeSet struct {
-	saCreate     []console.RemoteSourceApplication
-	saUpdate     []console.RemoteSourceApplication
-	dpCreate     []console.RemoteDataProduct
-	dpUpdate     []console.RemoteDataProduct
-	esCreate     []console.RemoteEventSpec
-	esUpdate     []console.RemoteEventSpec
-	esDelete     []console.RemoteEventSpec
-	imageCreate  []TriggerImageReference
-	IdToFileName map[string]string
+	saCreate          []console.RemoteSourceApplication
+	saUpdate          []console.RemoteSourceApplication
+	dpCreate          []console.RemoteDataProduct
+	dpUpdate          []console.RemoteDataProduct
+	esCreate          []console.RemoteEventSpec
+	esUpdate          []console.RemoteEventSpec
+	esDelete          []console.RemoteEventSpec
+	imageCreate       []TriggerImageReference
+	IdToFileName      map[string]string
+	localEventSpecIds []string
 }
 
 func (cs DataProductChangeSet) isEmpty() bool {
@@ -282,16 +283,22 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		}
 	}
 
+	localEsIds := make([]string, 0, len(esLocalIds))
+	for id := range esLocalIds {
+		localEsIds = append(localEsIds, id)
+	}
+
 	return &DataProductChangeSet{
-		saCreate:     saCreate,
-		saUpdate:     saUpdate,
-		dpCreate:     dpCreate,
-		dpUpdate:     dpUpdate,
-		esCreate:     esCreate,
-		esUpdate:     esUpdate,
-		esDelete:     esDelete,
-		imageCreate:  imageCreate,
-		IdToFileName: idToFileName,
+		saCreate:          saCreate,
+		saUpdate:          saUpdate,
+		dpCreate:          dpCreate,
+		dpUpdate:          dpUpdate,
+		esCreate:          esCreate,
+		esUpdate:          esUpdate,
+		esDelete:          esDelete,
+		imageCreate:       imageCreate,
+		IdToFileName:      idToFileName,
+		localEventSpecIds: localEsIds,
 	}, nil
 }
 
@@ -360,7 +367,7 @@ func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remote
 }
 
 func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *console.ApiClient) error {
-	slog.Info("publish", "msg", "applying changes")
+	slog.Info("sync", "msg", "applying changes")
 	for _, saC := range changes.saCreate {
 		err := console.CreateSourceApp(cnx, client, saC)
 		if err != nil {
@@ -432,53 +439,53 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 
 func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 	if changes.isEmpty() {
-		slog.Info("publish", "msg", "no changes detected, nothing to apply")
+		slog.Info("sync", "msg", "no changes detected, nothing to apply")
 	} else {
 		if len(changes.saCreate) != 0 {
 			for _, sa := range changes.saCreate {
-				slog.Info("publish", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
+				slog.Info("sync", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
 			}
 		}
 		if len(changes.saUpdate) != 0 {
 			for _, sa := range changes.saUpdate {
-				slog.Info("publish", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
+				slog.Info("sync", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
 			}
 		}
 		if len(changes.dpCreate) != 0 {
 			for _, dp := range changes.dpCreate {
-				slog.Info("publish", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
+				slog.Info("sync", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
 			}
 		}
 		if len(changes.dpUpdate) != 0 {
 			for _, dp := range changes.dpUpdate {
-				slog.Info("publish", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
+				slog.Info("sync", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
 			}
 		}
 		if len(changes.esCreate) != 0 {
 			for _, es := range changes.esCreate {
-				slog.Info("publish", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id)
+				slog.Info("sync", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id)
 			}
 		}
 		if len(changes.esUpdate) != 0 {
 			for _, es := range changes.esUpdate {
-				slog.Info("publish", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId)
+				slog.Info("sync", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId)
 			}
 		}
 		if len(changes.esDelete) != 0 {
 			for _, es := range changes.esDelete {
-				slog.Info("publish", "msg", "will delete event specifications", "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId, "data product name", idToFile[es.Id])
+				slog.Info("sync", "msg", "will delete event specifications", "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId, "data product name", idToFile[es.Id])
 			}
 		}
 		if len(changes.imageCreate) != 0 {
 			if cwd, err := os.Getwd(); err == nil {
 				for _, img := range changes.imageCreate {
 					if relp, err := filepath.Rel(cwd, img.fname); err == nil {
-						slog.Info("publish", "msg", "will publish image", "file", relp)
+						slog.Info("sync", "msg", "will publish image", "file", relp)
 					}
 				}
 			}
 		}
-		slog.Info("publish", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
+		slog.Info("sync", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
 	}
 }
 
@@ -579,13 +586,69 @@ func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]m
 	return changeSet, err
 }
 
-func Publish(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
+func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
 	PrintChangeset(*changeSet, changeSet.IdToFileName)
 	var err error
 	if !dryRun && !changeSet.isEmpty() {
 		err = ApplyDpChanges(*changeSet, cnx, client)
 	}
 	return err
+}
+
+func Release(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
+	err := Sync(cnx, client, changeSet, dryRun)
+	if err != nil {
+		return err
+	}
+
+	if !dryRun {
+		unpublishedIds, skipped, err := GetEventSpecIdsToRelease(cnx, client, changeSet.localEventSpecIds)
+		if err != nil {
+			return err
+		}
+
+		if skipped > 0 {
+			slog.Warn("release", "msg", "some event specs were not released due to absent event", "count", skipped)
+		}
+
+		if len(unpublishedIds) > 0 {
+			slog.Info("release", "msg", "releasing event specs", "count", len(unpublishedIds))
+			err = console.BatchPublishEventSpecs(cnx, client, unpublishedIds)
+			if err != nil {
+				return err
+			}
+			slog.Info("release", "msg", "successfully released event specs", "count", len(unpublishedIds))
+		} else {
+			slog.Info("release", "msg", "no event specs to release")
+		}
+	}
+
+	return nil
+}
+
+func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, localIds []string) ([]string, int, error) {
+	skipped := 0
+	remote, err := console.GetDataProductsAndRelatedResources(cnx, client)
+	if err != nil {
+		return nil, skipped, err
+	}
+
+	localIdSet := make(map[string]bool, len(localIds))
+	for _, id := range localIds {
+		localIdSet[id] = true
+	}
+
+	var unpublished []string
+	for _, es := range remote.EventSpecs {
+		if es.Status == "draft" && localIdSet[es.Id] {
+			if es.Event != nil {
+				unpublished = append(unpublished, es.Id)
+			} else {
+				skipped++
+			}
+		}
+	}
+	return unpublished, skipped, nil
 }
 
 func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {

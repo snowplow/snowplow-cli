@@ -18,20 +18,24 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/publish"
+	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/snowplow/snowplow-cli/internal/validation"
 	"github.com/spf13/cobra"
 )
 
-var publishCommand = &cobra.Command{
-	Use:   "publish {directory ./data-products}",
-	Short: "Publish all data products, event specs and source apps to CDI Console",
-	Long: `Publish the local version versions of all data products, event specs and source apps from CDI Console.
+var releaseCommand = &cobra.Command{
+	Use:   "release {directory ./data-products}",
+	Short: "Publish and release all data products, event specs and source apps to CDI Console",
+	Long: `Publish and release the local versions of all data products, event specs and source apps to CDI Console.
+
+This command syncs local files with remote data products, then releases any draft event specs. It will filter out the event specs without the event, and only attempt to publish the event specs that are part of the data products in the directory.
+Releasing marks event specs as published and enables event spec inference.
+Use 'sync' to only sync without releasing, and not change the status of event specs
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
-	Example: `  $ snowplow-cli dp publish
-  $ snowplow-cli dp download ./my-data-products`,
+	Example: `  $ snowplow-cli dp release
+  $ snowplow-cli dp release ./my-data-products`,
 	Run: func(cmd *cobra.Command, args []string) {
 		apiKeyId, _ := cmd.Flags().GetString("api-key-id")
 		apiKeySecret, _ := cmd.Flags().GetString("api-key")
@@ -78,29 +82,28 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		changes, err := publish.FindChanges(cnx, c, files)
+		changes, err := release.FindChanges(cnx, c, files)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		publish.LockChanged(changes, managedFrom)
+		release.LockChanged(changes, managedFrom)
 
 		err = validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, concurrentReq)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
 
-		err = publish.Publish(cnx, c, changes, dryRun)
+		err = release.Release(cnx, c, changes, dryRun)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
-
 	},
 }
 
 func init() {
-	DataProductsCmd.AddCommand(publishCommand)
-	publishCommand.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
-	publishCommand.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
-	publishCommand.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
+	DataProductsCmd.AddCommand(releaseCommand)
+	releaseCommand.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
+	releaseCommand.PersistentFlags().BoolP("dry-run", "d", false, "Only print planned changes without performing them")
+	releaseCommand.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
 }
