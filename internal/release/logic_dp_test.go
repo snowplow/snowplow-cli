@@ -17,6 +17,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -672,6 +673,13 @@ func Test_LockChanged(t *testing.T) {
 
 func newTestClientAndServer(t *testing.T, eventSpecsJSON string) (*console.ApiClient, *httptest.Server) {
 	t.Helper()
+	client, server, _ := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	return client, server
+}
+
+func newTestClientAndServerWithPublishCounter(t *testing.T, eventSpecsJSON string) (*console.ApiClient, *httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var publishCalls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/data-products/v2" && r.Method == "GET":
@@ -681,6 +689,9 @@ func newTestClientAndServer(t *testing.T, eventSpecsJSON string) (*console.ApiCl
 		case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `{"data": []}`)
+		case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+			publishCalls.Add(1)
+			w.WriteHeader(http.StatusAccepted)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -690,7 +701,7 @@ func newTestClientAndServer(t *testing.T, eventSpecsJSON string) (*console.ApiCl
 		Jwt:     "token",
 		BaseUrl: server.URL,
 	}
-	return client, server
+	return client, server, &publishCalls
 }
 
 func Test_GetEventSpecIdsToRelease(t *testing.T) {
@@ -782,9 +793,13 @@ func Test_GetEventSpecIdsToRelease(t *testing.T) {
 			client, server := newTestClientAndServer(t, tt.eventSpecsJSON)
 			defer server.Close()
 
-			gotIds, gotSkipped, err := GetEventSpecIdsToRelease(context.Background(), client, tt.localIds)
+			got, gotSkipped, err := GetEventSpecIdsToRelease(context.Background(), client, tt.localIds)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			var gotIds []string
+			for _, es := range got {
+				gotIds = append(gotIds, es.Id)
 			}
 			if diff := cmp.Diff(tt.wantIds, gotIds); diff != "" {
 				t.Errorf("unpublished ids mismatch (-want +got):\n%s", diff)
@@ -793,5 +808,83 @@ func Test_GetEventSpecIdsToRelease(t *testing.T) {
 				t.Errorf("skipped = %d, want %d", gotSkipped, tt.wantSkipped)
 			}
 		})
+	}
+}
+
+func Test_Release_DryRunDoesNotPublish(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "draft",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 0 {
+		t.Errorf("expected no publish calls during dry-run, got %d", publishCalls.Load())
+	}
+}
+
+func Test_Release_PublishesWhenNotDryRun(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "draft",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 1 {
+		t.Errorf("expected 1 publish call, got %d", publishCalls.Load())
+	}
+}
+
+func Test_Release_DryRunNothingToRelease(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "published",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 0 {
+		t.Errorf("expected no publish calls, got %d", publishCalls.Load())
 	}
 }

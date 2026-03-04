@@ -95,7 +95,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = release.Sync(cnx, c, changes, dryRun)
+		err = release.Sync(cnx, c, changes, dryRun, false)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

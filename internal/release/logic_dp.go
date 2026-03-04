@@ -17,9 +17,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"context"
+
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
@@ -437,7 +439,7 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 	return nil
 }
 
-func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
+func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string, isRelease bool) {
 	if changes.isEmpty() {
 		slog.Info("sync", "msg", "no changes detected, nothing to apply")
 	} else {
@@ -486,6 +488,14 @@ func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string) {
 			}
 		}
 		slog.Info("sync", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
+		if isRelease {
+			for _, es := range slices.Concat(changes.esCreate, changes.esDelete) {
+				slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
+			}
+			for _, es := range changes.esUpdate {
+				slog.Info("release", "msg", "might release event spec if the changes are structural(name, data structure, rules)", "name", es.Name, "resource name", es.Id)
+			}
+		}
 	}
 }
 
@@ -586,8 +596,8 @@ func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]m
 	return changeSet, err
 }
 
-func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
-	PrintChangeset(*changeSet, changeSet.IdToFileName)
+func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool, isRelase bool) error {
+	PrintChangeset(*changeSet, changeSet.IdToFileName, isRelase)
 	var err error
 	if !dryRun && !changeSet.isEmpty() {
 		err = ApplyDpChanges(*changeSet, cnx, client)
@@ -596,37 +606,44 @@ func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProduct
 }
 
 func Release(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) error {
-	err := Sync(cnx, client, changeSet, dryRun)
+	err := Sync(cnx, client, changeSet, dryRun, true)
 	if err != nil {
 		return err
 	}
 
-	if !dryRun {
-		unpublishedIds, skipped, err := GetEventSpecIdsToRelease(cnx, client, changeSet.localEventSpecIds)
-		if err != nil {
-			return err
+	toRelease, skipped, err := GetEventSpecIdsToRelease(cnx, client, changeSet.localEventSpecIds)
+	if err != nil {
+		return err
+	}
+
+	if skipped > 0 {
+		slog.Warn("release", "msg", "some event specs were not released due to absent event", "count", skipped)
+	}
+
+	if len(toRelease) > 0 {
+		for _, es := range toRelease {
+			slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
 		}
 
-		if skipped > 0 {
-			slog.Warn("release", "msg", "some event specs were not released due to absent event", "count", skipped)
-		}
-
-		if len(unpublishedIds) > 0 {
-			slog.Info("release", "msg", "releasing event specs", "count", len(unpublishedIds))
-			err = console.BatchPublishEventSpecs(cnx, client, unpublishedIds)
+		if !dryRun {
+			ids := make([]string, len(toRelease))
+			for i, es := range toRelease {
+				ids[i] = es.Id
+			}
+			err = console.BatchPublishEventSpecs(cnx, client, ids)
 			if err != nil {
 				return err
 			}
-			slog.Info("release", "msg", "successfully released event specs", "count", len(unpublishedIds))
-		} else {
-			slog.Info("release", "msg", "no event specs to release")
+			slog.Info("release", "msg", "successfully released event specs", "count", len(toRelease))
 		}
+	} else {
+		slog.Info("release", "msg", "no event specs to release")
 	}
 
 	return nil
 }
 
-func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, localIds []string) ([]string, int, error) {
+func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, localIds []string) ([]console.RemoteEventSpec, int, error) {
 	skipped := 0
 	remote, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
@@ -638,11 +655,11 @@ func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, lo
 		localIdSet[id] = true
 	}
 
-	var unpublished []string
+	var unpublished []console.RemoteEventSpec
 	for _, es := range remote.EventSpecs {
 		if es.Status == "draft" && localIdSet[es.Id] {
 			if es.Event != nil {
-				unpublished = append(unpublished, es.Id)
+				unpublished = append(unpublished, es)
 			} else {
 				skipped++
 			}
