@@ -775,15 +775,43 @@ func Test_GetEventSpecIdsToRelease(t *testing.T) {
 			wantSkipped: 0,
 		},
 		{
+			name: "failed with event is included for retry",
+			eventSpecsJSON: `[{
+				"id": "es-failed",
+				"status": "failed",
+				"name": "ES Failed",
+				"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-failed"},
+			wantIds:     []string{"es-failed"},
+			wantSkipped: 0,
+		},
+		{
+			name: "failed with nil event is skipped",
+			eventSpecsJSON: `[{
+				"id": "es-failed-no-event",
+				"status": "failed",
+				"name": "ES Failed No Event",
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-failed-no-event"},
+			wantIds:     nil,
+			wantSkipped: 1,
+		},
+		{
 			name: "mixed statuses and events",
 			eventSpecsJSON: `[
 				{"id": "es-draft-with-event", "status": "draft", "name": "A", "event": {"source": "iglu:com.example/a/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
 				{"id": "es-draft-no-event", "status": "draft", "name": "B", "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
 				{"id": "es-published", "status": "published", "name": "C", "event": {"source": "iglu:com.example/c/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
-				{"id": "es-not-local", "status": "draft", "name": "D", "event": {"source": "iglu:com.example/d/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}
+				{"id": "es-not-local", "status": "draft", "name": "D", "event": {"source": "iglu:com.example/d/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+				{"id": "es-failed-retry", "status": "failed", "name": "E", "event": {"source": "iglu:com.example/e/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}
 			]`,
-			localIds:    []string{"es-draft-with-event", "es-draft-no-event", "es-published"},
-			wantIds:     []string{"es-draft-with-event"},
+			localIds:    []string{"es-draft-with-event", "es-draft-no-event", "es-published", "es-failed-retry"},
+			wantIds:     []string{"es-draft-with-event", "es-failed-retry"},
 			wantSkipped: 1,
 		},
 	}

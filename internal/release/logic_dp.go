@@ -657,7 +657,7 @@ func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, lo
 
 	var unpublished []console.RemoteEventSpec
 	for _, es := range remote.EventSpecs {
-		if es.Status == "draft" && localIdSet[es.Id] {
+		if (es.Status == "draft" || es.Status == "failed") && localIdSet[es.Id] {
 			if es.Event != nil {
 				unpublished = append(unpublished, es)
 			} else {
