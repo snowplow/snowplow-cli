@@ -165,7 +165,7 @@ func ResourceNameToFileName(s string) string {
 	if len(res) == 0 {
 		return "unnamed"
 	}
-	// truncated length to avoid FS name length limts
+	// truncated length to avoid FS name length limits
 	if len(res) > maxLength {
 		suffix := "...(truncated)"
 		res = res[:maxLength-len(suffix)] + suffix

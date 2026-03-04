@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	kjson "k8s.io/apimachinery/pkg/util/json"
 
@@ -571,6 +572,10 @@ func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds
 		err = kjson.Unmarshal(rbody, &dresp)
 		if err != nil {
 			return errors.Join(err, errors.New("bad response with no message"))
+		}
+
+		if (strings.Contains(dresp.Message, "not deployed to production")) {
+			return fmt.Errorf("%s\nUse `snowplow-cli ds publish prod` to resolve", dresp.Message)
 		}
 
 		return fmt.Errorf("batch publish failed: %s", dresp.Message)
