@@ -596,8 +596,8 @@ func FindChanges(cnx context.Context, client *console.ApiClient, dp map[string]m
 	return changeSet, err
 }
 
-func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool, isRelase bool) error {
-	PrintChangeset(*changeSet, changeSet.IdToFileName, isRelase)
+func Sync(cnx context.Context, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool, isRelease bool) error {
+	PrintChangeset(*changeSet, changeSet.IdToFileName, isRelease)
 	var err error
 	if !dryRun && !changeSet.isEmpty() {
 		err = ApplyDpChanges(*changeSet, cnx, client)

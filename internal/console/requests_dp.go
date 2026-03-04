@@ -574,7 +574,7 @@ func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds
 			return errors.Join(err, errors.New("bad response with no message"))
 		}
 
-		if (strings.Contains(dresp.Message, "not deployed to production")) {
+		if strings.Contains(dresp.Message, "not deployed to production") {
 			return fmt.Errorf("%s\nUse `snowplow-cli ds publish prod` to resolve", dresp.Message)
 		}
 
