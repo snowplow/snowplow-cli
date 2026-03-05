@@ -89,11 +89,15 @@ func Test_MaybeResourcesfromPaths(t *testing.T) {
 }
 
 func Test_ResourceNameToFileName(t *testing.T) {
+	longName := strings.Repeat("a", 300)
+	suffix := "...(truncated)"
+	expectedLongNameTruncated := longName[:200-len(suffix)] + "...(truncated)"
 	tests := map[string]string{
 		"cool_name":                "cool_name",
 		"Normal data product name": "normal-data-product-name",
 		"/щ💡test":                  "-test",
 		"lpt1":                     "unnamed",
+		longName:                   expectedLongNameTruncated,
 	}
 
 	for input, expected := range tests {

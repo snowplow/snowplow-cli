@@ -7,12 +7,17 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
-package publish
+package release
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -663,5 +668,251 @@ func Test_LockChanged(t *testing.T) {
 		if !r {
 			t.Errorf("lockstatus or managedfrom failure at i:%d", i)
 		}
+	}
+}
+
+func newTestClientAndServer(t *testing.T, eventSpecsJSON string) (*console.ApiClient, *httptest.Server) {
+	t.Helper()
+	client, server, _ := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	return client, server
+}
+
+func newTestClientAndServerWithPublishCounter(t *testing.T, eventSpecsJSON string) (*console.ApiClient, *httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var publishCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/data-products/v2" && r.Method == "GET":
+			resp := fmt.Sprintf(`{"data": [], "includes": {"eventSpecs": %s}}`, eventSpecsJSON)
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+		case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"data": []}`)
+		case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+			publishCalls.Add(1)
+			w.WriteHeader(http.StatusAccepted)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	client := &console.ApiClient{
+		Http:    &http.Client{},
+		Jwt:     "token",
+		BaseUrl: server.URL,
+	}
+	return client, server, &publishCalls
+}
+
+func Test_GetEventSpecIdsToRelease(t *testing.T) {
+	tests := []struct {
+		name           string
+		eventSpecsJSON string
+		localIds       []string
+		wantIds        []string
+		wantSkipped    int
+	}{
+		{
+			name: "draft with event is included",
+			eventSpecsJSON: `[{
+				"id": "es-1",
+				"status": "draft",
+				"name": "ES 1",
+				"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-1"},
+			wantIds:     []string{"es-1"},
+			wantSkipped: 0,
+		},
+		{
+			name: "draft with nil event is skipped",
+			eventSpecsJSON: `[{
+				"id": "es-2",
+				"status": "draft",
+				"name": "ES 2",
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-2"},
+			wantIds:     nil,
+			wantSkipped: 1,
+		},
+		{
+			name: "published event spec is excluded",
+			eventSpecsJSON: `[{
+				"id": "es-3",
+				"status": "published",
+				"name": "ES 3",
+				"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-3"},
+			wantIds:     nil,
+			wantSkipped: 0,
+		},
+		{
+			name:           "empty localIds returns nothing",
+			eventSpecsJSON: `[{"id": "es-4", "status": "draft", "name": "ES 4", "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}]`,
+			localIds:       []string{},
+			wantIds:        nil,
+			wantSkipped:    0,
+		},
+		{
+			name: "no matching event specs",
+			eventSpecsJSON: `[{
+				"id": "es-5",
+				"status": "draft",
+				"name": "ES 5",
+				"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-other"},
+			wantIds:     nil,
+			wantSkipped: 0,
+		},
+		{
+			name: "failed with event is included for retry",
+			eventSpecsJSON: `[{
+				"id": "es-failed",
+				"status": "failed",
+				"name": "ES Failed",
+				"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-failed"},
+			wantIds:     []string{"es-failed"},
+			wantSkipped: 0,
+		},
+		{
+			name: "failed with nil event is skipped",
+			eventSpecsJSON: `[{
+				"id": "es-failed-no-event",
+				"status": "failed",
+				"name": "ES Failed No Event",
+				"entities": {"tracked": [], "enriched": []},
+				"sourceApplications": []
+			}]`,
+			localIds:    []string{"es-failed-no-event"},
+			wantIds:     nil,
+			wantSkipped: 1,
+		},
+		{
+			name: "mixed statuses and events",
+			eventSpecsJSON: `[
+				{"id": "es-draft-with-event", "status": "draft", "name": "A", "event": {"source": "iglu:com.example/a/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+				{"id": "es-draft-no-event", "status": "draft", "name": "B", "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+				{"id": "es-published", "status": "published", "name": "C", "event": {"source": "iglu:com.example/c/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+				{"id": "es-not-local", "status": "draft", "name": "D", "event": {"source": "iglu:com.example/d/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+				{"id": "es-failed-retry", "status": "failed", "name": "E", "event": {"source": "iglu:com.example/e/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}
+			]`,
+			localIds:    []string{"es-draft-with-event", "es-draft-no-event", "es-published", "es-failed-retry"},
+			wantIds:     []string{"es-draft-with-event", "es-failed-retry"},
+			wantSkipped: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, server := newTestClientAndServer(t, tt.eventSpecsJSON)
+			defer server.Close()
+
+			got, gotSkipped, err := GetEventSpecIdsToRelease(context.Background(), client, tt.localIds)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			var gotIds []string
+			for _, es := range got {
+				gotIds = append(gotIds, es.Id)
+			}
+			if diff := cmp.Diff(tt.wantIds, gotIds); diff != "" {
+				t.Errorf("unpublished ids mismatch (-want +got):\n%s", diff)
+			}
+			if gotSkipped != tt.wantSkipped {
+				t.Errorf("skipped = %d, want %d", gotSkipped, tt.wantSkipped)
+			}
+		})
+	}
+}
+
+func Test_Release_DryRunDoesNotPublish(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "draft",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 0 {
+		t.Errorf("expected no publish calls during dry-run, got %d", publishCalls.Load())
+	}
+}
+
+func Test_Release_PublishesWhenNotDryRun(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "draft",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 1 {
+		t.Errorf("expected 1 publish call, got %d", publishCalls.Load())
+	}
+}
+
+func Test_Release_DryRunNothingToRelease(t *testing.T) {
+	eventSpecsJSON := `[{
+		"id": "es-1",
+		"status": "published",
+		"name": "ES 1",
+		"event": {"source": "iglu:com.example/event/jsonschema/1-0-0"},
+		"entities": {"tracked": [], "enriched": []},
+		"sourceApplications": []
+	}]`
+	client, server, publishCalls := newTestClientAndServerWithPublishCounter(t, eventSpecsJSON)
+	defer server.Close()
+
+	changeSet := &DataProductChangeSet{
+		IdToFileName:      map[string]string{},
+		localEventSpecIds: []string{"es-1"},
+	}
+
+	err := Release(context.Background(), client, changeSet, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if publishCalls.Load() != 0 {
+		t.Errorf("expected no publish calls, got %d", publishCalls.Load())
 	}
 }
