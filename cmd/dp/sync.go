@@ -21,12 +21,12 @@ import (
 var syncCommand = &cobra.Command{
 	Use:     "sync {directory ./data-products}",
 	Aliases: []string{"publish"},
-	Short:   "Sync all data products, event specs and source apps to CDI Console",
-	Long: `Sync the local versions of all data products, event specs and source apps to CDI Console.
+	Short:   "Sync data products, event specs and source apps to Snowplow Console",
+	Long: `Sync data products, event specs and source apps to Snowplow Console.
 
-This command syncs local files with remote data products event specs and source apps, creating or updating them as needed.
-Event specs status will not be changed by running this command.
-Use 'release' to also release event specs, which changes the status in CDI Console to "published" and enable event spec inference.
+This command syncs local files with remote data products, event specs and source apps, creating or updating them as needed.
+Remote data products and source apps are updated in place. Structural changes to event specs (name, event, entities) will instead create a new draft version of the event spec.
+Use 'release' to also release event specs, which changes the status in Snowplow Console to "published" and enables event spec inference.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp sync

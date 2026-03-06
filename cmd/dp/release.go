@@ -20,12 +20,12 @@ import (
 
 var releaseCommand = &cobra.Command{
 	Use:   "release {directory ./data-products}",
-	Short: "Publish and release all data products, event specs and source apps to CDI Console",
-	Long: `Publish and release the local versions of all data products, event specs and source apps to CDI Console.
+	Short: "Sync data products, event specs and source apps to Snowplow Console, then release event specs",
+	Long: `Sync data products, event specs and source apps to Snowplow Console, then release event specs.
 
-This command syncs local files with remote data products, then releases any draft event specs. It will filter out the event specs without the event, and only attempt to publish the event specs that are part of the data products in the directory.
-Releasing marks event specs as published and enables event spec inference.
-Use 'sync' to only sync without releasing, and not change the status of event specs
+This command runs 'sync' first, then releases the event specs.
+Releasing sets the event spec status to 'published' and pushes them to the pipeline, enabling event spec inference.
+Only event specs that exist locally will be released. Each event spec must have an event defined, and all referenced events and entities must be published to the production environment.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp release
