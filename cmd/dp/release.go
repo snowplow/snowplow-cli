@@ -20,7 +20,7 @@ import (
 
 var releaseCommand = &cobra.Command{
 	Use:   "release {directory ./data-products}",
-	Short: "Sync data products, event specs and source apps to Snowplow Console, then release event specs",
+	Short: "Sync data products, event specs and source apps to Snowplow Console, then release event specs to be available within your pipeline",
 	Long: `Sync data products, event specs and source apps to Snowplow Console, then release event specs.
 
 This command runs 'sync' first, then releases the event specs.

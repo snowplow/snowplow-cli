@@ -24,8 +24,8 @@ var syncCommand = &cobra.Command{
 	Short:   "Sync data products, event specs and source apps to Snowplow Console",
 	Long: `Sync data products, event specs and source apps to Snowplow Console.
 
-This command syncs local files with remote data products, event specs and source apps, creating or updating them as needed.
-Remote data products and source apps are updated in place. Structural changes to event specs (name, event, entities) will instead create a new draft version of the event spec.
+This command syncs local files with Snowplow Console. Data products, event specs and source apps are created or updated as needed.
+Data products and source apps that exist in Snowplow Console are updated in place. Structural changes to event specs (name, event, entities) will instead create a new draft version of the event spec.
 Use 'release' to also release event specs, which changes the status in Snowplow Console to "published" and enables event spec inference.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
