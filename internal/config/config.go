@@ -28,9 +28,9 @@ import (
 const envNamePrefix = "SNOWPLOW_CONSOLE_"
 
 func InitConsoleFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringP("api-key-id", "a", "", "CDI console api key id")
-	cmd.PersistentFlags().StringP("api-key", "S", "", "CDI console api key")
-	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "CDI console host")
+	cmd.PersistentFlags().StringP("api-key-id", "a", "", "Snowplow Console api key id")
+	cmd.PersistentFlags().StringP("api-key", "S", "", "Snowplow Console api key")
+	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "Snowplow Console host")
 	cmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
 	cmd.PersistentFlags().StringP("managed-from", "m", "", "Link to a github repo where the data structure is managed")
 }
