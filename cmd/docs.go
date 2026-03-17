@@ -35,7 +35,7 @@ var docsCommand = &cobra.Command{
 		// Clean the output directory if it exists
 		if _, err := os.Stat(outputDir); !os.IsNotExist(err) {
 			if err := os.RemoveAll(outputDir); err != nil {
-				slog.Error("Failed to clean output directory", "error", err)
+				slog.Error("dang yo", "error", err)
 				os.Exit(1)
 			}
 		}
