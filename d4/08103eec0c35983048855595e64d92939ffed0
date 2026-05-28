@@ -1,0 +1,19 @@
+README.md
+  s_cdc1cb7dd85188::t_54c35815a19d77 47-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d408103eec0c35983048855595e64d92939ffed0",
+  "prompts": {},
+  "sessions": {
+    "s_cdc1cb7dd85188": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4384c7f4-0b5c-4650-8324-551aca5f6d63",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
