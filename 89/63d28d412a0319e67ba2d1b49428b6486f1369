@@ -1,0 +1,26 @@
+cmd/events/track.go
+  s_cdc1cb7dd85188::t_9957ed9838c44e 1-53,56-58,60-81
+  s_cdc1cb7dd85188::t_deef28e787090e 54-55,59
+cmd/events/events.go
+  s_cdc1cb7dd85188::t_ad53e457de9827 1-18,21-29
+  s_cdc1cb7dd85188::t_4ebd536977a7ea 19-20
+cmd/root.go
+  s_cdc1cb7dd85188::t_b309b8129d3e49 53
+  s_cdc1cb7dd85188::t_2c1deae84348f1 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8963d28d412a0319e67ba2d1b49428b6486f1369",
+  "prompts": {},
+  "sessions": {
+    "s_cdc1cb7dd85188": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4384c7f4-0b5c-4650-8324-551aca5f6d63",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
