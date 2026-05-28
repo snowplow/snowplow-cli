@@ -1,0 +1,21 @@
+internal/tracking/tracking.go
+  s_cdc1cb7dd85188::t_42fbb8ced33468 141-182
+internal/tracking/tracking_test.go
+  s_cdc1cb7dd85188::t_0fa4a1c308dbee 194-255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "823ceb752b6de5cb9933f16dea74ba0badd4d069",
+  "prompts": {},
+  "sessions": {
+    "s_cdc1cb7dd85188": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4384c7f4-0b5c-4650-8324-551aca5f6d63",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
