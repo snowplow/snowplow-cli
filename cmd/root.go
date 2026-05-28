@@ -15,6 +15,7 @@ import (
 
 	"github.com/snowplow/snowplow-cli/cmd/dp"
 	"github.com/snowplow/snowplow-cli/cmd/ds"
+	"github.com/snowplow/snowplow-cli/cmd/events"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -64,4 +65,5 @@ Then on:
 	RootCmd.AddCommand(McpCmd)
 	RootCmd.AddCommand(SetupCmd)
 	RootCmd.AddCommand(StatusCmd)
+	RootCmd.AddCommand(events.EventsCmd)
 }
