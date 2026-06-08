@@ -1,0 +1,26 @@
+README.md
+  s_d268d121abb926::t_dc0c7931a1f9e8 71
+  s_d268d121abb926::t_0a6de2eeba80a1 99,102
+  s_d268d121abb926::t_ef1609d48a34d6 48,53,62,83,92
+cmd/events/send.go
+  s_d268d121abb926::t_04a96471dd8ec0 21-22,28-29,38-46,71,81-87
+cmd/events/events.go
+  s_d268d121abb926::t_70cff6516a8466 28
+  s_d268d121abb926::t_689aa3f643ee81 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "120e525fdaa6a153b4f8aa7765beda89514ddac3",
+  "prompts": {},
+  "sessions": {
+    "s_d268d121abb926": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55883fcb-9951-467c-a0e4-d634febb97da",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
