@@ -1,7 +1,7 @@
-cmd/events/events.go
-  s_d268d121abb926::t_e98af246f83d03 21,28
 README.md
-  s_d268d121abb926::t_e98af246f83d03 48,53,62,71,83,92,99,102
+  s_d268d121abb926::t_70cfb38494eef3 48,53,62,71,83,92,99,102
+cmd/events/events.go
+  s_d268d121abb926::t_70cfb38494eef3 21,28
 ---
 {
   "schema_version": "authorship/3.0.0",
