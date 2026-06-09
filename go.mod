@@ -14,6 +14,7 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/r3labs/diff/v3 v3.0.2
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
+	github.com/snowplow/snowplow-golang-tracker/v3 v3.1.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/tidwall/sjson v1.2.5
@@ -33,6 +34,9 @@ require (
 	github.com/clipperhouse/displaywidth v0.6.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-memdb v1.3.4 // indirect
+	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
