@@ -44,3 +44,60 @@ console:
   api-key-id: ********-****-****-****-************
   api-key: ********-****-****-****-************
 ```
+
+## Sending events (`events send`)
+
+Send a single self-describing event to a Snowplow collector:
+
+```bash
+snowplow-cli events send \
+  --collector collector.example.com \
+  --schema iglu:com.snowplowanalytics.snowplow/custom_event/jsonschema/1-0-0 \
+  --json '{"category":"test","action":"click"}'
+```
+
+Or pass a full self-describing JSON:
+
+```bash
+snowplow-cli events send \
+  --collector collector.example.com \
+  --sdjson '{"schema":"iglu:com.snowplowanalytics.snowplow/custom_event/jsonschema/1-0-0","data":{"category":"test","action":"click"}}'
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--collector` | `-c` | — | Collector domain (required) |
+| `--app-id` | `-a` | `snowplowcli` | Application ID |
+| `--method` | `-m` | `POST` | HTTP method (`POST`/`GET`) |
+| `--protocol` | `-p` | `https` | Protocol (`http`/`https`) |
+| `--sdjson` | `-J` | — | Self-describing JSON `{"schema":...,"data":...}` |
+| `--schema` | `-d` | — | Schema (data structure) URI |
+| `--json` | `-j` | — | Non-self-describing JSON data |
+| `--ip-address` | `-i` | — | Custom IP address |
+| `--entities` | `-e` | `[]` | JSON array of entities to attach |
+
+Exit codes: `0` (2xx/3xx), `4` (4xx), `5` (5xx), `1` (validation or other error).
+
+### Migrating from `snowplow-tracking-cli`
+
+`events send` aims to replace the standalone `snowplow-tracking-cli`. The behavior — building a
+self-describing event and sending it once — is unchanged, including the `0/4/5/1` exit
+codes and the validation rules. Only the command prefix and some flag names change.
+
+```bash
+# before
+snowplow-tracking-cli --collector collector.example.com --schema iglu:... --json '{...}'
+
+# after
+snowplow-cli events send --collector collector.example.com --schema iglu:... --json '{...}'
+```
+
+Flag mapping:
+
+| Old | New | Note |
+|-----|-----|------|
+| `--appid` / `-id` | `--app-id` / `-a` | renamed (kebab-case); old name still works but is deprecated; default now `snowplowcli` |
+| `--sdjson` / `-sdj` | `--sdjson` / `-J` | new shorthand |
+| `--schema` / `-s` | `--schema` / `-d` | new shorthand  |
+| `--ipaddress` / `-ip` | `--ip-address` / `-i` | renamed (kebab-case); old name still works but is deprecated |
+| `--contexts` / `-ctx` | `--entities` / `-e` | renamed to current Snowplow terminology |

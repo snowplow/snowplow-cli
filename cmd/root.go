@@ -15,6 +15,7 @@ import (
 
 	"github.com/snowplow-product/snowplow-cli/cmd/dp"
 	"github.com/snowplow-product/snowplow-cli/cmd/ds"
+	"github.com/snowplow-product/snowplow-cli/cmd/events"
 	"github.com/snowplow-product/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -49,4 +50,5 @@ Then on:
 	RootCmd.PersistentFlags().Bool("json-output", false, "Log output as json")
 	RootCmd.AddCommand(ds.DataStructuresCmd)
 	RootCmd.AddCommand(dp.DataProductsCmd)
+	RootCmd.AddCommand(events.EventsCmd)
 }
