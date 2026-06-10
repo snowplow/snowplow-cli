@@ -1,3 +1,8 @@
+Version 0.3.0 (2026-06-10)
+--------------------------
+Add events send command for sending self-describing events to a collector, replacing snowplow-tracking-cli (#136)
+Update wording in descriptions (#126)
+
 Version 0.2.0 (2026-03-05)
 --------------------------
 [DPS-1576] Add release command, rename publish to sync (#125)
