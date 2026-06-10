@@ -1,0 +1,20 @@
+CHANGELOG
+  s_6b24e6950e37fc::t_f804b3eb999d37 1-2,4-5
+  s_6b24e6950e37fc::t_33cc582e4b1332 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "16e9adc8241e8a92af1c7ef72bc5f404eae8e8f2",
+  "prompts": {},
+  "sessions": {
+    "s_6b24e6950e37fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac3bc7a2-9523-4cc0-9ee7-2bf57b3ca955",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
