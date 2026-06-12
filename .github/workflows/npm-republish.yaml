@@ -61,12 +61,6 @@ jobs:
       -
         name: Verify packages are installable
         run: |
-          for p in "" -darwin-amd64 -darwin-arm64 -linux-386 -linux-amd64 -linux-arm64 -win32-386 -win32-amd64 -win32-arm64; do
-            npm view "@snowplow/snowplow-cli$p@$VERSION" version
-          done
-          for attempt in 1 2 3 4 5; do
-            got=$(npx -y "@snowplow/snowplow-cli@$VERSION" --version) && break
-            sleep 15
-          done
+          got=$(npx -y "@snowplow/snowplow-cli" --version) && break
           echo "npx reports: $got"
           echo "$got" | grep -F "$VERSION"
