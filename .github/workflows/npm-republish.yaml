@@ -1,0 +1,72 @@
+# TEMPORARY: republishes the v0.3.0 npm packages from the existing GitHub
+# release after the original cd run failed on a revoked npm token.
+# This PR is closed without merging once @snowplow/snowplow-cli@0.3.0 is live.
+name: npm-republish
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  VERSION: 0.3.0
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download release binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v$VERSION" --dir assets
+          cd assets && sha256sum -c "snowplow-cli_${VERSION}_checksums.txt"
+      -
+        name: Arrange goreleaser dist layout
+        run: |
+          declare -A assets=(
+            [darwin_amd64_v1]=snowplow-cli_darwin_x86_64
+            [darwin_arm64_v8.0]=snowplow-cli_darwin_arm64
+            [linux_386_sse2]=snowplow-cli_linux_i386
+            [linux_amd64_v1]=snowplow-cli_linux_x86_64
+            [linux_arm64_v8.0]=snowplow-cli_linux_arm64
+            [windows_386_sse2]=snowplow-cli_windows_i386.exe
+            [windows_amd64_v1]=snowplow-cli_windows_x86_64.exe
+            [windows_arm64_v8.0]=snowplow-cli_windows_arm64.exe
+          )
+          for key in "${!assets[@]}"; do
+            bin=snowplow-cli
+            [[ "${assets[$key]}" == *.exe ]] && bin=snowplow-cli.exe
+            mkdir -p "dist/snowplow-cli_$key"
+            cp "assets/${assets[$key]}" "dist/snowplow-cli_$key/$bin"
+            chmod +x "dist/snowplow-cli_$key/$bin"
+          done
+      -
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+          registry-url: 'https://registry.npmjs.org'
+      -
+        name: Publish npm packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISHING_AUTOMATION_TOKEN }}
+        run: cd npm && version="$VERSION" ./create-platform-packages.sh
+      -
+        name: Verify packages are installable
+        run: |
+          for p in "" -darwin-amd64 -darwin-arm64 -linux-386 -linux-amd64 -linux-arm64 -win32-386 -win32-amd64 -win32-arm64; do
+            npm view "@snowplow/snowplow-cli$p@$VERSION" version
+          done
+          for attempt in 1 2 3 4 5; do
+            got=$(npx -y "@snowplow/snowplow-cli@$VERSION" --version) && break
+            sleep 15
+          done
+          echo "npx reports: $got"
+          echo "$got" | grep -F "$VERSION"
