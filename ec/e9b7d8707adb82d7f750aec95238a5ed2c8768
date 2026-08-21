@@ -1,0 +1,31 @@
+.github/workflows/claude.yml
+  s_b935e0efa8be61::t_df16cc750940dd 29,32,36
+.github/workflows/claude-code-review.yml
+  s_b935e0efa8be61::t_b7626edcdd62a8 30,33,37
+.github/workflows/ci.yaml
+  s_b935e0efa8be61::t_b7c61a403a561f 9-11,17-20
+.github/workflows/cd.yaml
+  s_b935e0efa8be61::t_da732e29c72c49 41
+  s_b935e0efa8be61::t_62ddd60bed8323 17-19,22,25,28
+.github/workflows/golangci-lint.yml
+  s_b935e0efa8be61::t_7a16c2ec7688f0 17-20,24
+.github/workflows/validate.yml
+  s_b935e0efa8be61::t_332ff4fc99ffeb 15-18
+  s_b935e0efa8be61::t_839a8b15d7f799 5-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ece9b7d8707adb82d7f750aec95238a5ed2c8768",
+  "prompts": {},
+  "sessions": {
+    "s_b935e0efa8be61": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad7f259-7e56-4e2d-9a58-d71c95648b83",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
