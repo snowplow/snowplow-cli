@@ -1,0 +1,19 @@
+.github/workflows/zizmor.yml
+  s_b935e0efa8be61::t_9ba7484b10f1e6 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "fb406e66207c68139d114fa8bab0bb1c29553053",
+  "prompts": {},
+  "sessions": {
+    "s_b935e0efa8be61": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad7f259-7e56-4e2d-9a58-d71c95648b83",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Gleb Lobov <gleb.lobov@snowplowanalytics.com>"
+    }
+  }
+}
