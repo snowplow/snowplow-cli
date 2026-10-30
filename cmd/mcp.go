@@ -19,9 +19,11 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/snowplow/snowplow-cli/internal/config"
+	"github.com/snowplow/snowplow-cli/internal/consolemcp"
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/snowplow/snowplow-cli/internal/validation"
@@ -258,6 +260,26 @@ func init() {
 
 	McpCmd.Flags().Bool("dump-context", false, "Dumps the result of the get_context tool to stdout and exits.")
 	McpCmd.Flags().String("base-directory", "", "The base path to use for relative file lookups. Useful for clients that pass in relative file paths.")
+	McpCmd.Flags().Bool("local-only", false, "Only serve the local tools, without the Snowplow Console MCP tools")
+}
+
+func addConsoleTools(cmd *cobra.Command, s *server.MCPServer) func() {
+	host, _ := cmd.Flags().GetString("host")
+	orgID, _ := cmd.Flags().GetString("org-id")
+	apiKeyID, _ := cmd.Flags().GetString("api-key-id")
+	apiKey, _ := cmd.Flags().GetString("api-key")
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
+	defer cancel()
+
+	c, n, err := consolemcp.AddTools(ctx, s, consolemcp.URL(host), orgID, apiKeyID, apiKey)
+	if err != nil {
+		slog.Warn("Snowplow Console MCP unavailable, serving local tools only", "error", err)
+		return func() {}
+	}
+	slog.Debug("Snowplow Console MCP tools added", "count", n)
+
+	return func() { _ = c.Close() }
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
@@ -308,6 +330,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	s.AddTool(validateDataProductsTool, validateDataProductsHandler(cmd))
 	s.AddTool(getContextTool, getContextHandler)
 	s.AddTool(uuidTool, genUuid)
+
+	if localOnly, _ := cmd.Flags().GetBool("local-only"); !localOnly {
+		closeConsole := addConsoleTools(cmd, s)
+		defer closeConsole()
+	}
 
 	if err := server.ServeStdio(s); err != nil {
 		if !errors.Is(err, context.Canceled) {

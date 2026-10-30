@@ -474,3 +474,53 @@ func Test_GetUserInfo_UserInfoNotMap(t *testing.T) {
 		t.Errorf("expected missing user info error, got: %v", err)
 	}
 }
+
+func Test_CreateScopedAPIKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/msc/v1/organizations/org/credentials/v3/api-keys" || r.Method != "POST" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		var req struct {
+			Description string `json:"description"`
+			Permissions []struct {
+				Capabilities []Capability `json:"capabilities"`
+			} `json:"permissions"`
+		}
+		if err := json.Unmarshal(body, &req); err != nil {
+			t.Errorf("bad request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if req.Description != "app key" {
+			t.Errorf("bad description %q", req.Description)
+		}
+		caps := req.Permissions[0].Capabilities
+		if len(caps) != 2 || caps[0].ResourceType != "SIGNALS" || caps[1].Action != "VIEW" || caps[0].Filters == nil {
+			t.Errorf("bad capabilities %+v", caps)
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"kid","key":"secret"}`))
+	}))
+	defer server.Close()
+
+	key, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsReadCapabilities)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key.ID != "kid" || key.Secret != "secret" {
+		t.Fatalf("unexpected key %+v", key)
+	}
+}
+
+func Test_CreateScopedAPIKey_Forbidden(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"not allowed"}`))
+	}))
+	defer server.Close()
+
+	if _, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsReadCapabilities); err == nil {
+		t.Fatal("expected an error")
+	}
+}

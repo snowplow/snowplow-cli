@@ -794,3 +794,25 @@ func Test_selectOrganizationForInput_WhitespaceInput(t *testing.T) {
 		t.Errorf("expected invalid selection error, got: %v", err)
 	}
 }
+
+func Test_SelectIndex(t *testing.T) {
+	cases := []struct {
+		input        string
+		defaultIndex int
+		want         int
+		wantErr      bool
+	}{
+		{"", 0, 0, false},
+		{"", -1, 0, true},
+		{"3", 0, 2, false},
+		{"0", 0, 0, true},
+		{"4", 0, 0, true},
+		{"abc", 0, 0, true},
+	}
+	for _, c := range cases {
+		got, err := SelectIndex(c.input, 3, c.defaultIndex)
+		if (err != nil) != c.wantErr || (!c.wantErr && got != c.want) {
+			t.Errorf("input %q, default %d: got %d, %v", c.input, c.defaultIndex, got, err)
+		}
+	}
+}

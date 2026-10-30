@@ -36,6 +36,40 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		"audience", snowplowAudience,
 		"read-only", readOnly)
 
+	session, err := Login(ctx, clientID, auth0Domain, consoleHost)
+	if err != nil {
+		return err
+	}
+
+	green := color.New(color.FgGreen)
+
+	apiKey, err := console.CreateAPIKey(ctx, session.AccessToken, consoleHost, session.Org.ID, readOnly)
+	if err != nil {
+		return fmt.Errorf("failed to create API key: %w", err)
+	}
+
+	if err := config.PersistConfig(session.Org.ID, apiKey.ID, apiKey.Secret, consoleHost, isDotenv); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	green.Printf("✓ Logged in to Snowplow Console as %s\n", session.Email)
+	green.Printf("✓ Authentication credentials saved\n")
+	if readOnly {
+		green.Printf("✓ API key created with read-only permissions for %s\n", session.Org.Name)
+	} else {
+		green.Printf("✓ API key created with admin permissions for %s\n", session.Org.Name)
+	}
+
+	return nil
+}
+
+type Session struct {
+	AccessToken string
+	Org         console.Organization
+	Email       string
+}
+
+func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Session, error) {
 	slog.Debug("Initiating device authentication flow")
 
 	oauthConfig := &oauth2.Config{
@@ -52,7 +86,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		oauth2.SetAuthURLParam("audience", snowplowAudience))
 	if err != nil {
 		handleAuthError(err, clientID, auth0Domain)
-		return fmt.Errorf("failed to initiate device authentication flow: %w", err)
+		return nil, fmt.Errorf("failed to initiate device authentication flow: %w", err)
 	}
 
 	yellow := color.New(color.FgYellow, color.Bold)
@@ -98,7 +132,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 
 	token, err := pollForTokenWithSpinner(ctx, oauthConfig, deviceAuth)
 	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
 	green.Printf("\n✓ Authentication complete.\n")
@@ -106,16 +140,16 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 
 	jwtOrgID, err := getOrgIDFromJWT(token.AccessToken)
 	if err != nil {
-		return fmt.Errorf("failed to get organization ID: %w", err)
+		return nil, fmt.Errorf("failed to get organization ID: %w", err)
 	}
 
 	organizations, err := console.GetOrganizations(ctx, token.AccessToken, consoleHost)
 	if err != nil {
-		return fmt.Errorf("failed to fetch organizations: %w", err)
+		return nil, fmt.Errorf("failed to fetch organizations: %w", err)
 	}
 
 	if len(organizations) == 0 {
-		return fmt.Errorf("no organizations found for your account")
+		return nil, fmt.Errorf("no organizations found for your account")
 	}
 
 	var selectedOrg *console.Organization
@@ -126,36 +160,19 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	} else {
 		selectedOrg, err = selectOrganization(organizations, jwtOrgID)
 		if err != nil {
-			return fmt.Errorf("failed to select organization: %w", err)
+			return nil, fmt.Errorf("failed to select organization: %w", err)
 		}
 		green.Printf("✓ Selected organization: %s\n", selectedOrg.Name)
 	}
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
-	apiKey, err := console.CreateAPIKey(ctx, token.AccessToken, consoleHost, selectedOrg.ID, readOnly)
-	if err != nil {
-		return fmt.Errorf("failed to create API key: %w", err)
-	}
-
 	userInfo, err := console.GetUserInfo(ctx, token.AccessToken)
 	if err != nil {
-		return fmt.Errorf("failed to get user info: %w", err)
+		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	if err := config.PersistConfig(selectedOrg.ID, apiKey.ID, apiKey.Secret, consoleHost, isDotenv); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
-	}
-
-	green.Printf("✓ Logged in to Snowplow Console as %s\n", userInfo.Email)
-	green.Printf("✓ Authentication credentials saved\n")
-	if readOnly {
-		green.Printf("✓ API key created with read-only permissions for %s\n", selectedOrg.Name)
-	} else {
-		green.Printf("✓ API key created with admin permissions for %s\n", selectedOrg.Name)
-	}
-
-	return nil
+	return &Session{AccessToken: token.AccessToken, Org: *selectedOrg, Email: userInfo.Email}, nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
@@ -208,20 +225,30 @@ func selectOrganization(organizations []console.Organization, jwtOrgID string) (
 }
 
 func selectOrganizationForInput(organizations []console.Organization, jwtOrgID, input string, defaultIndex int) (*console.Organization, error) {
+	i, err := SelectIndex(input, len(organizations), defaultIndex)
+	if err != nil {
+		return nil, err
+	}
+	return &organizations[i], nil
+}
+
+// SelectIndex parses a choice from a numbered list of n items. Empty input
+// picks defaultIndex; a negative defaultIndex means there is no default.
+func SelectIndex(input string, n, defaultIndex int) (int, error) {
 	if input == "" && defaultIndex >= 0 {
-		return &organizations[defaultIndex], nil
+		return defaultIndex, nil
 	}
 
 	var selection int
 	if _, err := fmt.Sscanf(input, "%d", &selection); err != nil {
-		return nil, fmt.Errorf("invalid selection: %s", input)
+		return 0, fmt.Errorf("invalid selection: %s", input)
 	}
 
-	if selection < 1 || selection > len(organizations) {
-		return nil, fmt.Errorf("selection must be between 1 and %d", len(organizations))
+	if selection < 1 || selection > n {
+		return 0, fmt.Errorf("selection must be between 1 and %d", n)
 	}
 
-	return &organizations[selection-1], nil
+	return selection - 1, nil
 }
 
 func displayAvailableOrgs(organizations []console.Organization, jwtOrgID string, defaultIndex int) {
