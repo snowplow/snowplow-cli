@@ -20,7 +20,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
@@ -28,6 +27,12 @@ import (
 type APIKeyResponse struct {
 	ID     string `json:"id"`
 	Secret string `json:"key"`
+}
+
+type Capability struct {
+	ResourceType string `json:"resourceType"`
+	Action       string `json:"action"`
+	Filters      []any  `json:"filters"`
 }
 
 type UserInfo struct {
@@ -38,96 +43,60 @@ type UserInfo struct {
 
 func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, readOnly bool) (*APIKeyResponse, error) {
 	slog.Debug("Creating API key for organization", "org-id", orgID)
-	apiURL := fmt.Sprintf("%s/api/msc/v1/organizations/%s/credentials/v2/api-keys", consoleHost, orgID)
-
-	slog.Debug("Creating API key", "url", apiURL, "orgID", orgID)
 
 	userInfo, err := GetUserInfo(ctx, accessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	var description string
+	description := fmt.Sprintf("%s CLI key", userInfo.Email)
+	capabilities := []Capability{{ResourceType: "*", Action: "*", Filters: []any{}}}
 	if readOnly {
 		description = fmt.Sprintf("%s CLI key (read-only)", userInfo.Email)
-	} else {
-		description = fmt.Sprintf("%s CLI key", userInfo.Email)
-	}
-
-	var permissions []map[string]any
-	if readOnly {
-		permissions = []map[string]any{
-			{
-				"capabilities": []map[string]any{
-					{
-						"resourceType": "DATA-PRODUCTS",
-						"action":       "LIST",
-						"filters":      []any{},
-					},
-					{
-						"resourceType": "DATA-PRODUCTS",
-						"action":       "VIEW",
-						"filters":      []any{},
-					},
-				},
-			},
-		}
-	} else {
-		permissions = []map[string]any{
-			{
-				"capabilities": []map[string]any{
-					{
-						"resourceType": "*",
-						"action":       "*",
-						"filters":      []any{},
-					},
-				},
-			},
+		capabilities = []Capability{
+			{ResourceType: "DATA-PRODUCTS", Action: "LIST", Filters: []any{}},
+			{ResourceType: "DATA-PRODUCTS", Action: "VIEW", Filters: []any{}},
 		}
 	}
 
-	reqBody := map[string]any{
+	client := userClient(consoleHost, orgID, accessToken)
+	return postAPIKey(ctx, client, fmt.Sprintf("%s/credentials/v2/api-keys", client.BaseUrl), description, capabilities)
+}
+
+func CreateScopedAPIKey(ctx context.Context, accessToken, consoleHost, orgID, description string, capabilities []Capability) (*APIKeyResponse, error) {
+	client := userClient(consoleHost, orgID, accessToken)
+	return postAPIKey(ctx, client, fmt.Sprintf("%s/credentials/v3/api-keys", client.BaseUrl), description, capabilities)
+}
+
+func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description string, capabilities []Capability) (*APIKeyResponse, error) {
+	slog.Debug("Creating API key", "url", apiURL)
+
+	jsonBody, err := json.Marshal(map[string]any{
 		"description": description,
-		"permissions": permissions,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
+		"permissions": []map[string]any{{"capabilities": capabilities}},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	slog.Debug("API key request", "body", string(jsonBody))
-
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jsonBody))
+	req, err := ConsoleRequest("POST", apiURL, client, ctx, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("X-SNOWPLOW-CLI", util.VersionInfo)
-
-	slog.Debug("Request headers",
-		"Content-Type", req.Header.Get("Content-Type"),
-		"Authorization", "Bearer "+accessToken[:min(20, len(accessToken))]+"...",
-		"X-SNOWPLOW-CLI", req.Header.Get("X-SNOWPLOW-CLI"))
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := client.Http.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
-
+	defer util.LoggingCloser(ctx, resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-
 	slog.Debug("API response", "status", resp.StatusCode, "body", string(body))
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("API key creation failed: %s", string(body))
+		return nil, fmt.Errorf("API key creation failed: %d %s", resp.StatusCode, string(body))
 	}
 
 	var apiKeyResponse APIKeyResponse
