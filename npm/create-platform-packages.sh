@@ -48,6 +48,16 @@ for i in "${!keys[@]}"; do
 
   IFS='-' read -r osPart archPart <<<"${values[i]}"
 
+  case "$archPart" in
+    amd64) nodeCpu="x64" ;;
+    arm64) nodeCpu="arm64" ;;
+    386) nodeCpu="ia32" ;;
+    *)
+      echo "unknown arch $archPart" >&2
+      exit 1
+      ;;
+  esac
+
   cat >"platforms/snowplow-cli-$p/package.json" <<EOT
 {
   "name": "@snowplow/snowplow-cli-${values[i]}",
@@ -56,7 +66,7 @@ for i in "${!keys[@]}"; do
   "repository": "https://github.com/snowplow/snowplow-cli",
   "description": "snowplow cli for $osPart ($archPart)",
   "os": ["$osPart"],
-  "cpu": ["$archPart"],
+  "cpu": ["$nodeCpu"],
   "files": ["bin"]
 }
 EOT
