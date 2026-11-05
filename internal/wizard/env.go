@@ -19,49 +19,33 @@ import (
 	"strings"
 )
 
-// upsertDotenv sets values in a .env file, keeping every other line (and
-// comment) as it was. The file is left readable by the owner only.
+// upsertDotenv sets values in a .env file, keeping its other lines.
 func upsertDotenv(path string, values map[string]string) error {
-	var lines []string
 	b, err := os.ReadFile(path)
-	switch {
-	case err == nil:
-		if err := os.Chmod(path, 0600); err != nil {
-			return err
-		}
-		lines = strings.Split(strings.TrimRight(string(b), "\n"), "\n")
-	case errors.Is(err, os.ErrNotExist):
-	default:
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-
-	done := map[string]bool{}
+	var lines []string
+	if s := strings.TrimRight(string(b), "\n"); s != "" {
+		lines = strings.Split(s, "\n")
+	}
+	pending := maps.Clone(values)
 	for i, line := range lines {
-		rest, exported := strings.CutPrefix(strings.TrimSpace(line), "export ")
-		name, _, ok := strings.Cut(rest, "=")
-		if !ok {
-			continue
-		}
-		name = strings.TrimSpace(name)
+		key, _, _ := strings.Cut(line, "=")
+		name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(key), "export "))
 		if v, ok := values[name]; ok {
-			lines[i] = name + "=" + v
-			if exported {
-				lines[i] = "export " + lines[i]
-			}
-			done[name] = true
+			lines[i] = key + "=" + v
+			delete(pending, name)
 		}
 	}
-
-	for _, name := range slices.Sorted(maps.Keys(values)) {
-		if !done[name] {
-			lines = append(lines, name+"="+values[name])
-		}
+	for _, name := range slices.Sorted(maps.Keys(pending)) {
+		lines = append(lines, name+"="+pending[name])
 	}
-
-	if len(lines) > 0 && lines[0] == "" {
-		lines = lines[1:]
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600); err != nil {
+		return err
 	}
-	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600)
+	// WriteFile only sets the mode on a new file, and this one now holds a key.
+	return os.Chmod(path, 0600)
 }
 
 func git(dir string, args ...string) (string, error) {

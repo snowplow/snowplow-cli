@@ -34,8 +34,6 @@ const signalsStarterPrompt = "Use the signals-setup skill to set up Snowplow Sig
 	"Setup is done when all four steps are complete: Tracking, Attribute groups, Services, and Used by your app. " +
 	"If the signals-setup skill isn't available, stop and tell the user to install or update the Snowplow skills."
 
-const mcpDocsURL = "https://docs.snowplow.io/docs/ai/snowplow-mcp/"
-
 var (
 	green  = color.New(color.FgGreen)
 	yellow = color.New(color.FgYellow)
@@ -56,6 +54,9 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 		return err
 	}
 	org := session.Org
+	if org.ID != session.HomeOrgID {
+		_, _ = yellow.Printf("! The Snowplow MCP works in your home organization, not %s, so your agent's Snowplow tools won't see this project's setup.\n", org.Name)
+	}
 
 	env, err := pickSignalsEnvironment(ctx, opts, session)
 	if err != nil {
@@ -68,10 +69,10 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 	}
 
 	agents := detectAgents()
-	installSkills(ctx, agents, opts.ProjectDir)
+	installPlugin(ctx, agents, opts.ProjectDir)
 
 	_, _ = green.Printf("\n✓ Snowplow Signals is ready for your agent in %s.\n", org.Name)
-	return startAgent(ctx, opts, session, agents)
+	return startAgent(agents)
 }
 
 func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.Session) (console.SignalsEnvironment, error) {
@@ -88,7 +89,7 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.S
 
 	switch {
 	case len(ready) == 0 && len(all) > 0:
-		return console.SignalsEnvironment{}, fmt.Errorf("the Signals environment in %s is still being set up; try again when it's ready in Console", s.Org.Name)
+		return console.SignalsEnvironment{}, fmt.Errorf("no Signals environment in %s is ready yet; try again when one is ready in Console", s.Org.Name)
 	case len(ready) == 0:
 		return console.SignalsEnvironment{}, fmt.Errorf("%s has no Signals environment; set one up in Console first: %s", s.Org.Name, opts.ConsoleHost)
 	case len(ready) == 1:
@@ -133,7 +134,7 @@ func ensureAppKey(ctx context.Context, opts SignalsOptions, s *setup.Session, ap
 		case res.OK:
 			_, _ = green.Printf("✓ Signals credentials in %s already work\n", envPath)
 			return nil
-		case res.Reason != "auth":
+		case res.Reason != ReasonAuth:
 			return fmt.Errorf("the Signals credentials in %s don't work: %s", envPath, res.Error)
 		}
 		// Console rejected the existing key. Create a new one
@@ -141,7 +142,7 @@ func ensureAppKey(ctx context.Context, opts SignalsOptions, s *setup.Session, ap
 
 	project := filepath.Base(opts.ProjectDir)
 	key, err := console.CreateScopedAPIKey(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID,
-		fmt.Sprintf("%s Signals app key (%s)", s.Email, project), console.SignalsReadCapabilities)
+		fmt.Sprintf("%s Signals app key (%s)", s.Email, project), console.SignalsAppCapabilities)
 	if err != nil {
 		return fmt.Errorf("failed to create the Signals app key: %w", err)
 	}
@@ -154,84 +155,71 @@ func ensureAppKey(ctx context.Context, opts SignalsOptions, s *setup.Session, ap
 	}); err != nil {
 		return err
 	}
-	_, _ = green.Printf("✓ Signals credentials written to %s (key limited to reading Signals)\n", envPath)
+	_, _ = green.Printf("✓ Signals credentials written to %s (key that can read and edit Signals)\n", envPath)
 	return nil
 }
 
-// installSkills installs the Snowplow skills with the skills CLI
-// (https://github.com/vercel-labs/skills). A failure is reported, not fatal.
-func installSkills(ctx context.Context, agents []agent, dir string) {
+// An agent that already has the Snowplow MCP some other way only gets the
+// skills, so it doesn't end up with two. Failures are reported, not fatal.
+func installPlugin(ctx context.Context, agents []agent, dir string) {
 	if len(agents) == 0 {
-		_, _ = yellow.Println("! No supported agent found (Claude Code, Codex or Cursor).")
+		_, _ = yellow.Println("! No supported agent found (Claude Code, Codex or Cursor). Add the Snowplow plugin to yours with: npx plugins add snowplow/skills")
 		return
 	}
 
-	var targets []string
+	var skillsOnly []string
 	for _, a := range agents {
-		if a.ID == agentClaude && claudeHasSnowplowPlugin(dir) {
-			_, _ = green.Println("✓ Claude Code: Snowplow skills come from the snowplow plugin")
+		if hasSnowplowMCP(a, dir) {
+			skillsOnly = append(skillsOnly, a.ID)
 			continue
 		}
-		targets = append(targets, a.ID)
+		npx(ctx, "the Snowplow plugin for "+a.Name, "-y", "plugins@1", "add", "snowplow/skills", "-y", "--target", a.ID)
 	}
-	if len(targets) == 0 {
-		return
+	if len(skillsOnly) > 0 {
+		npx(ctx, "the Snowplow skills", append([]string{"-y", "skills@1", "add", "snowplow/skills", "-g", "-y", "-a"}, skillsOnly...)...)
 	}
-
-	cmd := exec.CommandContext(ctx, "npx", append([]string{"-y", "skills@1", "add", "snowplow/skills", "-g", "-y", "-a"}, targets...)...)
-	fmt.Printf("Installing the Snowplow skills: %s\n", strings.Join(cmd.Args, " "))
-	if err := cmd.Run(); err != nil {
-		_, _ = yellow.Printf("! Couldn't install the Snowplow skills (%v). Run the command above yourself.\n", err)
-		return
-	}
-	_, _ = green.Println("✓ Snowplow skills installed")
 }
 
-// startAgent starts the agent the user picks, or prints the prompt to start one
-// themselves. The agent's own MCP setup is never changed.
-func startAgent(ctx context.Context, opts SignalsOptions, s *setup.Session, agents []agent) error {
-	hasMCP := map[string]bool{}
-	needsMCP := len(agents) == 0
+func npx(ctx context.Context, what string, args ...string) {
+	cmd := exec.CommandContext(ctx, "npx", args...)
+	fmt.Printf("Installing %s: %s\n", what, strings.Join(cmd.Args, " "))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_, _ = yellow.Printf("! Couldn't install %s (%v). Run the command above yourself.\n%s", what, err, out)
+		return
+	}
+	_, _ = green.Printf("✓ Installed %s\n", what)
+}
+
+func startAgent(agents []agent) error {
 	var launchable []agent
 	var options []string
 	for _, a := range agents {
-		hasMCP[a.ID] = hasSnowplowMCP(a, opts.ProjectDir)
-		needsMCP = needsMCP || !hasMCP[a.ID]
-		if a.canLaunch() && (hasMCP[a.ID] || a.takesSessionMCP()) {
+		if a.canLaunch() {
 			launchable = append(launchable, a)
 			options = append(options, "Start "+a.Name)
 		}
 	}
 
 	if interactive() && len(launchable) > 0 {
+		// Setup is already done, so an invalid choice falls back to showing the prompt.
 		i, err := choose("How do you want to continue?", append(options, "Show the prompt, I'll start my agent myself"))
-		if err != nil {
-			return err
-		}
-		if i < len(launchable) {
+		if err == nil && i < len(launchable) {
 			a := launchable[i]
-			if !hasMCP[a.ID] {
-				return launchWithSessionMCP(ctx, opts, s, a)
-			}
 			args := []string{signalsStarterPrompt}
 			if a.ID == agentClaude {
 				args = claudeArgs(signalsStarterPrompt)
 			}
-			return launch(a.Bin, args, nil)
+			_, _ = cyan.Println("\nIf your browser opens to sign in to the Snowplow MCP, accept it to continue.")
+			return launch(a.Bin, args)
 		}
 	}
 
-	printPrompt(needsMCP)
+	printPrompt()
 	return nil
 }
 
-func printPrompt(needsMCP bool) {
-	if needsMCP {
-		_, _ = cyan.Printf("\n1. Install the Snowplow MCP in your agent: %s\n", mcpDocsURL)
-		_, _ = cyan.Println("2. Start your agent in this project and send:")
-	} else {
-		_, _ = cyan.Println("\nStart your agent in this project and send:")
-	}
+func printPrompt() {
+	_, _ = cyan.Println("\nStart your agent in this project and send:")
 	fmt.Printf("\n  %s\n\n", signalsStarterPrompt)
 }
 

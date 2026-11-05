@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -40,12 +41,6 @@ func readSignalsCredentials(envPath string) (signalsCredentials, error) {
 	if err != nil {
 		return signalsCredentials{}, err
 	}
-	c := signalsCredentials{
-		APIURL:   env[envSignalsAPIURL],
-		OrgID:    env[envSignalsOrgID],
-		APIKeyID: env[envSignalsAPIKeyID],
-		APIKey:   env[envSignalsAPIKey],
-	}
 	var missing []string
 	for _, name := range []string{envSignalsAPIURL, envSignalsOrgID, envSignalsAPIKeyID, envSignalsAPIKey} {
 		if env[name] == "" {
@@ -53,16 +48,29 @@ func readSignalsCredentials(envPath string) (signalsCredentials, error) {
 		}
 	}
 	if len(missing) > 0 {
-		return c, fmt.Errorf("missing %s in %s", strings.Join(missing, ", "), envPath)
+		return signalsCredentials{}, fmt.Errorf("missing %s in %s", strings.Join(missing, ", "), envPath)
 	}
-	return c, nil
+	return signalsCredentials{
+		APIURL:   env[envSignalsAPIURL],
+		OrgID:    env[envSignalsOrgID],
+		APIKeyID: env[envSignalsAPIKeyID],
+		APIKey:   env[envSignalsAPIKey],
+	}, nil
 }
+
+// VerifyReason says why the check failed. Agents read it from --json-output.
+type VerifyReason string
+
+const (
+	ReasonConfig  VerifyReason = "config"  // values missing from .env
+	ReasonAuth    VerifyReason = "auth"    // Console or Signals rejected the key
+	ReasonNetwork VerifyReason = "network" // Console or the Signals API couldn't be checked
+)
 
 type VerifyResult struct {
 	OK     bool
 	APIURL string
-	// Reason is one of: config, auth, network.
-	Reason string
+	Reason VerifyReason
 	Error  string
 }
 
@@ -72,7 +80,7 @@ func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResul
 
 	creds, err := readSignalsCredentials(envPath)
 	if err != nil {
-		return VerifyResult{Reason: "config", Error: err.Error()}
+		return VerifyResult{Reason: ReasonConfig, Error: err.Error()}
 	}
 	res := VerifyResult{APIURL: creds.APIURL}
 
@@ -80,19 +88,21 @@ func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResul
 	if err != nil {
 		var tokenErr *console.TokenError
 		if errors.As(err, &tokenErr) && tokenErr.Rejected() {
-			res.Reason, res.Error = "auth", fmt.Sprintf("the API key in %s was rejected by Console: %v", envPath, err)
+			res.Reason, res.Error = ReasonAuth, fmt.Sprintf("the API key in %s was rejected by Console: %v", envPath, err)
 		} else {
-			res.Reason, res.Error = "network", fmt.Sprintf("couldn't check the key with Console at %s: %v", consoleHost, err)
+			res.Reason, res.Error = ReasonNetwork, fmt.Sprintf("couldn't check the key with Console at %s: %v", consoleHost, err)
 		}
 		return res
 	}
 
-	status, err := signalsStatus(ctx, creds.APIURL, client.Jwt)
+	status, err := signalsStatus(ctx, client, creds.APIURL)
 	switch {
 	case err != nil:
-		res.Reason, res.Error = "network", err.Error()
+		res.Reason, res.Error = ReasonNetwork, err.Error()
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		res.Reason, res.Error = ReasonAuth, fmt.Sprintf("the Signals API rejected the key in %s (%d)", envPath, status)
 	case status != http.StatusOK:
-		res.Reason, res.Error = "network", fmt.Sprintf("the Signals API returned %d", status)
+		res.Reason, res.Error = ReasonNetwork, fmt.Sprintf("the Signals API returned %d", status)
 	default:
 		res.OK = true
 	}
@@ -101,16 +111,18 @@ func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResul
 
 // signalsStatus makes an authenticated call to check the key validity.
 // Using /attribute_keys for simplicity (health is public)
-func signalsStatus(ctx context.Context, apiURL, jwt string) (int, error) {
+// The Console client's HTTP client logs the request under --debug.
+func signalsStatus(ctx context.Context, client *console.ApiClient, apiURL string) (int, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(apiURL, "/")+"/api/v1/registry/attribute_keys/", nil)
 	if err != nil {
 		return 0, err
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt)
-	resp, err := http.DefaultClient.Do(req)
+	req.Header.Set("Authorization", "Bearer "+client.Jwt)
+	resp, err := client.Http.Do(req)
 	if err != nil {
 		return 0, err
 	}
+	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 	return resp.StatusCode, nil
 }

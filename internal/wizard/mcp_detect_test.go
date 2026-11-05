@@ -16,57 +16,6 @@ import (
 	"testing"
 )
 
-func TestClaudePluginHasSnowplowMCP(t *testing.T) {
-	// installPlugin records a plugin install whose own .mcp.json is the Snowplow MCP.
-	installPlugin := func(t *testing.T, home, scope, projectPath string) {
-		t.Helper()
-		plugin := filepath.Join(home, ".claude", "plugins", "cache", "snowplow", "snowplow", "0.1.0")
-		writeFile(t, filepath.Join(plugin, ".mcp.json"), `{"mcpServers":{"snowplow":{"command":"npx","args":["-y","mcp-remote","https://console.snowplowanalytics.com/api/agent/mcp"]}}}`)
-		install, _ := json.Marshal(map[string]any{"version": 2, "plugins": map[string]any{
-			"snowplow@snowplow": []map[string]string{{"scope": scope, "projectPath": projectPath, "installPath": plugin}},
-		}})
-		writeFile(t, filepath.Join(home, ".claude", "plugins", "installed_plugins.json"), string(install))
-	}
-	const on, off = `{"enabledPlugins":{"snowplow@snowplow":true}}`, `{"enabledPlugins":{"snowplow@snowplow":false}}`
-
-	t.Run("enabled for the user", func(t *testing.T) {
-		home, work := stubEnv(t)
-		installPlugin(t, home, "user", "")
-		writeFile(t, filepath.Join(home, ".claude", "settings.json"), on)
-		if !claudePluginHasSnowplowMCP(home, work) {
-			t.Fatal("expected the plugin's MCP to count")
-		}
-	})
-
-	t.Run("disabled in this project", func(t *testing.T) {
-		home, work := stubEnv(t)
-		installPlugin(t, home, "user", "")
-		writeFile(t, filepath.Join(home, ".claude", "settings.json"), on)
-		writeFile(t, filepath.Join(work, ".claude", "settings.local.json"), off)
-		if claudePluginHasSnowplowMCP(home, work) {
-			t.Fatal("a plugin turned off for this project shouldn't count")
-		}
-	})
-
-	t.Run("installed for another project", func(t *testing.T) {
-		home, work := stubEnv(t)
-		installPlugin(t, home, "project", "/some/other/project")
-		writeFile(t, filepath.Join(home, ".claude", "settings.json"), on)
-		if claudePluginHasSnowplowMCP(home, work) {
-			t.Fatal("another project's plugin shouldn't count")
-		}
-	})
-
-	t.Run("installed for this project", func(t *testing.T) {
-		home, work := stubEnv(t)
-		installPlugin(t, home, "project", work)
-		writeFile(t, filepath.Join(work, ".claude", "settings.json"), on)
-		if !claudePluginHasSnowplowMCP(home, work) {
-			t.Fatal("expected this project's plugin to count")
-		}
-	})
-}
-
 func TestHasSnowplowMCP(t *testing.T) {
 	claude, codex, cursor := agent{ID: agentClaude}, agent{ID: agentCodex}, agent{ID: agentCursor}
 	const remote = `{"mcpServers":{"snowplow-mcp":{"type":"http","url":"https://console.snowplowanalytics.com/api/agent/mcp"}}}`
@@ -132,6 +81,14 @@ func TestHasSnowplowMCP(t *testing.T) {
 		}
 	})
 
+	t.Run("codex commented out", func(t *testing.T) {
+		home, work := stubEnv(t)
+		writeFile(t, filepath.Join(home, ".codex", "config.toml"), "# [mcp_servers.snowplow-mcp]\n# url = \"https://console.snowplowanalytics.com/api/agent/mcp\"\n")
+		if hasSnowplowMCP(codex, work) {
+			t.Fatal("a commented-out server shouldn't count")
+		}
+	})
+
 	t.Run("CODEX_HOME", func(t *testing.T) {
 		_, work := stubEnv(t)
 		codexHome := t.TempDir()
@@ -148,7 +105,8 @@ func TestIsSnowplowMCPMatchesWhereItConnects(t *testing.T) {
 	_ = json.Unmarshal([]byte(`{
 		"my own name": {"command": "npx", "args": ["-y", "mcp-remote", "https://console.snowplowanalytics.com/api/agent/mcp", "3334"]},
 		"snowplow": {"command": "snowplow-cli", "args": ["mcp"]},
-		"notes": {"command": "notes-mcp", "env": {"SEE": "https://console.snowplowanalytics.com/api/agent/mcp"}}
+		"notes": {"command": "notes-mcp", "env": {"SEE": "https://console.snowplowanalytics.com/api/agent/mcp"}},
+		"other": {"type": "http", "url": "https://mcp.example.com/api/agent/mcp"}
 	}`), &servers)
 	only := func(name string) map[string]mcpServer { return map[string]mcpServer{name: servers[name]} }
 	if !serversHaveSnowplowMCP(only("my own name")) {
@@ -156,5 +114,8 @@ func TestIsSnowplowMCPMatchesWhereItConnects(t *testing.T) {
 	}
 	if serversHaveSnowplowMCP(only("snowplow")) || serversHaveSnowplowMCP(only("notes")) {
 		t.Fatal("only a server's url or args should count, not its name or other fields")
+	}
+	if serversHaveSnowplowMCP(only("other")) {
+		t.Fatal("another host's /api/agent/mcp isn't the Snowplow MCP")
 	}
 }

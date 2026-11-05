@@ -29,7 +29,6 @@ import (
 
 const snowplowAudience = "https://snowplowanalytics.com/api/"
 
-// Defaults for the device login, shared by the commands that sign in.
 const (
 	DefaultClientID    = "EXQ3csSDr6D7wTIiebNPhXpgkSsOzCzi"
 	DefaultAuth0Domain = "id.snowplowanalytics.com"
@@ -73,6 +72,7 @@ type Session struct {
 	AccessToken string
 	Email       string
 	Org         console.Organization
+	HomeOrgID   string
 }
 
 func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Session, error) {
@@ -178,7 +178,7 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Ses
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
-	return &Session{AccessToken: token.AccessToken, Email: userInfo.Email, Org: *selectedOrg}, nil
+	return &Session{AccessToken: token.AccessToken, Email: userInfo.Email, Org: *selectedOrg, HomeOrgID: jwtOrgID}, nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
@@ -238,8 +238,6 @@ func selectOrganizationForInput(organizations []console.Organization, jwtOrgID, 
 	return &organizations[i], nil
 }
 
-// SelectIndex parses a choice from a numbered list of n items. Empty input
-// picks defaultIndex; a negative defaultIndex means there is no default.
 func SelectIndex(input string, n, defaultIndex int) (int, error) {
 	if input == "" && defaultIndex >= 0 {
 		return defaultIndex, nil

@@ -14,6 +14,8 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/snowplow/snowplow-cli/internal/config"
+	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/wizard"
 	"github.com/spf13/cobra"
 )
@@ -31,9 +33,22 @@ The command exits non-zero when the check fails.`,
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := snplog.InitLogging(cmd); err != nil {
+			return err
+		}
+		_ = config.InitConsoleConfigForSetup(cmd)
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		host, _ := cmd.Flags().GetString("host")
-		envPath, _ := cmd.Flags().GetString("env")
+		host, err := cmd.Flags().GetString("host")
+		if err != nil {
+			return err
+		}
+		envPath, err := cmd.Flags().GetString("env")
+		if err != nil {
+			return err
+		}
 
 		res := wizard.VerifySignals(cmd.Context(), host, envPath)
 		if !res.OK {

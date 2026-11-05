@@ -23,7 +23,7 @@ var SignalsCmd = &cobra.Command{
 		if err := snplog.InitLogging(cmd); err != nil {
 			return err
 		}
-		// Only the host is needed: setup signs in, and status reads the project's .env.
+		// Only the host is needed: setup signs in.
 		return config.InitConsoleConfigForSetup(cmd)
 	},
 }

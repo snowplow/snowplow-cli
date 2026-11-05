@@ -12,14 +12,12 @@ package wizard
 
 import (
 	"encoding/json"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
-const snowplowMCPPath = "/api/agent/mcp"
+const snowplowMCPURL = "console.snowplowanalytics.com/api/agent/mcp"
 
 // hasSnowplowMCP treats a missing or unreadable config as no Snowplow MCP.
 // At worst, the user is offered an MCP they already have.
@@ -45,10 +43,8 @@ func hasSnowplowMCP(a agent, dir string) bool {
 	return false
 }
 
+// The Snowplow plugin's own MCP isn't counted: re-installing the plugin updates it.
 func claudeHasSnowplowMCP(home, dir string) bool {
-	if claudePluginHasSnowplowMCP(home, dir) {
-		return true
-	}
 	var doc struct {
 		MCPServers map[string]mcpServer `json:"mcpServers"`
 		Projects   map[string]struct {
@@ -66,55 +62,6 @@ func claudeHasSnowplowMCP(home, dir string) bool {
 		}
 	}
 	return mcpFileHasSnowplowMCP(filepath.Join(dir, ".mcp.json"))
-}
-
-// The Snowplow plugin brings the Snowplow skills along with its MCP.
-func claudeHasSnowplowPlugin(dir string) bool {
-	home, err := os.UserHomeDir()
-	return err == nil && claudePluginHasSnowplowMCP(home, dir)
-}
-
-// Plugin MCP servers live in each plugin's folder, not in .claude.json.
-func claudePluginHasSnowplowMCP(home, dir string) bool {
-	var installed struct {
-		Plugins map[string][]struct {
-			Scope       string `json:"scope"`
-			ProjectPath string `json:"projectPath"`
-			InstallPath string `json:"installPath"`
-		} `json:"plugins"`
-	}
-	if !readJSON(filepath.Join(home, ".claude", "plugins", "installed_plugins.json"), &installed) {
-		return false
-	}
-
-	// Later settings files override earlier ones.
-	enabled := map[string]bool{}
-	for _, path := range []string{
-		filepath.Join(home, ".claude", "settings.json"),
-		filepath.Join(dir, ".claude", "settings.json"),
-		filepath.Join(dir, ".claude", "settings.local.json"),
-	} {
-		var settings struct {
-			EnabledPlugins map[string]bool `json:"enabledPlugins"`
-		}
-		if readJSON(path, &settings) {
-			maps.Copy(enabled, settings.EnabledPlugins)
-		}
-	}
-
-	paths := projectPaths(dir)
-	for name, installs := range installed.Plugins {
-		if !enabled[name] {
-			continue
-		}
-		for _, i := range installs {
-			if (i.Scope == "user" || slices.Contains(paths, i.ProjectPath)) &&
-				mcpFileHasSnowplowMCP(filepath.Join(i.InstallPath, ".mcp.json")) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // A project may be recorded under its symlinked or its resolved path.
@@ -141,16 +88,25 @@ type mcpServer struct {
 // Matched by URL, not name: people add the Snowplow MCP under names of their own.
 func serversHaveSnowplowMCP(servers map[string]mcpServer) bool {
 	for _, s := range servers {
-		if strings.Contains(s.URL, snowplowMCPPath) || strings.Contains(strings.Join(s.Args, " "), snowplowMCPPath) {
+		if strings.Contains(s.URL, snowplowMCPURL) || strings.Contains(strings.Join(s.Args, " "), snowplowMCPURL) {
 			return true
 		}
 	}
 	return false
 }
 
+// Commented-out lines don't count.
 func codexFileHasSnowplowMCP(path string) bool {
 	b, err := os.ReadFile(path)
-	return err == nil && strings.Contains(string(b), snowplowMCPPath)
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") && strings.Contains(line, snowplowMCPURL) {
+			return true
+		}
+	}
+	return false
 }
 
 func readJSON(path string, v any) bool {

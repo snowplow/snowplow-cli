@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	// The skills CLI's names for the agents.
+	// The skills and plugins CLIs' names for the agents.
 	agentClaude = "claude-code"
 	agentCodex  = "codex"
 	agentCursor = "cursor"
@@ -42,11 +42,6 @@ func (a agent) canLaunch() bool {
 }
 
 func detectAgents() []agent {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil
-	}
-
 	var agents []agent
 	if bin, err := exec.LookPath("claude"); err == nil {
 		agents = append(agents, agent{ID: agentClaude, Name: "Claude Code", Bin: bin})
@@ -55,18 +50,26 @@ func detectAgents() []agent {
 		agents = append(agents, agent{ID: agentCodex, Name: "Codex", Bin: bin})
 	}
 	// Cursor is set up but never started: it's mostly used as an editor.
-	if _, err := os.Stat(filepath.Join(home, ".cursor")); err == nil {
-		agents = append(agents, agent{ID: agentCursor, Name: "Cursor"})
+	if home, err := os.UserHomeDir(); err == nil {
+		if _, err := os.Stat(filepath.Join(home, ".cursor")); err == nil {
+			agents = append(agents, agent{ID: agentCursor, Name: "Cursor"})
+		}
 	}
 	return agents
 }
 
-func launch(bin string, args []string, env []string) error {
+func claudeArgs(prompt string) []string {
+	return []string{prompt, "--settings", claudeSessionSettings}
+}
+
+// Stops Claude Code's file tools, but not shell commands, from reading the app's key in .env.
+const claudeSessionSettings = `{"permissions":{"deny":["Read(./.env)","Read(./.env.*)"]}}`
+
+func launch(bin string, args []string) error {
 	cmd := exec.Command(bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	cmd.Env = append(os.Environ(), env...)
 
-	// Ctrl-C and closing the terminal reach us too: wait for the agent so cleanup still runs.
+	// Ctrl-C and closing the terminal reach us too: ignore them while the agent has the terminal.
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGHUP)
 	defer signal.Stop(signals)

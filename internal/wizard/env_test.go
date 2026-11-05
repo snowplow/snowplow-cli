@@ -19,7 +19,7 @@ import (
 
 func TestUpsertDotenvKeepsOtherLines(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".env")
-	orig := "# app settings\nDATABASE_URL=postgres://x\nexport SNOWPLOW_SIGNALS_API_KEY=old\n"
+	orig := "# app settings\nDATABASE_URL=postgres://x\nSNOWPLOW_SIGNALS_API_KEY=old\n"
 	if err := os.WriteFile(path, []byte(orig), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -33,12 +33,30 @@ func TestUpsertDotenvKeepsOtherLines(t *testing.T) {
 	}
 
 	got, _ := os.ReadFile(path)
-	want := "# app settings\nDATABASE_URL=postgres://x\nexport SNOWPLOW_SIGNALS_API_KEY=new\nSNOWPLOW_SIGNALS_ORG_ID=org\n"
+	want := "# app settings\nDATABASE_URL=postgres://x\nSNOWPLOW_SIGNALS_API_KEY=new\nSNOWPLOW_SIGNALS_ORG_ID=org\n"
 	if string(got) != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0600 {
 		t.Fatalf("expected an existing file to be tightened to 0600, got %v", info.Mode().Perm())
+	}
+}
+
+func TestUpsertDotenvReplacesEveryOccurrence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".env")
+	orig := "SNOWPLOW_SIGNALS_API_KEY=first\nexport SNOWPLOW_SIGNALS_API_KEY=second\n"
+	if err := os.WriteFile(path, []byte(orig), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := upsertDotenv(path, map[string]string{"SNOWPLOW_SIGNALS_API_KEY": "new"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := os.ReadFile(path)
+	want := "SNOWPLOW_SIGNALS_API_KEY=new\nexport SNOWPLOW_SIGNALS_API_KEY=new\n"
+	if string(got) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
 

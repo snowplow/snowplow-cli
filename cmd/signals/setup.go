@@ -22,13 +22,12 @@ var setupCmd = &cobra.Command{
 	Short: "Set up Snowplow Signals in this project with your coding agent",
 	Long: `Sign in once, then get this project and your coding agent ready for Snowplow Signals:
 
-  - writes Signals credentials for your app to .env (a key that can only read Signals)
-  - adds the Snowplow skills to Claude Code, Codex and Cursor
+  - writes Signals credentials for your app to .env (a key that can read and edit Signals)
+  - installs the Snowplow plugin (skills and MCP) in Claude Code, Codex and Cursor;
+    an agent that already has the Snowplow MCP only gets the skills
   - starts your agent with a prompt that walks through the Signals setup
 
-When it starts Claude Code, the Snowplow MCP is connected for that session only,
-with a key that is removed when the session ends. Your agent's own MCP setup is
-never changed; to keep the MCP for later sessions, install it from the docs.`,
+The Snowplow MCP signs in with your Snowplow account the first time your agent uses it.`,
 	Example: `  $ snowplow-cli signals setup
   $ npx @snowplow/snowplow-cli signals setup`,
 	Args:         cobra.NoArgs,
@@ -39,7 +38,10 @@ never changed; to keep the MCP for later sessions, install it from the docs.`,
 			return err
 		}
 
-		host, _ := cmd.Flags().GetString("host")
+		host, err := cmd.Flags().GetString("host")
+		if err != nil {
+			return err
+		}
 		return wizard.SetupSignals(cmd.Context(), wizard.SignalsOptions{ConsoleHost: host, ProjectDir: dir})
 	},
 }

@@ -63,21 +63,27 @@ func TestVerifySignals(t *testing.T) {
 	}
 
 	res = VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "wrong"))
-	if res.OK || res.Reason != "auth" {
+	if res.OK || res.Reason != ReasonAuth {
 		t.Fatalf("expected an auth failure, got %+v", res)
 	}
 }
 
 func TestVerifySignalsFailures(t *testing.T) {
-	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusUnauthorized, ``)
-	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
-		t.Fatalf("expected a Signals failure, got %+v", res)
+	// Console accepts the key but Signals doesn't, e.g. it lacks Signals permissions.
+	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusForbidden, ``)
+	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret")); res.Reason != ReasonAuth {
+		t.Fatalf("expected a Signals rejection to be an auth failure, got %+v", res)
+	}
+
+	_, signalsDown := fakeConsoleAndSignals(t, http.StatusServiceUnavailable, ``)
+	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsDown, "secret")); res.Reason != ReasonNetwork {
+		t.Fatalf("expected a Signals outage to be a network failure, got %+v", res)
 	}
 
 	path := filepath.Join(t.TempDir(), ".env")
 	_ = os.WriteFile(path, []byte("SNOWPLOW_SIGNALS_API_URL=x\n"), 0600)
 	res := VerifySignals(context.Background(), consoleURL, path)
-	if res.Reason != "config" {
+	if res.Reason != ReasonConfig {
 		t.Fatalf("expected a config failure, got %+v", res)
 	}
 	if !strings.Contains(res.Error, "missing SNOWPLOW_SIGNALS_ORG_ID, SNOWPLOW_SIGNALS_API_KEY_ID, SNOWPLOW_SIGNALS_API_KEY in") {
@@ -87,7 +93,7 @@ func TestVerifySignalsFailures(t *testing.T) {
 	// Console unreachable: the key wasn't checked, so it isn't an auth failure.
 	down := httptest.NewServer(http.NotFoundHandler())
 	down.Close()
-	if res := VerifySignals(context.Background(), down.URL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
+	if res := VerifySignals(context.Background(), down.URL, writeEnv(t, signalsURL, "secret")); res.Reason != ReasonNetwork {
 		t.Fatalf("expected a network failure, got %+v", res)
 	}
 
@@ -95,7 +101,7 @@ func TestVerifySignalsFailures(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer outage.Close()
-	if res := VerifySignals(context.Background(), outage.URL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
+	if res := VerifySignals(context.Background(), outage.URL, writeEnv(t, signalsURL, "secret")); res.Reason != ReasonNetwork {
 		t.Fatalf("expected a Console outage not to be an auth failure, got %+v", res)
 	}
 }

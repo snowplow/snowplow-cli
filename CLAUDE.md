@@ -16,6 +16,7 @@ cmd/                       Cobra command tree
   root.go                  Root command, persistent flags, subcommand wiring
   dp/                      `data-products` (alias `dp`) — download, validate, generate, sync, release, purge, add-es
   ds/                      `data-structures` (alias `ds`) — download, validate, generate, publish dev/prod
+  signals/                 `signals` — setup (credentials + coding agent), status (check app credentials)
   setup.go                 Interactive credential setup wizard
   status.go                Print current resolved config
   mcp.go                   MCP server (model context protocol)
@@ -31,6 +32,7 @@ internal/
   changes/                 Change tracking for DS publish
   amend/                   File amendment utilities
   setup/                   Setup wizard internals
+  wizard/                  `signals setup` internals: app key in .env, agent detection, plugin install, verification
   util/                    Constants, file I/O, version string
 npm/                       npm distribution wrapper
 .github/workflows/         CI (ci.yaml), release (cd.yaml), lint, Claude actions

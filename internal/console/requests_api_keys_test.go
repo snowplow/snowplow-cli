@@ -496,7 +496,7 @@ func Test_CreateScopedAPIKey(t *testing.T) {
 			t.Errorf("bad description %q", req.Description)
 		}
 		caps := req.Permissions[0].Capabilities
-		if len(caps) != 2 || caps[0].ResourceType != "SIGNALS" || caps[1].Action != "VIEW" || caps[0].Filters == nil {
+		if len(caps) != 3 || caps[0].ResourceType != "SIGNALS" || caps[2].Action != "EDIT" || caps[0].Filters == nil {
 			t.Errorf("bad capabilities %+v", caps)
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -504,7 +504,7 @@ func Test_CreateScopedAPIKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	key, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsReadCapabilities)
+	key, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsAppCapabilities)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -520,29 +520,7 @@ func Test_CreateScopedAPIKey_Forbidden(t *testing.T) {
 	}))
 	defer server.Close()
 
-	if _, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsReadCapabilities); err == nil {
+	if _, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsAppCapabilities); err == nil {
 		t.Fatal("expected an error")
-	}
-}
-
-func Test_DeleteAPIKey(t *testing.T) {
-	var gotMethod, gotPath, gotAuth string
-	status := http.StatusNoContent
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotMethod, gotPath, gotAuth = r.Method, r.URL.Path, r.Header.Get("Authorization")
-		w.WriteHeader(status)
-	}))
-	defer server.Close()
-
-	if err := DeleteAPIKey(context.Background(), "token", server.URL, "org-1", "key-1"); err != nil {
-		t.Fatal(err)
-	}
-	if gotMethod != "DELETE" || gotPath != "/api/msc/v1/organizations/org-1/credentials/v2/api-keys/key-1" || gotAuth != "Bearer token" {
-		t.Fatalf("unexpected request %s %s (auth %q)", gotMethod, gotPath, gotAuth)
-	}
-
-	status = http.StatusForbidden
-	if err := DeleteAPIKey(context.Background(), "token", server.URL, "org-1", "key-1"); err == nil {
-		t.Fatal("expected an error when Console refuses")
 	}
 }

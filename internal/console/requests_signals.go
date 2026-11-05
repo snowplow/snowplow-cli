@@ -40,9 +40,11 @@ func (e SignalsEnvironment) APIURL() string {
 	return "https://" + e.Config.PersonalizationApiHost
 }
 
-var SignalsReadCapabilities = []Capability{
+// The app's key can also edit Signals, so the app can set up attributes through a Signals SDK.
+var SignalsAppCapabilities = []Capability{
 	{ResourceType: "SIGNALS", Action: "LIST", Filters: []any{}},
 	{ResourceType: "SIGNALS", Action: "VIEW", Filters: []any{}},
+	{ResourceType: "SIGNALS", Action: "EDIT", Filters: []any{}},
 }
 
 // userClient makes Console requests with the token from the device login,
@@ -79,29 +81,4 @@ func GetSignalsEnvironments(ctx context.Context, accessToken, consoleHost, orgID
 		return nil, fmt.Errorf("failed to parse Signals environments: %w", err)
 	}
 	return envs, nil
-}
-
-// SignalsSetupCapabilities covers the Snowplow MCP tools the signals-setup
-// skill uses. Update it when the skill's tools change.
-var SignalsSetupCapabilities = []Capability{
-	// Every signals_* tool, and list_signals_environments.
-	{ResourceType: "SIGNALS", Action: "LIST", Filters: []any{}},
-	{ResourceType: "SIGNALS", Action: "VIEW", Filters: []any{}},
-	{ResourceType: "SIGNALS", Action: "EDIT", Filters: []any{}},
-	// list_pipelines, get_pipeline_metrics, get_collector_config.
-	{ResourceType: "ENVIRONMENTS", Action: "LIST", Filters: []any{}},
-	{ResourceType: "ENVIRONMENTS", Action: "VIEW", Filters: []any{}},
-	// Reading, creating and editing tracking plans, event specs and source
-	// apps. Publishing an event spec is an edit.
-	{ResourceType: "DATA-PRODUCTS", Action: "LIST", Filters: []any{}},
-	{ResourceType: "DATA-PRODUCTS", Action: "VIEW", Filters: []any{}},
-	{ResourceType: "DATA-PRODUCTS", Action: "CREATE", Filters: []any{}},
-	{ResourceType: "DATA-PRODUCTS", Action: "EDIT", Filters: []any{}},
-	// Schemas for custom events: CREATE deploys a new one to dev, EDIT a new
-	// version, and PUBLISH to prod, where Signals reads events from.
-	{ResourceType: "DATA-STRUCTURES", Action: "LIST", Filters: []any{}},
-	{ResourceType: "DATA-STRUCTURES", Action: "VIEW", Filters: []any{}},
-	{ResourceType: "DATA-STRUCTURES", Action: "CREATE", Filters: []any{}},
-	{ResourceType: "DATA-STRUCTURES", Action: "EDIT", Filters: []any{}},
-	{ResourceType: "DATA-STRUCTURES", Action: "PUBLISH", Filters: []any{}},
 }
