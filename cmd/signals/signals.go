@@ -23,12 +23,13 @@ var SignalsCmd = &cobra.Command{
 		if err := snplog.InitLogging(cmd); err != nil {
 			return err
 		}
-		// Only the host is needed: the credentials checked come from the project's .env.
+		// Only the host is needed: setup signs in, and status reads the project's .env.
 		return config.InitConsoleConfigForSetup(cmd)
 	},
 }
 
 func init() {
 	config.InitConsoleFlags(SignalsCmd)
+	SignalsCmd.AddCommand(setupCmd)
 	SignalsCmd.AddCommand(statusCmd)
 }

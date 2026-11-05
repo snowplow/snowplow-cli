@@ -81,72 +81,27 @@ func GetSignalsEnvironments(ctx context.Context, accessToken, consoleHost, orgID
 	return envs, nil
 }
 
-type APIKeyPermission struct {
-	OrganizationID string       `json:"organizationId"`
-	Capabilities   []Capability `json:"capabilities"`
-}
-
-func GetAPIKeyPermissions(ctx context.Context, accessToken, consoleHost, orgID, keyID string) ([]APIKeyPermission, error) {
-	client := userClient(consoleHost, orgID, accessToken)
-	url := fmt.Sprintf("%s/credentials/v2/api-keys/%s", client.BaseUrl, keyID)
-
-	resp, err := DoConsoleRequest("GET", url, client, ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer util.LoggingCloser(ctx, resp.Body)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch API key: %d %s", resp.StatusCode, string(body))
-	}
-
-	var key struct {
-		Permissions []APIKeyPermission `json:"permissions"`
-	}
-	if err := json.Unmarshal(body, &key); err != nil {
-		return nil, fmt.Errorf("failed to parse API key: %w", err)
-	}
-	return key.Permissions, nil
-}
-
+// SignalsSetupCapabilities covers the Snowplow MCP tools the signals-setup
+// skill uses. Update it when the skill's tools change.
 var SignalsSetupCapabilities = []Capability{
-	{ResourceType: "SIGNALS", Action: "LIST"},
-	{ResourceType: "SIGNALS", Action: "VIEW"},
-	{ResourceType: "SIGNALS", Action: "CREATE"},
-	{ResourceType: "SIGNALS", Action: "EDIT"},
-	{ResourceType: "DATA-PRODUCTS", Action: "LIST"},
-	{ResourceType: "DATA-PRODUCTS", Action: "VIEW"},
-	{ResourceType: "DATA-PRODUCTS", Action: "CREATE"},
-	{ResourceType: "DATA-PRODUCTS", Action: "EDIT"},
-}
-
-func Allows(permissions []APIKeyPermission, orgID string, needed []Capability) bool {
-	return len(Missing(permissions, orgID, needed)) == 0
-}
-
-func Missing(permissions []APIKeyPermission, orgID string, needed []Capability) []Capability {
-	var missing []Capability
-	for _, n := range needed {
-		if !allows(permissions, orgID, n) {
-			missing = append(missing, n)
-		}
-	}
-	return missing
-}
-
-func allows(permissions []APIKeyPermission, orgID string, n Capability) bool {
-	for _, p := range permissions {
-		if p.OrganizationID != "" && p.OrganizationID != orgID {
-			continue
-		}
-		for _, c := range p.Capabilities {
-			if (c.ResourceType == "*" || c.ResourceType == n.ResourceType) && (c.Action == "*" || c.Action == n.Action) {
-				return true
-			}
-		}
-	}
-	return false
+	// Every signals_* tool, and list_signals_environments.
+	{ResourceType: "SIGNALS", Action: "LIST", Filters: []any{}},
+	{ResourceType: "SIGNALS", Action: "VIEW", Filters: []any{}},
+	{ResourceType: "SIGNALS", Action: "EDIT", Filters: []any{}},
+	// list_pipelines, get_pipeline_metrics, get_collector_config.
+	{ResourceType: "ENVIRONMENTS", Action: "LIST", Filters: []any{}},
+	{ResourceType: "ENVIRONMENTS", Action: "VIEW", Filters: []any{}},
+	// Reading, creating and editing tracking plans, event specs and source
+	// apps. Publishing an event spec is an edit.
+	{ResourceType: "DATA-PRODUCTS", Action: "LIST", Filters: []any{}},
+	{ResourceType: "DATA-PRODUCTS", Action: "VIEW", Filters: []any{}},
+	{ResourceType: "DATA-PRODUCTS", Action: "CREATE", Filters: []any{}},
+	{ResourceType: "DATA-PRODUCTS", Action: "EDIT", Filters: []any{}},
+	// Schemas for custom events: CREATE deploys a new one to dev, EDIT a new
+	// version, and PUBLISH to prod, where Signals reads events from.
+	{ResourceType: "DATA-STRUCTURES", Action: "LIST", Filters: []any{}},
+	{ResourceType: "DATA-STRUCTURES", Action: "VIEW", Filters: []any{}},
+	{ResourceType: "DATA-STRUCTURES", Action: "CREATE", Filters: []any{}},
+	{ResourceType: "DATA-STRUCTURES", Action: "EDIT", Filters: []any{}},
+	{ResourceType: "DATA-STRUCTURES", Action: "PUBLISH", Filters: []any{}},
 }

@@ -12,20 +12,23 @@ package wizard
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
-// UpsertDotenv sets values in a .env file, keeping every other line (and
-// comment) as it was. New files are created readable by the owner only.
-func UpsertDotenv(path string, values map[string]string) error {
+// upsertDotenv sets values in a .env file, keeping every other line (and
+// comment) as it was. The file is left readable by the owner only.
+func upsertDotenv(path string, values map[string]string) error {
 	var lines []string
 	b, err := os.ReadFile(path)
 	switch {
 	case err == nil:
+		if err := os.Chmod(path, 0600); err != nil {
+			return err
+		}
 		lines = strings.Split(strings.TrimRight(string(b), "\n"), "\n")
 	case errors.Is(err, os.ErrNotExist):
 	default:
@@ -34,26 +37,25 @@ func UpsertDotenv(path string, values map[string]string) error {
 
 	done := map[string]bool{}
 	for i, line := range lines {
-		name, _, ok := strings.Cut(strings.TrimPrefix(strings.TrimSpace(line), "export "), "=")
+		rest, exported := strings.CutPrefix(strings.TrimSpace(line), "export ")
+		name, _, ok := strings.Cut(rest, "=")
 		if !ok {
 			continue
 		}
 		name = strings.TrimSpace(name)
 		if v, ok := values[name]; ok {
 			lines[i] = name + "=" + v
+			if exported {
+				lines[i] = "export " + lines[i]
+			}
 			done[name] = true
 		}
 	}
 
-	var missing []string
-	for name := range values {
+	for _, name := range slices.Sorted(maps.Keys(values)) {
 		if !done[name] {
-			missing = append(missing, name)
+			lines = append(lines, name+"="+values[name])
 		}
-	}
-	sort.Strings(missing)
-	for _, name := range missing {
-		lines = append(lines, name+"="+values[name])
 	}
 
 	if len(lines) > 0 && lines[0] == "" {
@@ -62,50 +64,19 @@ func UpsertDotenv(path string, values map[string]string) error {
 	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0600)
 }
 
-func InGitRepo(dir string) bool {
-	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+func git(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
-	return err == nil && strings.TrimSpace(string(out)) == "true"
+	return strings.TrimSpace(string(out)), err
 }
 
-func GitDirty(dir string) bool {
-	cmd := exec.Command("git", "status", "--porcelain")
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	return err == nil && len(strings.TrimSpace(string(out))) > 0
+func gitDirty(dir string) bool {
+	out, err := git(dir, "status", "--porcelain")
+	return err == nil && out != ""
 }
 
-func GitTracked(dir, name string) bool {
-	cmd := exec.Command("git", "ls-files", "--error-unmatch", "--", name)
-	cmd.Dir = dir
-	return cmd.Run() == nil
-}
-
-func EnsureGitignored(dir, name string) (bool, error) {
-	if !InGitRepo(dir) {
-		return false, nil
-	}
-	check := exec.Command("git", "check-ignore", "-q", name)
-	check.Dir = dir
-	if check.Run() == nil {
-		return false, nil
-	}
-
-	path := filepath.Join(dir, ".gitignore")
-	existing, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, err
-	}
-	prefix := ""
-	if len(existing) > 0 && !strings.HasSuffix(string(existing), "\n") {
-		prefix = "\n"
-	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = f.Close() }()
-	_, err = f.WriteString(prefix + name + "\n")
-	return err == nil, err
+func gitTracked(dir, name string) bool {
+	_, err := git(dir, "ls-files", "--error-unmatch", "--", name)
+	return err == nil
 }

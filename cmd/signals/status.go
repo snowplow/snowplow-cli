@@ -22,7 +22,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check that the Signals credentials in .env work",
 	Long: `Check the app's Signals credentials the way the app uses them: exchange the
-key in .env for a token, then list attribute keys on the Signals API.
+key in .env for a token, then make an authenticated call to the Signals API.
 
 With --json-output the result is a single JSON object, for coding agents.
 The command exits non-zero when the check fails.`,
@@ -40,7 +40,7 @@ The command exits non-zero when the check fails.`,
 			slog.Error("Signals check failed", "ok", false, "apiUrl", res.APIURL, "reason", res.Reason, "error", res.Error)
 			return errors.New(res.Error)
 		}
-		slog.Info("Signals credentials work", "ok", true, "apiUrl", res.APIURL, "attributeKeys", res.AttributeKeys)
+		slog.Info("Signals credentials work", "ok", true, "apiUrl", res.APIURL)
 		return nil
 	},
 }

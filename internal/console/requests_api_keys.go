@@ -68,6 +68,20 @@ func CreateScopedAPIKey(ctx context.Context, accessToken, consoleHost, orgID, de
 	return postAPIKey(ctx, client, fmt.Sprintf("%s/credentials/v3/api-keys", client.BaseUrl), description, capabilities)
 }
 
+func DeleteAPIKey(ctx context.Context, accessToken, consoleHost, orgID, keyID string) error {
+	client := userClient(consoleHost, orgID, accessToken)
+	resp, err := DoConsoleRequest("DELETE", fmt.Sprintf("%s/credentials/v2/api-keys/%s", client.BaseUrl, keyID), client, ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer util.LoggingCloser(ctx, resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API key deletion failed: %d %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description string, capabilities []Capability) (*APIKeyResponse, error) {
 	slog.Debug("Creating API key", "url", apiURL)
 
@@ -93,7 +107,7 @@ func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description stri
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug("API response", "status", resp.StatusCode, "body", string(body))
+	slog.Debug("API response", "status", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("API key creation failed: %d %s", resp.StatusCode, string(body))

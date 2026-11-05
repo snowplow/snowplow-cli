@@ -45,8 +45,8 @@ func fakeConsoleAndSignals(t *testing.T, signalsStatus int, signalsBody string) 
 func writeEnv(t *testing.T, apiURL, key string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), ".env")
-	err := UpsertDotenv(path, map[string]string{
-		EnvSignalsAPIURL: apiURL, EnvSignalsOrgID: "org", EnvSignalsAPIKeyID: "kid", EnvSignalsAPIKey: key,
+	err := upsertDotenv(path, map[string]string{
+		envSignalsAPIURL: apiURL, envSignalsOrgID: "org", envSignalsAPIKeyID: "kid", envSignalsAPIKey: key,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestVerifySignals(t *testing.T) {
 	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusOK, `[{"name":"domain_userid"},{"name":"domain_sessionid"}]`)
 
 	res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret"))
-	if !res.OK || res.AttributeKeys != 2 || res.APIURL != signalsURL {
+	if !res.OK || res.APIURL != signalsURL {
 		t.Fatalf("unexpected result %+v", res)
 	}
 
@@ -69,14 +69,9 @@ func TestVerifySignals(t *testing.T) {
 }
 
 func TestVerifySignalsFailures(t *testing.T) {
-	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusForbidden, ``)
-	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret")); res.Reason != "forbidden" {
-		t.Fatalf("expected forbidden, got %+v", res)
-	}
-
-	consoleURL, signalsURL = fakeConsoleAndSignals(t, http.StatusOK, `[]`)
-	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret")); res.Reason != "empty" {
-		t.Fatalf("expected empty, got %+v", res)
+	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusUnauthorized, ``)
+	if res := VerifySignals(context.Background(), consoleURL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
+		t.Fatalf("expected a Signals failure, got %+v", res)
 	}
 
 	path := filepath.Join(t.TempDir(), ".env")
@@ -94,5 +89,13 @@ func TestVerifySignalsFailures(t *testing.T) {
 	down.Close()
 	if res := VerifySignals(context.Background(), down.URL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
 		t.Fatalf("expected a network failure, got %+v", res)
+	}
+
+	outage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer outage.Close()
+	if res := VerifySignals(context.Background(), outage.URL, writeEnv(t, signalsURL, "secret")); res.Reason != "network" {
+		t.Fatalf("expected a Console outage not to be an auth failure, got %+v", res)
 	}
 }

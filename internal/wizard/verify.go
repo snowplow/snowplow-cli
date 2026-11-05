@@ -12,11 +12,9 @@ package wizard
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -27,29 +25,29 @@ import (
 // The app's Signals credentials in the project .env. They deliberately don't
 // share snowplow-cli's SNOWPLOW_CONSOLE_* names, so neither picks up the other's key.
 const (
-	EnvSignalsAPIURL   = "SNOWPLOW_SIGNALS_API_URL"
-	EnvSignalsOrgID    = "SNOWPLOW_SIGNALS_ORG_ID"
-	EnvSignalsAPIKeyID = "SNOWPLOW_SIGNALS_API_KEY_ID"
-	EnvSignalsAPIKey   = "SNOWPLOW_SIGNALS_API_KEY"
+	envSignalsAPIURL   = "SNOWPLOW_SIGNALS_API_URL"
+	envSignalsOrgID    = "SNOWPLOW_SIGNALS_ORG_ID"
+	envSignalsAPIKeyID = "SNOWPLOW_SIGNALS_API_KEY_ID"
+	envSignalsAPIKey   = "SNOWPLOW_SIGNALS_API_KEY"
 )
 
-type SignalsCredentials struct {
+type signalsCredentials struct {
 	APIURL, OrgID, APIKeyID, APIKey string
 }
 
-func ReadSignalsCredentials(envPath string) (SignalsCredentials, error) {
+func readSignalsCredentials(envPath string) (signalsCredentials, error) {
 	env, err := godotenv.Read(envPath)
 	if err != nil {
-		return SignalsCredentials{}, err
+		return signalsCredentials{}, err
 	}
-	c := SignalsCredentials{
-		APIURL:   env[EnvSignalsAPIURL],
-		OrgID:    env[EnvSignalsOrgID],
-		APIKeyID: env[EnvSignalsAPIKeyID],
-		APIKey:   env[EnvSignalsAPIKey],
+	c := signalsCredentials{
+		APIURL:   env[envSignalsAPIURL],
+		OrgID:    env[envSignalsOrgID],
+		APIKeyID: env[envSignalsAPIKeyID],
+		APIKey:   env[envSignalsAPIKey],
 	}
 	var missing []string
-	for _, name := range []string{EnvSignalsAPIURL, EnvSignalsOrgID, EnvSignalsAPIKeyID, EnvSignalsAPIKey} {
+	for _, name := range []string{envSignalsAPIURL, envSignalsOrgID, envSignalsAPIKeyID, envSignalsAPIKey} {
 		if env[name] == "" {
 			missing = append(missing, name)
 		}
@@ -61,19 +59,18 @@ func ReadSignalsCredentials(envPath string) (SignalsCredentials, error) {
 }
 
 type VerifyResult struct {
-	OK            bool
-	APIURL        string
-	AttributeKeys int
-	// Reason is one of: config, auth, forbidden, network, empty.
+	OK     bool
+	APIURL string
+	// Reason is one of: config, auth, network.
 	Reason string
 	Error  string
 }
 
-// VerifySignals checks the app's credentials the way the app will use them:
-// exchange the key for a token, then list attribute keys on the Signals API.
-// The registry always has attribute keys, so an empty list means something is wrong.
 func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResult {
-	creds, err := ReadSignalsCredentials(envPath)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	creds, err := readSignalsCredentials(envPath)
 	if err != nil {
 		return VerifyResult{Reason: "config", Error: err.Error()}
 	}
@@ -81,53 +78,39 @@ func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResul
 
 	client, err := console.NewApiClient(ctx, consoleHost, creds.APIKeyID, creds.APIKey, creds.OrgID)
 	if err != nil {
-		// A transport error means Console wasn't reached, so the key wasn't judged.
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
-			res.Reason, res.Error = "network", fmt.Sprintf("couldn't reach Console at %s: %v", consoleHost, err)
-		} else {
+		var tokenErr *console.TokenError
+		if errors.As(err, &tokenErr) && tokenErr.Rejected() {
 			res.Reason, res.Error = "auth", fmt.Sprintf("the API key in %s was rejected by Console: %v", envPath, err)
+		} else {
+			res.Reason, res.Error = "network", fmt.Sprintf("couldn't check the key with Console at %s: %v", consoleHost, err)
 		}
 		return res
 	}
 
-	n, status, err := countAttributeKeys(ctx, creds.APIURL, client.Jwt)
+	status, err := signalsStatus(ctx, creds.APIURL, client.Jwt)
 	switch {
 	case err != nil:
 		res.Reason, res.Error = "network", err.Error()
-	case status == http.StatusUnauthorized || status == http.StatusForbidden:
-		res.Reason, res.Error = "forbidden", fmt.Sprintf("the Signals API refused the key (%d); it needs the SIGNALS VIEW permission", status)
 	case status != http.StatusOK:
 		res.Reason, res.Error = "network", fmt.Sprintf("the Signals API returned %d", status)
-	case n == 0:
-		res.Reason, res.Error = "empty", "the Signals API returned no attribute keys"
 	default:
 		res.OK = true
 	}
-	res.AttributeKeys = n
 	return res
 }
 
-func countAttributeKeys(ctx context.Context, apiURL, jwt string) (int, int, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
+// signalsStatus makes an authenticated call to check the key validity.
+// Using /attribute_keys for simplicity (health is public)
+func signalsStatus(ctx context.Context, apiURL, jwt string) (int, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(apiURL, "/")+"/api/v1/registry/attribute_keys/", nil)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+jwt)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return 0, resp.StatusCode, nil
-	}
-	var keys []json.RawMessage
-	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
-		return 0, resp.StatusCode, fmt.Errorf("unexpected response from the Signals API: %w", err)
-	}
-	return len(keys), resp.StatusCode, nil
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
 }

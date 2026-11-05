@@ -524,3 +524,25 @@ func Test_CreateScopedAPIKey_Forbidden(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func Test_DeleteAPIKey(t *testing.T) {
+	var gotMethod, gotPath, gotAuth string
+	status := http.StatusNoContent
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotAuth = r.Method, r.URL.Path, r.Header.Get("Authorization")
+		w.WriteHeader(status)
+	}))
+	defer server.Close()
+
+	if err := DeleteAPIKey(context.Background(), "token", server.URL, "org-1", "key-1"); err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != "DELETE" || gotPath != "/api/msc/v1/organizations/org-1/credentials/v2/api-keys/key-1" || gotAuth != "Bearer token" {
+		t.Fatalf("unexpected request %s %s (auth %q)", gotMethod, gotPath, gotAuth)
+	}
+
+	status = http.StatusForbidden
+	if err := DeleteAPIKey(context.Background(), "token", server.URL, "org-1", "key-1"); err == nil {
+		t.Fatal("expected an error when Console refuses")
+	}
+}

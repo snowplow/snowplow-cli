@@ -29,6 +29,12 @@ import (
 
 const snowplowAudience = "https://snowplowanalytics.com/api/"
 
+// Defaults for the device login, shared by the commands that sign in.
+const (
+	DefaultClientID    = "EXQ3csSDr6D7wTIiebNPhXpgkSsOzCzi"
+	DefaultAuth0Domain = "id.snowplowanalytics.com"
+)
+
 func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv bool, ctx context.Context) error {
 	slog.Debug("Starting Snowplow CLI setup",
 		"auth0-domain", auth0Domain,
@@ -48,16 +54,11 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		return fmt.Errorf("failed to create API key: %w", err)
 	}
 
-	userInfo, err := console.GetUserInfo(ctx, session.AccessToken)
-	if err != nil {
-		return fmt.Errorf("failed to get user info: %w", err)
-	}
-
 	if err := config.PersistConfig(session.Org.ID, apiKey.ID, apiKey.Secret, consoleHost, isDotenv); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	green.Printf("✓ Logged in to Snowplow Console as %s\n", userInfo.Email)
+	green.Printf("✓ Logged in to Snowplow Console as %s\n", session.Email)
 	green.Printf("✓ Authentication credentials saved\n")
 	if readOnly {
 		green.Printf("✓ API key created with read-only permissions for %s\n", session.Org.Name)
@@ -70,6 +71,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 
 type Session struct {
 	AccessToken string
+	Email       string
 	Org         console.Organization
 }
 
@@ -147,6 +149,11 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Ses
 		return nil, fmt.Errorf("failed to get organization ID: %w", err)
 	}
 
+	userInfo, err := console.GetUserInfo(ctx, token.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+
 	organizations, err := console.GetOrganizations(ctx, token.AccessToken, consoleHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch organizations: %w", err)
@@ -171,7 +178,7 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Ses
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
-	return &Session{AccessToken: token.AccessToken, Org: *selectedOrg}, nil
+	return &Session{AccessToken: token.AccessToken, Email: userInfo.Email, Org: *selectedOrg}, nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {

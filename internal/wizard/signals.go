@@ -14,28 +14,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/snowplow/snowplow-cli/internal/config"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/setup"
 )
 
 type SignalsOptions struct {
-	ClientID, Auth0Domain, ConsoleHost     string
-	ProjectDir                             string
-	NoLaunch                               bool
-	SavedOrgID, SavedAPIKeyID, SavedAPIKey string
+	ConsoleHost, ProjectDir string
 }
 
 // The agent's first message names the skill rather than using a slash command,
 // because each agent invokes skills differently.
 const signalsStarterPrompt = "Use the signals-setup skill to set up Snowplow Signals in this project. " +
-	"Setup is done when all four steps are complete: Tracking, Attribute groups, Services, and Used by your app."
+	"Setup is done when all four steps are complete: Tracking, Attribute groups, Services, and Used by your app. " +
+	"If the signals-setup skill isn't available, stop and tell the user to install or update the Snowplow skills."
+
+const mcpDocsURL = "https://docs.snowplow.io/docs/ai/snowplow-mcp/"
 
 var (
 	green  = color.New(color.FgGreen)
@@ -44,16 +43,15 @@ var (
 )
 
 func SetupSignals(ctx context.Context, opts SignalsOptions) error {
-	// Checked before signing in, so no key is created that would end up in a commit.
-	if GitTracked(opts.ProjectDir, ".env") {
+	if gitTracked(opts.ProjectDir, ".env") {
 		return errors.New(".env is committed to git, so the Signals key would be committed too. " +
 			"Stop tracking it with `git rm --cached .env`, commit that, then run this again")
 	}
-	if GitDirty(opts.ProjectDir) {
+	if gitDirty(opts.ProjectDir) {
 		_, _ = yellow.Println("! This project has uncommitted changes. Your agent will edit files, so consider committing first.")
 	}
 
-	session, err := setup.Login(ctx, opts.ClientID, opts.Auth0Domain, opts.ConsoleHost)
+	session, err := setup.Login(ctx, setup.DefaultClientID, setup.DefaultAuth0Domain, opts.ConsoleHost)
 	if err != nil {
 		return err
 	}
@@ -64,20 +62,16 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 		return err
 	}
 
-	if err := ensureCLIKey(ctx, opts, session); err != nil {
-		return err
-	}
-
 	envPath := filepath.Join(opts.ProjectDir, ".env")
 	if err := ensureAppKey(ctx, opts, session, env.APIURL(), envPath); err != nil {
 		return err
 	}
 
-	agents := DetectAgents()
-	setupAgents(ctx, agents)
+	agents := detectAgents()
+	installSkills(ctx, agents, opts.ProjectDir)
 
 	_, _ = green.Printf("\n✓ Snowplow Signals is ready for your agent in %s.\n", org.Name)
-	return handOff(agents, opts.NoLaunch)
+	return startAgent(ctx, opts, session, agents)
 }
 
 func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.Session) (console.SignalsEnvironment, error) {
@@ -117,23 +111,6 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.S
 	return ready[i], nil
 }
 
-// describeCapabilities groups actions by resource, e.g. "SIGNALS (CREATE, EDIT), DATA-PRODUCTS (EDIT)".
-func describeCapabilities(caps []console.Capability) string {
-	var resources []string
-	actions := map[string][]string{}
-	for _, c := range caps {
-		if _, ok := actions[c.ResourceType]; !ok {
-			resources = append(resources, c.ResourceType)
-		}
-		actions[c.ResourceType] = append(actions[c.ResourceType], c.Action)
-	}
-	parts := make([]string, len(resources))
-	for i, r := range resources {
-		parts[i] = fmt.Sprintf("%s (%s)", r, strings.Join(actions[r], ", "))
-	}
-	return strings.Join(parts, ", ")
-}
-
 func envLabel(e console.SignalsEnvironment) string {
 	name := e.Pipeline.Name
 	if name == "" {
@@ -142,157 +119,123 @@ func envLabel(e console.SignalsEnvironment) string {
 	return fmt.Sprintf("%s (%s)", name, e.APIURL())
 }
 
-func ensureCLIKey(ctx context.Context, opts SignalsOptions, s *setup.Session) error {
-	if opts.SavedOrgID == s.Org.ID && opts.SavedAPIKeyID != "" && opts.SavedAPIKey != "" {
-		if _, err := console.NewApiClient(ctx, opts.ConsoleHost, opts.SavedAPIKeyID, opts.SavedAPIKey, opts.SavedOrgID); err == nil {
-			perms, err := console.GetAPIKeyPermissions(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID, opts.SavedAPIKeyID)
-			switch {
-			case err != nil:
-				slog.Debug("couldn't check the saved key's permissions, reusing it", "error", err)
-				_, _ = green.Println("✓ Using your saved snowplow-cli key for the Snowplow MCP")
-				return nil
-			case console.Allows(perms, s.Org.ID, console.SignalsSetupCapabilities):
-				_, _ = green.Println("✓ Using your saved snowplow-cli key for the Snowplow MCP")
-				return nil
-			default:
-				missing := describeCapabilities(console.Missing(perms, s.Org.ID, console.SignalsSetupCapabilities))
-				if !interactive() || !confirm(fmt.Sprintf("Your saved snowplow-cli key can't set up Signals and tracking: it's missing %s. Replace it with a new key with full access?", missing)) {
-					return errors.New("your saved snowplow-cli key can't set up Signals and tracking; " +
-						"run `snowplow-cli setup` for a key with full access, then run this again")
-				}
-			}
-		}
-	}
-
-	if opts.SavedOrgID != "" && opts.SavedOrgID != s.Org.ID {
-		if !interactive() || !confirm(fmt.Sprintf("snowplow-cli is set up for another organization. Switch it to %s?", s.Org.Name)) {
-			return errors.New("snowplow-cli is set up for another organization; run `snowplow-cli setup` to switch, then run this again")
-		}
-	}
-
-	key, err := console.CreateAPIKey(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID, false)
-	if err != nil {
-		return fmt.Errorf("failed to create the snowplow-cli key: %w", err)
-	}
-	if err := config.SaveConfig(s.Org.ID, key.ID, key.Secret, opts.ConsoleHost); err != nil {
-		return err
-	}
-	_, _ = green.Println("✓ Created a snowplow-cli key for the Snowplow MCP")
-	return nil
-}
-
 func ensureAppKey(ctx context.Context, opts SignalsOptions, s *setup.Session, apiURL, envPath string) error {
-	if c, err := ReadSignalsCredentials(envPath); err == nil && c.OrgID == s.Org.ID && c.APIURL == apiURL {
-		if VerifySignals(ctx, opts.ConsoleHost, envPath).OK {
+	existing, err := readSignalsCredentials(envPath)
+	hasOrgKey := err == nil && existing.OrgID == s.Org.ID
+
+	if hasOrgKey {
+		// Keys aren't tied to a Signals environment, so only the URL may need updating.
+		if err := upsertDotenv(envPath, map[string]string{envSignalsAPIURL: apiURL}); err != nil {
+			return err
+		}
+		res := VerifySignals(ctx, opts.ConsoleHost, envPath)
+		switch {
+		case res.OK:
 			_, _ = green.Printf("✓ Signals credentials in %s already work\n", envPath)
 			return nil
+		case res.Reason != "auth":
+			return fmt.Errorf("the Signals credentials in %s don't work: %s", envPath, res.Error)
 		}
+		// Console rejected the existing key. Create a new one
 	}
 
-	userInfo, err := console.GetUserInfo(ctx, s.AccessToken)
-	if err != nil {
-		return fmt.Errorf("failed to get user info: %w", err)
-	}
 	project := filepath.Base(opts.ProjectDir)
 	key, err := console.CreateScopedAPIKey(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID,
-		fmt.Sprintf("%s Signals app key (%s)", userInfo.Email, project), console.SignalsReadCapabilities)
+		fmt.Sprintf("%s Signals app key (%s)", s.Email, project), console.SignalsReadCapabilities)
 	if err != nil {
 		return fmt.Errorf("failed to create the Signals app key: %w", err)
 	}
 
-	if err := UpsertDotenv(envPath, map[string]string{
-		EnvSignalsAPIURL:   apiURL,
-		EnvSignalsOrgID:    s.Org.ID,
-		EnvSignalsAPIKeyID: key.ID,
-		EnvSignalsAPIKey:   key.Secret,
+	if err := upsertDotenv(envPath, map[string]string{
+		envSignalsAPIURL:   apiURL,
+		envSignalsOrgID:    s.Org.ID,
+		envSignalsAPIKeyID: key.ID,
+		envSignalsAPIKey:   key.Secret,
 	}); err != nil {
 		return err
 	}
 	_, _ = green.Printf("✓ Signals credentials written to %s (key limited to reading Signals)\n", envPath)
-
-	if changed, err := EnsureGitignored(opts.ProjectDir, ".env"); err != nil {
-		_, _ = yellow.Printf("! Couldn't add .env to .gitignore: %v. Make sure it isn't committed.\n", err)
-	} else if changed {
-		_, _ = green.Println("✓ Added .env to .gitignore")
-	}
 	return nil
 }
 
-// setupAgents reports and skips failures: one agent's problem shouldn't stop the rest.
-func setupAgents(ctx context.Context, agents []Agent) {
+// installSkills installs the Snowplow skills with the skills CLI
+// (https://github.com/vercel-labs/skills). A failure is reported, not fatal.
+func installSkills(ctx context.Context, agents []agent, dir string) {
 	if len(agents) == 0 {
-		command, args := MCPCommand()
 		_, _ = yellow.Println("! No supported agent found (Claude Code, Codex or Cursor).")
-		fmt.Printf("  Add this MCP server to your agent: %s %s\n", command, strings.Join(args, " "))
 		return
 	}
 
-	command, args := MCPCommand()
+	var targets []string
 	for _, a := range agents {
-		if err := a.AddMCP(command, args); err != nil {
-			_, _ = yellow.Printf("! %s: couldn't add the Snowplow MCP: %v\n", a.Name, err)
+		if a.ID == agentClaude && claudeHasSnowplowPlugin(dir) {
+			_, _ = green.Println("✓ Claude Code: Snowplow skills come from the snowplow plugin")
 			continue
 		}
-		_, _ = green.Printf("✓ %s: Snowplow MCP added\n", a.Name)
+		targets = append(targets, a.ID)
 	}
-	if ClaudePluginInstalled() {
-		_, _ = yellow.Println("! The snowplow plugin is also installed in Claude Code. Its MCP server repeats the same tools and asks for a second login; disable it with /plugin.")
-	}
-
-	skills, err := FetchSkills(ctx)
-	if err != nil {
-		_, _ = yellow.Printf("! Couldn't download the Snowplow skills: %v\n", err)
+	if len(targets) == 0 {
 		return
 	}
-	done := map[string]bool{}
-	for _, a := range agents {
-		if done[a.SkillsDir] {
-			continue
-		}
-		done[a.SkillsDir] = true
-		skipped, err := InstallSkills(a.SkillsDir, skills)
-		if err != nil {
-			_, _ = yellow.Printf("! Couldn't install skills into %s: %v\n", a.SkillsDir, err)
-			continue
-		}
-		_, _ = green.Printf("✓ Snowplow skills installed in %s\n", a.SkillsDir)
-		for _, name := range skipped {
-			_, _ = yellow.Printf("! Skipped %s: %s already has a skill with that name\n", name, a.SkillsDir)
-		}
+
+	cmd := exec.CommandContext(ctx, "npx", append([]string{"-y", "skills@1", "add", "snowplow/skills", "-g", "-y", "-a"}, targets...)...)
+	fmt.Printf("Installing the Snowplow skills: %s\n", strings.Join(cmd.Args, " "))
+	if err := cmd.Run(); err != nil {
+		_, _ = yellow.Printf("! Couldn't install the Snowplow skills (%v). Run the command above yourself.\n", err)
+		return
 	}
+	_, _ = green.Println("✓ Snowplow skills installed")
 }
 
-func handOff(agents []Agent, noLaunch bool) error {
-	var launchable []Agent
+// startAgent starts the agent the user picks, or prints the prompt to start one
+// themselves. The agent's own MCP setup is never changed.
+func startAgent(ctx context.Context, opts SignalsOptions, s *setup.Session, agents []agent) error {
+	hasMCP := map[string]bool{}
+	needsMCP := len(agents) == 0
+	var launchable []agent
+	var options []string
 	for _, a := range agents {
-		if a.CanLaunch() {
+		hasMCP[a.ID] = hasSnowplowMCP(a, opts.ProjectDir)
+		needsMCP = needsMCP || !hasMCP[a.ID]
+		if a.canLaunch() && (hasMCP[a.ID] || a.takesSessionMCP()) {
 			launchable = append(launchable, a)
+			options = append(options, "Start "+a.Name)
 		}
 	}
 
-	if !noLaunch && interactive() && len(launchable) > 0 {
-		options := make([]string, 0, len(launchable)+1)
-		for _, a := range launchable {
-			options = append(options, "Start "+a.Name)
-		}
-		options = append(options, "Show the prompt, I'll start my agent myself")
-
-		i, err := choose("How do you want to continue?", options)
+	if interactive() && len(launchable) > 0 {
+		i, err := choose("How do you want to continue?", append(options, "Show the prompt, I'll start my agent myself"))
 		if err != nil {
 			return err
 		}
 		if i < len(launchable) {
-			return Launch(launchable[i], signalsStarterPrompt)
+			a := launchable[i]
+			if !hasMCP[a.ID] {
+				return launchWithSessionMCP(ctx, opts, s, a)
+			}
+			args := []string{signalsStarterPrompt}
+			if a.ID == agentClaude {
+				args = claudeArgs(signalsStarterPrompt)
+			}
+			return launch(a.Bin, args, nil)
 		}
 	}
 
-	_, _ = cyan.Println("\nStart your agent in this project and send:")
-	fmt.Printf("\n  %s\n\n", signalsStarterPrompt)
+	printPrompt(needsMCP)
 	return nil
 }
 
-// Overridable in tests.
-var interactive = func() bool {
+func printPrompt(needsMCP bool) {
+	if needsMCP {
+		_, _ = cyan.Printf("\n1. Install the Snowplow MCP in your agent: %s\n", mcpDocsURL)
+		_, _ = cyan.Println("2. Start your agent in this project and send:")
+	} else {
+		_, _ = cyan.Println("\nStart your agent in this project and send:")
+	}
+	fmt.Printf("\n  %s\n\n", signalsStarterPrompt)
+}
+
+func interactive() bool {
 	info, err := os.Stdin.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
@@ -306,11 +249,4 @@ func choose(question string, options []string) (int, error) {
 	var input string
 	_, _ = fmt.Scanln(&input)
 	return setup.SelectIndex(input, len(options), 0)
-}
-
-func confirm(question string) bool {
-	fmt.Printf("%s (y/N) ", question)
-	var input string
-	_, _ = fmt.Scanln(&input)
-	return strings.EqualFold(input, "y")
 }

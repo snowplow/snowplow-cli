@@ -12,9 +12,7 @@ package wizard
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,20 +22,12 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/setup"
 )
 
-// userToken is a stand-in for the device login's access token, with the
-// claims console.GetUserInfo reads.
-func userToken() string {
-	enc := base64.RawURLEncoding.EncodeToString
-	payload := `{"sub":"u1","https://snowplowanalytics.com/roles":{"user":{"email":"dev@example.com","name":"Dev"}}}`
-	return enc([]byte(`{"alg":"none"}`)) + "." + enc([]byte(payload)) + ".sig"
-}
-
 func Test_ensureAppKey_ReusesWorkingKey(t *testing.T) {
 	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusOK, `[{"name":"domain_userid"}]`)
 	envPath := writeEnv(t, signalsURL, "secret")
 	before, _ := os.ReadFile(envPath)
 
-	s := &setup.Session{AccessToken: userToken(), Org: console.Organization{ID: "org"}}
+	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	if err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath); err != nil {
 		t.Fatal(err)
@@ -47,12 +37,12 @@ func Test_ensureAppKey_ReusesWorkingKey(t *testing.T) {
 	}
 }
 
-func Test_ensureAppKey_ReplacesKeyWithoutSignalsAccess(t *testing.T) {
-	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusForbidden, ``)
-	envPath := writeEnv(t, signalsURL, "secret")
+func Test_ensureAppKey_ReplacesRejectedKey(t *testing.T) {
+	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusOK, `[{"name":"domain_userid"}]`)
+	envPath := writeEnv(t, signalsURL, "revoked")
 
 	// The fake Console has no key creation endpoint, so reaching it fails.
-	s := &setup.Session{AccessToken: userToken(), Org: console.Organization{ID: "org"}}
+	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath)
 	if err == nil || !strings.Contains(err.Error(), "failed to create the Signals app key") {
@@ -60,46 +50,50 @@ func Test_ensureAppKey_ReplacesKeyWithoutSignalsAccess(t *testing.T) {
 	}
 }
 
-func Test_ensureCLIKey_KeepsKeyWithoutSignalsAccessUnlessAsked(t *testing.T) {
-	created := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/msc/v1/organizations/org/credentials/v3/token":
-			_, _ = w.Write([]byte(`{"accessToken":"jwt"}`))
-		case r.URL.Path == "/api/msc/v1/organizations/org/credentials/v2/api-keys/kid":
-			_, _ = w.Write([]byte(`{"permissions":[{"organizationId":"org","capabilities":[{"resourceType":"DATA-PRODUCTS","action":"VIEW"}]}]}`))
-		case r.Method == "POST":
-			created = true
-			w.WriteHeader(http.StatusCreated)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
+func Test_ensureAppKey_KeepsKeyWhenSignalsFails(t *testing.T) {
+	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusUnauthorized, ``)
+	envPath := writeEnv(t, signalsURL, "secret")
+	before, _ := os.ReadFile(envPath)
 
-	// Without a terminal to answer in, setup stops instead of replacing the key.
-	orig := interactive
-	interactive = func() bool { return false }
-	t.Cleanup(func() { interactive = orig })
-
-	s := &setup.Session{AccessToken: userToken(), Org: console.Organization{ID: "org"}}
-	opts := SignalsOptions{ConsoleHost: srv.URL, SavedOrgID: "org", SavedAPIKeyID: "kid", SavedAPIKey: "secret"}
-	err := ensureCLIKey(context.Background(), opts, s)
-	if err == nil || !strings.Contains(err.Error(), "can't set up Signals and tracking") {
-		t.Fatalf("expected setup to stop, got %v", err)
+	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
+	err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath)
+	if err == nil || !strings.Contains(err.Error(), "the Signals API returned 401") {
+		t.Fatalf("expected the check's error, got %v", err)
 	}
-	if created {
-		t.Fatal("no key should be created without asking")
+	if after, _ := os.ReadFile(envPath); string(after) != string(before) {
+		t.Fatalf(".env changed:\n%s", after)
 	}
 }
 
-func Test_describeCapabilities(t *testing.T) {
-	caps := []console.Capability{
-		{ResourceType: "SIGNALS", Action: "CREATE"},
-		{ResourceType: "SIGNALS", Action: "EDIT"},
-		{ResourceType: "DATA-PRODUCTS", Action: "EDIT"},
+func Test_ensureAppKey_KeepsKeyForAnotherEnvironment(t *testing.T) {
+	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusOK, ``)
+	envPath := writeEnv(t, "https://old.signals.example", "secret")
+
+	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
+	if err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath); err != nil {
+		t.Fatal(err)
 	}
-	if got := describeCapabilities(caps); got != "SIGNALS (CREATE, EDIT), DATA-PRODUCTS (EDIT)" {
-		t.Fatalf("got %q", got)
+	if c, _ := readSignalsCredentials(envPath); c.APIURL != signalsURL || c.APIKeyID != "kid" {
+		t.Fatalf("expected the same key with the new URL, got %+v", c)
+	}
+}
+
+func TestInstallSkillsLeavesClaudeToThePlugin(t *testing.T) {
+	home, work := stubEnv(t)
+	plugin := filepath.Join(home, ".claude", "plugins", "cache", "snowplow", "snowplow", "0.1.0")
+	writeFile(t, filepath.Join(plugin, ".mcp.json"), `{"mcpServers":{"snowplow":{"command":"npx","args":["mcp-remote","https://console.snowplowanalytics.com/api/agent/mcp"]}}}`)
+	writeFile(t, filepath.Join(home, ".claude", "plugins", "installed_plugins.json"),
+		`{"version":2,"plugins":{"snowplow@snowplow":[{"scope":"user","installPath":"`+plugin+`"}]}}`)
+	writeFile(t, filepath.Join(home, ".claude", "settings.json"), `{"enabledPlugins":{"snowplow@snowplow":true}}`)
+	npx := fakeBin(t, "npx")
+	t.Setenv("PATH", filepath.Dir(npx))
+
+	installSkills(context.Background(), []agent{{ID: agentClaude}, {ID: agentCodex}}, work)
+
+	args, _ := os.ReadFile(npx + ".args")
+	if want := "-y\nskills@1\nadd\nsnowplow/skills\n-g\n-y\n-a\ncodex\n"; string(args) != want {
+		t.Fatalf("expected only Codex to get the skills, got %q", args)
 	}
 }
