@@ -113,6 +113,22 @@ This repository includes a GitHub Actions workflow that connects directly with C
 
 This lets team members request Claude’s help on code reviews, bug fixes, and development tasks directly in GitHub. Claude can read CI results, write to PRs, and manage issues as needed for collaboration.
 
+## Setting up Signals (`signals setup`)
+
+Get a project and your coding agent ready for [Snowplow Signals](https://docs.snowplow.io/docs/signals/). Run it from your project's root:
+
+```bash
+snowplow-cli signals setup
+```
+
+You need [Node.js](https://nodejs.org/) 18 or later.
+
+To check existing Signals credentials in `.env` you can use:
+
+```bash
+snowplow-cli signals status
+```
+
 ## Sending events (`events send`)
 
 Send a single self-describing event to a Snowplow collector:
