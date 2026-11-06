@@ -59,4 +59,5 @@ func init() {
 	validateCmd.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 	validateCmd.PersistentFlags().Bool("full", false, "Perform compatibility check on all files, not only the ones that were changed")
 	validateCmd.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
+	validateCmd.PersistentFlags().Bool("fix", false, "Write the version Snowplow Console will assign into each event specification that declares a different one")
 }

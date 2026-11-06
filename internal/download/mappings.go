@@ -116,10 +116,12 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 	}
 
 	entities := model.EntitiesDef{Tracked: trackedEntities, Enriched: enrichedEntities}
+	version := remoteEs.Version
 	return model.EventSpecCanonical{
 		ResourceName:               remoteEs.Id,
 		ExcludedSourceApplications: excludedSourceApps,
 		Name:                       remoteEs.Name,
+		Version:                    &version,
 		Description:                remoteEs.Description,
 		Event:                      &event,
 		Entities:                   entities,

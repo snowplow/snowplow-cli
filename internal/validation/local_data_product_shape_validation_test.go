@@ -119,3 +119,47 @@ func Test_ValidateDPShape_Rules(t *testing.T) {
 	}
 
 }
+
+var inputVersionBase = `
+apiVersion: v1
+resourceType: data-product
+resourceName: d066a9a7-e6c4-4d72-9a93-1418746f5279
+data:
+  name: Data Product number 1
+  eventSpecifications:
+    - name: event spec 1
+      resourceName: d066a9a7-e6c4-4d72-9a93-1418746f5279
+      %s
+`
+
+var dpVersionTests = []struct {
+	in    string
+	valid bool
+}{
+	{``, true},
+	{`version: 0`, true},
+	{`version: 3`, true},
+	{`version: -1`, false},
+	{`version: "3"`, false},
+	{`version: 1.5`, false},
+}
+
+func Test_ValidateDPShape_Version(t *testing.T) {
+
+	for _, tt := range dpVersionTests {
+		inputRaw := fmt.Sprintf(inputVersionBase, tt.in)
+		t.Run(tt.in, func(t *testing.T) {
+			var input map[string]any
+			if err := yaml.Unmarshal([]byte(inputRaw), &input); err != nil {
+				t.Fatal(err)
+			}
+
+			_, ok := ValidateDPShape(input)
+
+			if ok != tt.valid {
+				t.Errorf("%s got: %v want: %v", tt.in, ok, tt.valid)
+			}
+		})
+	}
+
+}

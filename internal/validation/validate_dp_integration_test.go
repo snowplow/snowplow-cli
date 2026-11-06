@@ -23,7 +23,9 @@ import (
 	"testing"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/download"
 	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 func TestValidateDataProductsWithClient_HappyPath(t *testing.T) {
@@ -39,7 +41,7 @@ func TestValidateDataProductsWithClient_HappyPath(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductSuccessTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 
 	if err != nil {
 		t.Errorf("Expected validation to succeed, but got error: %v", err)
@@ -63,7 +65,7 @@ func TestValidateDataProductsWithClient_LocalValidationFailure(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductSuccessTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 
 	if err == nil {
 		t.Error("Expected validation to fail for invalid data product")
@@ -92,7 +94,7 @@ func TestValidateDataProductsWithClient_NetworkFailure(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductNetworkFailureTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 
 	if err == nil {
 		t.Error("Expected validation to fail due to network error")
@@ -115,7 +117,7 @@ func TestValidateDataProductsWithClient_CompatibilityCheckFailure(t *testing.T) 
 
 	mockClient := createMockDataProductClient(&MockDataProductCompatFailureTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, true, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, true, 1, false)
 
 	if err == nil {
 		logStr := logOutput.String()
@@ -136,7 +138,7 @@ func TestValidateDataProductsWithClient_GitHubAnnotations(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductWarningTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, true, false, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, true, false, 1, false)
 
 	if err != nil {
 		t.Errorf("Expected validation to succeed with warnings, but got error: %v", err)
@@ -156,7 +158,7 @@ func TestValidateDataProductsWithClient_ConcurrencyLimits(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductSuccessTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 20)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 20, false)
 
 	if err != nil {
 		t.Errorf("Expected validation to succeed, but got error: %v", err)
@@ -168,7 +170,7 @@ func TestValidateDataProductsWithClient_ConcurrencyLimits(t *testing.T) {
 	}
 
 	logOutput.Reset()
-	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 0)
+	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 0, false)
 
 	if err != nil {
 		t.Errorf("Expected validation to succeed, but got error: %v", err)
@@ -189,7 +191,7 @@ func TestValidateDataProductsWithClient_NoLoggerInContext(t *testing.T) {
 
 	mockClient := createMockDataProductClient(&MockDataProductSuccessTransport{})
 
-	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1)
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 
 	t.Logf("Function completed with error: %v", err)
 }
@@ -444,5 +446,151 @@ func (m *MockDataProductWarningTransport) RoundTrip(req *http.Request) (*http.Re
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
+	}
+}
+
+const versionRemoteDataProducts = `{
+  "data": [{
+    "id": "dbc68917-3bcb-4640-a165-483de5fc033c",
+    "name": "checkout",
+    "status": "draft",
+    "sourceApplications": [],
+    "eventSpecs": [{"id": "b57f712e-ee43-4e10-8b36-48a0f6f2e628"}]
+  }],
+  "includes": {"eventSpecs": [{
+    "id": "b57f712e-ee43-4e10-8b36-48a0f6f2e628",
+    "name": "Checkout Started",
+    "description": "A checkout started",
+    "status": "published",
+    "version": 3,
+    "sourceApplications": [],
+    "dataProductId": "dbc68917-3bcb-4640-a165-483de5fc033c",
+    "event": {
+      "source": "iglu:com.example/checkout/jsonschema/1-0-0",
+      "schema": {"type": "object", "additionalProperties": false, "properties": {"a": {"type": "string", "maxLength": 10}}, "required": ["a"]}
+    },
+    "entities": {"tracked": [{"source": "iglu:com.example/cart/jsonschema/1-0-0", "minCardinality": 0, "comment": "a note"}]}
+  }]}
+}`
+
+const versionLocalDataProduct = `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    # the spec Console knows
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started
+      version: 3
+      description: A checkout started
+      event:
+        source: iglu:com.example/checkout/jsonschema/1-0-1
+        schema: {type: object, additionalProperties: false, properties: {a: {type: string, maxLength: 10}}, required: [a]}
+      entities:
+        tracked:
+          - source: iglu:com.example/cart/jsonschema/1-0-0
+            minCardinality: 0
+        enriched: []
+`
+
+type MockDataProductRemoteTransport struct {
+	dataProducts string
+}
+
+func (m *MockDataProductRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == "GET" {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(m.dataProducts)),
+			Request:    req,
+		}, nil
+	}
+	return (&MockDataProductSuccessTransport{}).RoundTrip(req)
+}
+
+func TestValidateDataProductsWithClient_DownloadThenValidate(t *testing.T) {
+	for _, ext := range []string{"yaml", "json"} {
+		t.Run(ext, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+
+			files := util.Files{DataProductsLocation: tmpDir, SourceAppsLocation: "source-apps", ExtentionPreference: ext, ImagesLocation: "images"}
+			err := download.DownloadDataProductsAndRelatedResources(files, ctx, mockClient, false)
+			if err != nil {
+				t.Fatalf("download failed: %v", err)
+			}
+
+			written, err := os.ReadFile(filepath.Join(tmpDir, "checkout."+ext))
+			if err != nil {
+				t.Fatalf("failed to read downloaded file: %v", err)
+			}
+			wantVersion := "version: 3"
+			if ext == "json" {
+				wantVersion = `"version": 3`
+			}
+			if !strings.Contains(string(written), wantVersion) {
+				t.Errorf("downloaded file should carry the Console version, got:\n%s", written)
+			}
+
+			err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+			if err != nil {
+				t.Errorf("Expected an unchanged download to validate, but got error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateDataProductsWithClient_VersionMismatch(t *testing.T) {
+	tmpDir := t.TempDir()
+	dpFile := filepath.Join(tmpDir, "checkout.yaml")
+	if err := os.WriteFile(dpFile, []byte(versionLocalDataProduct), 0644); err != nil {
+		t.Fatalf("Failed to write data product file: %v", err)
+	}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+
+	if err == nil || !strings.Contains(err.Error(), "validation failed 1 errors") {
+		t.Fatalf("Expected a version validation failure, got: %v", err)
+	}
+	wantLog := `path=/data/eventSpecifications/0 errors="Checkout Started: version 3 needs a bump\nchanged: event, entities\nexpected version: 4\nrun ` + "`snowplow-cli dp validate --fix`" + ` to update it\n"`
+	if !strings.Contains(logOutput.String(), wantLog) {
+		t.Errorf("Expected version error in logs\nwant: %s\ngot: %s", wantLog, logOutput.String())
+	}
+}
+
+func TestValidateDataProductsWithClient_VersionFix(t *testing.T) {
+	tmpDir := t.TempDir()
+	dpFile := filepath.Join(tmpDir, "checkout.yaml")
+	if err := os.WriteFile(dpFile, []byte(versionLocalDataProduct), 0644); err != nil {
+		t.Fatalf("Failed to write data product file: %v", err)
+	}
+
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true)
+	if err != nil {
+		t.Fatalf("Expected --fix to succeed, got: %v", err)
+	}
+
+	fixed, err := os.ReadFile(dpFile)
+	if err != nil {
+		t.Fatalf("failed to read fixed file: %v", err)
+	}
+	want := strings.Replace(versionLocalDataProduct, "version: 3", "version: 4", 1)
+	if string(fixed) != want {
+		t.Errorf("Expected only the version to change\nwant:\n%s\ngot:\n%s", want, fixed)
+	}
+
+	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+	if err != nil {
+		t.Errorf("Expected validate to pass after --fix, got: %v", err)
 	}
 }

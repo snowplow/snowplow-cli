@@ -12,6 +12,7 @@ package console
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -375,10 +376,14 @@ func Test_UpdateDataProduct(t *testing.T) {
 }
 
 func Test_CreateEventSpec(t *testing.T) {
+	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == "POST" {
 			if r.Header.Get("authorization") != "Bearer token" {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
 			}
 
 			resp := `{}`
@@ -394,37 +399,27 @@ func Test_CreateEventSpec(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	err := CreateEventSpec(cnx, client, sampleRemoteEs)
+	err := CreateEventSpec(cnx, client, sampleRemoteEs, nil)
 
 	if err != nil {
 		t.Error(err)
 	}
+	if _, ok := body["expectedVersion"]; ok {
+		t.Errorf("expectedVersion sent without a declared version, got: %v", body)
+	}
 
 }
 
-func Test_UpdateEventSpec(t *testing.T) {
+func Test_CreateEventSpecWithExpectedVersion(t *testing.T) {
+	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == "POST" {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
 			}
 
-			resp := `{}`
-
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
-			return
-		}
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "GET" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
-			}
-
-			// we only need this for version
-			resp := `{"data": [{"version": 2}]}`
-
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, resp)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{}`)
 			return
 		}
 		t.Errorf("Unexpected request, got: %s", r.URL.Path)
@@ -434,10 +429,127 @@ func Test_UpdateEventSpec(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
 
-	err := UpdateEventSpec(cnx, client, sampleRemoteEs)
+	err := CreateEventSpec(cnx, client, sampleRemoteEs, intPtr(0))
 
 	if err != nil {
 		t.Error(err)
+	}
+	if body["expectedVersion"] != float64(0) {
+		t.Errorf("expectedVersion should be 0, got: %v", body["expectedVersion"])
+	}
+	spec, _ := body["spec"].(map[string]any)
+	if _, ok := spec["expectedVersion"]; ok {
+		t.Errorf("expectedVersion should not be inside spec, got: %v", spec)
+	}
+
+}
+
+func Test_UpdateEventSpec(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+
+			resp := `{}`
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, resp)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := UpdateEventSpec(cnx, client, sampleRemoteEs, nil)
+
+	if err != nil {
+		t.Error(err)
+	}
+	if _, ok := body["expectedVersion"]; ok {
+		t.Errorf("expectedVersion sent without a declared version, got: %v", body)
+	}
+	spec, _ := body["spec"].(map[string]any)
+	if spec["version"] != float64(0) {
+		t.Errorf("the cli should not compute a version, got: %v", spec["version"])
+	}
+	if spec["status"] != "draft" {
+		t.Errorf("status should be draft, got: %v", spec["status"])
+	}
+
+}
+
+func Test_UpdateEventSpecWithExpectedVersion(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{}`)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := UpdateEventSpec(cnx, client, sampleRemoteEs, intPtr(4))
+
+	if err != nil {
+		t.Error(err)
+	}
+	if body["expectedVersion"] != float64(4) {
+		t.Errorf("expectedVersion should be 4, got: %v", body["expectedVersion"])
+	}
+
+}
+
+func Test_BatchPublishEventSpecs(t *testing.T) {
+	var body string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/publish" && r.Method == "POST" {
+			b, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Error(err)
+			}
+			body = string(b)
+
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	cnx := context.Background()
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+
+	err := BatchPublishEventSpecs(cnx, client, []string{"a", "b"}, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	if body != `{"eventSpecIds":["a","b"]}` {
+		t.Errorf("unexpected body without declared versions, got: %s", body)
+	}
+
+	err = BatchPublishEventSpecs(cnx, client, []string{"a", "b"}, []EventSpecVersionRef{{Id: "b", Version: 3}})
+	if err != nil {
+		t.Error(err)
+	}
+	if body != `{"eventSpecIds":["a","b"],"expectedVersions":[{"id":"b","version":3}]}` {
+		t.Errorf("unexpected body with declared versions, got: %s", body)
 	}
 
 }

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/parser"
 	"github.com/google/uuid"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/tidwall/sjson"
@@ -190,4 +192,107 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 
 	return output, nil
 
+}
+
+func SetEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) error {
+	file, err := os.ReadFile(dpFileName)
+	if err != nil {
+		return err
+	}
+
+	output, err := SetEventSpecVersions(versionsByIndex, file, dpFileName)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(dpFileName, output, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+func SetEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName string) ([]byte, error) {
+	var output []byte
+	var err error
+	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
+		output, err = setVersionsYaml(versionsByIndex, file)
+		if err != nil {
+			return []byte{}, err
+		}
+	} else if strings.HasSuffix(dpFileName, ".json") {
+		output, err = setVersionsJson(versionsByIndex, file)
+		if err != nil {
+			return []byte{}, err
+		}
+	} else {
+		return []byte{}, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
+	}
+	return output, nil
+}
+
+func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
+
+	updatedDp := string(file)
+
+	for idx, version := range versionsByIndex {
+		updated, err := sjson.Set(updatedDp, fmt.Sprintf("data.eventSpecifications.%d.version", idx), version)
+		if err != nil {
+			return []byte{}, err
+		}
+		updatedDp = updated
+	}
+
+	return []byte(updatedDp), nil
+}
+
+func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
+	parsed, err := parser.ParseBytes(file, parser.ParseComments)
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to parse data product YAML: %w", err)
+	}
+
+	type replacement struct {
+		offset int
+		old    string
+		new    string
+	}
+
+	lineStarts := []int{0}
+	for i, b := range file {
+		if b == '\n' {
+			lineStarts = append(lineStarts, i+1)
+		}
+	}
+
+	var replacements []replacement
+	for idx, version := range versionsByIndex {
+		path, err := yaml.PathString(fmt.Sprintf("$.data.eventSpecifications[%d].version", idx))
+		if err != nil {
+			return []byte{}, err
+		}
+		node, err := path.FilterFile(parsed)
+		if err != nil {
+			return []byte{}, fmt.Errorf("version of event specification %d not found: %w", idx, err)
+		}
+		tk := node.GetToken()
+		line := tk.Position.Line - 1
+		if line < 0 || line >= len(lineStarts) {
+			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
+		}
+		offset := lineStarts[line] + tk.Position.Column - 1
+		if offset < 0 || offset+len(tk.Value) > len(file) || string(file[offset:offset+len(tk.Value)]) != tk.Value {
+			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
+		}
+		replacements = append(replacements, replacement{offset: offset, old: tk.Value, new: fmt.Sprintf("%d", version)})
+	}
+
+	sort.Slice(replacements, func(i, j int) bool { return replacements[i].offset > replacements[j].offset })
+
+	output := string(file)
+	for _, r := range replacements {
+		output = output[:r.offset] + r.new + output[r.offset+len(r.old):]
+	}
+
+	return []byte(output), nil
 }
