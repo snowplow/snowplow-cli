@@ -97,13 +97,21 @@ func Test_ensureAppKey_KeepsKeyForAnotherEnvironment(t *testing.T) {
 func Test_pickSignalsEnvironment(t *testing.T) {
 	const (
 		ready    = `{"status":"ready","pipeline":{"id":"p1","name":"Prod"},"config":{"personalizationApiHost":"prod.signals.example"}}`
+		ready2   = `{"status":"ready","pipeline":{"id":"p2","name":"QA"},"config":{"personalizationApiHost":"qa.signals.example"}}`
 		creating = `{"status":"creating","pipeline":{"id":"p3","name":"New"}}`
 	)
-	// Several ready environments prompt, so that case isn't covered here.
-	tests := []struct{ name, body, wantURL, wantErr string }{
+	// go test gives the test binary no terminal, so several ready environments can't be picked
+	// without --pipeline.
+	tests := []struct{ name, body, pipeline, wantURL, wantErr string }{
 		{name: "none", body: `[]`, wantErr: "has no Signals environment"},
 		{name: "none ready", body: `[` + creating + `]`, wantErr: "no Signals environment in Acme is ready yet"},
 		{name: "one ready", body: `[` + creating + `,` + ready + `]`, wantURL: "https://prod.signals.example"},
+		{name: "several ready", body: `[` + ready + `,` + ready2 + `]`, wantErr: "Acme has 2 Signals environments; pick one with --pipeline and its name or ID: Prod (p1), QA (p2)"},
+		{name: "pipeline by name", body: `[` + ready + `,` + ready2 + `]`, pipeline: "qa", wantURL: "https://qa.signals.example"},
+		{name: "pipeline by ID", body: `[` + ready + `,` + ready2 + `]`, pipeline: "p1", wantURL: "https://prod.signals.example"},
+		{name: "pipeline not found", body: `[` + ready + `]`, pipeline: "Staging", wantErr: `no Signals environment for pipeline "Staging"; use one of: Prod (p1)`},
+		{name: "pipeline not ready", body: `[` + ready + `,` + creating + `]`, pipeline: "New", wantErr: "the Signals environment for New isn't ready yet"},
+		{name: "pipeline name shared", body: `[` + ready + `,` + strings.Replace(ready2, `"QA"`, `"Prod"`, 1) + `]`, pipeline: "Prod", wantErr: "use its ID instead: Prod (p1), Prod (p2)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,7 +121,7 @@ func Test_pickSignalsEnvironment(t *testing.T) {
 			defer srv.Close()
 
 			s := &setup.Session{AccessToken: "token", Org: console.Organization{ID: "org", Name: "Acme"}}
-			env, err := pickSignalsEnvironment(context.Background(), SignalsOptions{ConsoleHost: srv.URL}, s)
+			env, err := pickSignalsEnvironment(context.Background(), SignalsOptions{ConsoleHost: srv.URL, Pipeline: tt.pipeline}, s)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 					t.Fatalf("expected an error containing %q, got %v", tt.wantErr, err)

@@ -41,7 +41,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 		"audience", snowplowAudience,
 		"read-only", readOnly)
 
-	session, err := Login(ctx, clientID, auth0Domain, consoleHost)
+	session, err := Login(ctx, clientID, auth0Domain, consoleHost, false)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ type Session struct {
 	HomeOrgID   string
 }
 
-func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Session, error) {
+func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeOrgOnly bool) (*Session, error) {
 	slog.Debug("Initiating device authentication flow")
 
 	oauthConfig := &oauth2.Config{
@@ -164,11 +164,16 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string) (*Ses
 	}
 
 	var selectedOrg *console.Organization
+	home := getDefaultIndex(organizations, jwtOrgID)
 
-	if len(organizations) == 1 {
+	switch {
+	case len(organizations) == 1:
 		selectedOrg = &organizations[0]
 		green.Printf("✓ Found organization: %s\n", selectedOrg.Name)
-	} else {
+	case homeOrgOnly && home >= 0:
+		selectedOrg = &organizations[home]
+		green.Printf("✓ Using your organization: %s\n", selectedOrg.Name)
+	default:
 		selectedOrg, err = selectOrganization(organizations, jwtOrgID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to select organization: %w", err)

@@ -20,12 +20,15 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/setup"
 )
 
 type SignalsOptions struct {
 	ConsoleHost, ProjectDir string
+	// Pipeline picks the Signals environment by pipeline ID or name, for runs without a terminal.
+	Pipeline string
 }
 
 // The agent's first message names the skill rather than using a slash command,
@@ -49,7 +52,7 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 		_, _ = yellow.Println("! This project has uncommitted changes. Your agent will edit files, so consider committing first.")
 	}
 
-	session, err := setup.Login(ctx, setup.DefaultClientID, setup.DefaultAuth0Domain, opts.ConsoleHost)
+	session, err := setup.Login(ctx, setup.DefaultClientID, setup.DefaultAuth0Domain, opts.ConsoleHost, true)
 	if err != nil {
 		return err
 	}
@@ -82,7 +85,7 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.S
 	}
 	var ready []console.SignalsEnvironment
 	for _, e := range all {
-		if e.Status == "ready" && e.APIURL() != "" {
+		if isReady(e) {
 			ready = append(ready, e)
 		}
 	}
@@ -92,13 +95,21 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.S
 		return console.SignalsEnvironment{}, fmt.Errorf("no Signals environment in %s is ready yet; try again when one is ready in Console", s.Org.Name)
 	case len(ready) == 0:
 		return console.SignalsEnvironment{}, fmt.Errorf("%s has no Signals environment; set one up in Console first: %s", s.Org.Name, opts.ConsoleHost)
+	case opts.Pipeline != "":
+		e, err := environmentForPipeline(all, ready, opts.Pipeline, s.Org.Name)
+		if err != nil {
+			return console.SignalsEnvironment{}, err
+		}
+		_, _ = green.Printf("✓ Signals environment: %s\n", envLabel(e))
+		return e, nil
 	case len(ready) == 1:
 		_, _ = green.Printf("✓ Signals environment: %s\n", envLabel(ready[0]))
 		return ready[0], nil
 	}
 
 	if !interactive() {
-		return console.SignalsEnvironment{}, fmt.Errorf("%s has %d Signals environments; run this in a terminal to pick one", s.Org.Name, len(ready))
+		return console.SignalsEnvironment{}, fmt.Errorf("%s has %d Signals environments; pick one with --pipeline and its name or ID: %s",
+			s.Org.Name, len(ready), pipelineList(ready))
 	}
 	labels := make([]string, len(ready))
 	for i, e := range ready {
@@ -110,6 +121,36 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.S
 	}
 	_, _ = green.Printf("✓ Signals environment: %s\n", labels[i])
 	return ready[i], nil
+}
+
+func environmentForPipeline(all, ready []console.SignalsEnvironment, pipeline, org string) (console.SignalsEnvironment, error) {
+	var matches []console.SignalsEnvironment
+	for _, e := range all {
+		if e.Pipeline.ID == pipeline || strings.EqualFold(e.Pipeline.Name, pipeline) {
+			matches = append(matches, e)
+		}
+	}
+	switch {
+	case len(matches) == 0:
+		return console.SignalsEnvironment{}, fmt.Errorf("%s has no Signals environment for pipeline %q; use one of: %s", org, pipeline, pipelineList(ready))
+	case len(matches) > 1:
+		return console.SignalsEnvironment{}, fmt.Errorf("more than one pipeline in %s is called %q; use its ID instead: %s", org, pipeline, pipelineList(matches))
+	case !isReady(matches[0]):
+		return console.SignalsEnvironment{}, fmt.Errorf("the Signals environment for %s isn't ready yet; try again when it's ready in Console", matches[0].Pipeline.Name)
+	}
+	return matches[0], nil
+}
+
+func isReady(e console.SignalsEnvironment) bool {
+	return e.Status == "ready" && e.APIURL() != ""
+}
+
+func pipelineList(envs []console.SignalsEnvironment) string {
+	items := make([]string, len(envs))
+	for i, e := range envs {
+		items[i] = fmt.Sprintf("%s (%s)", e.Pipeline.Name, e.Pipeline.ID)
+	}
+	return strings.Join(items, ", ")
 }
 
 func envLabel(e console.SignalsEnvironment) string {
@@ -224,8 +265,7 @@ func printPrompt() {
 }
 
 func interactive() bool {
-	info, err := os.Stdin.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
+	return isatty.IsTerminal(os.Stdin.Fd())
 }
 
 func choose(question string, options []string) (int, error) {

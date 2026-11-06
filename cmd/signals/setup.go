@@ -23,12 +23,14 @@ var setupCmd = &cobra.Command{
 	Long: `Sign in once, then get this project and your coding agent ready for Snowplow Signals:
 
   - writes Signals credentials for your app to .env (a key that can read and edit Signals)
-  - installs the Snowplow plugin (skills and MCP) in Claude Code, Codex and Cursor;
-    an agent that already has the Snowplow MCP only gets the skills
+  - installs the Snowplow plugin (skills and MCP)
   - starts your agent with a prompt that walks through the Signals setup
 
-The Snowplow MCP signs in with your Snowplow account the first time your agent uses it.`,
+The Snowplow MCP signs in with your Snowplow account the first time your agent uses it.
+
+Requires Node.js 18 or later.`,
 	Example: `  $ snowplow-cli signals setup
+  $ snowplow-cli signals setup --pipeline Production
   $ npx @snowplow/snowplow-cli signals setup`,
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
@@ -42,6 +44,14 @@ The Snowplow MCP signs in with your Snowplow account the first time your agent u
 		if err != nil {
 			return err
 		}
-		return wizard.SetupSignals(cmd.Context(), wizard.SignalsOptions{ConsoleHost: host, ProjectDir: dir})
+		pipeline, err := cmd.Flags().GetString("pipeline")
+		if err != nil {
+			return err
+		}
+		return wizard.SetupSignals(cmd.Context(), wizard.SignalsOptions{ConsoleHost: host, ProjectDir: dir, Pipeline: pipeline})
 	},
+}
+
+func init() {
+	setupCmd.Flags().String("pipeline", "", "Name or ID of the pipeline whose Signals environment to use")
 }
