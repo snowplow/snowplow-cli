@@ -11,12 +11,14 @@ package release
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -914,5 +916,450 @@ func Test_Release_DryRunNothingToRelease(t *testing.T) {
 	}
 	if publishCalls.Load() != 0 {
 		t.Errorf("expected no publish calls, got %d", publishCalls.Load())
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func versionRuleLocalAndRemote(localEs model.EventSpec, remoteEs console.RemoteEventSpec) (LocalFilesRefsResolved, console.DataProductsAndRelatedResources) {
+	dp := model.DataProduct{
+		ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Data: model.DataProductData{
+			Name:                "Data Product 1",
+			EventSpecifications: []model.EventSpec{localEs},
+		},
+	}
+	local := LocalFilesRefsResolved{
+		DataProudcts: []model.DataProduct{dp},
+		IdToFileName: map[string]string{localEs.ResourceName: "/base/dp.yaml"},
+	}
+
+	remoteDp := console.RemoteDataProduct{
+		Id:                   "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Name:                 "Data Product 1",
+		SourceApplicationIds: []string{},
+		EventSpecs:           []console.EventSpecReference{{Id: remoteEs.Id}},
+	}
+	remote := console.DataProductsAndRelatedResources{
+		DataProducts: []console.RemoteDataProduct{remoteDp},
+		EventSpecs:   []console.RemoteEventSpec{remoteEs},
+	}
+	return local, remote
+}
+
+func versionRuleRemoteEs() console.RemoteEventSpec {
+	return console.RemoteEventSpec{
+		Id:                   "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		Name:                 "Checkout Started",
+		Description:          "description",
+		SourceApplicationIds: []string{},
+		Version:              3,
+		DataProductId:        "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Event: &console.EventWrapper{Event: console.Event{
+			Source: "iglu:com.example/checkout/jsonschema/1-0-0",
+			Schema: map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": int64(10)}}},
+		}},
+		Entities: console.Entities{
+			Tracked: []console.Entity{{
+				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
+				MinCardinality: intPtr(0),
+				MaxCardinality: intPtr(1),
+			}},
+			Enriched: []console.Entity{},
+		},
+	}
+}
+
+func versionRuleLocalEs() model.EventSpec {
+	return model.EventSpec{
+		ResourceName: "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		Name:         "Checkout Started",
+		Description:  "description",
+		Event: model.SchemaRef{
+			Source: "iglu:com.example/checkout/jsonschema/1-0-0",
+			Schema: map[string]any{"properties": map[string]any{"a": map[string]any{"maxLength": 10}}, "type": "object"},
+		},
+		Entities: model.EntitiesDef{
+			Tracked: []model.SchemaRef{{
+				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
+				MinCardinality: intPtr(0),
+				MaxCardinality: intPtr(1),
+			}},
+		},
+	}
+}
+
+func Test_findChanges_VersionRule(t *testing.T) {
+	tests := []struct {
+		name         string
+		changeLocal  func(es *model.EventSpec)
+		changeRemote func(es *console.RemoteEventSpec)
+		wantUpdate   bool
+		wantExpected int
+		wantChanged  []string
+	}{
+		{
+			name:         "unchanged keeps the version",
+			wantUpdate:   false,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "description change keeps the version",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name: "trigger change keeps the version",
+			changeLocal: func(es *model.EventSpec) {
+				es.Triggers = []model.Trigger{{Id: "a29e6ba7-769a-4919-b9a3-e6bb7bd97d67", Description: "new"}}
+			},
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "name change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Name = "Checkout Begun" },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"name"},
+		},
+		{
+			name:         "event source change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Event.Source = "iglu:com.example/checkout/jsonschema/1-0-1" },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name: "event schema change adds one",
+			changeLocal: func(es *model.EventSpec) {
+				es.Event.Schema = map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": 11}}}
+			},
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name:         "entity cardinality change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name: "name, event and entities change adds one",
+			changeLocal: func(es *model.EventSpec) {
+				es.Name = "Checkout Begun"
+				es.Event.Source = "iglu:com.example/checkout/jsonschema/1-0-1"
+				es.Entities.Enriched = []model.SchemaRef{{Source: "iglu:com.example/geo/jsonschema/1-0-0"}}
+			},
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"name", "event", "entities"},
+		},
+		{
+			name:         "remote entity comment alone sends nothing and keeps the version",
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   false,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "remote entity comment is dropped by an update and adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name:         "missing min cardinality is sent as null and treated as 0",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MinCardinality = nil },
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "absent remote entities list differs from the empty list the cli sends",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Enriched = nil },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name:         "remote empty event schema differs from the absent schema the cli sends",
+			changeLocal:  func(es *model.EventSpec) { es.Event.Schema = nil; es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Event.Schema = map[string]any{} },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name:         "removing the event adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Event = model.SchemaRef{} },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localEs := versionRuleLocalEs()
+			if tt.changeLocal != nil {
+				tt.changeLocal(&localEs)
+			}
+			localEs.Version = intPtr(99)
+			remoteEs := versionRuleRemoteEs()
+			if tt.changeRemote != nil {
+				tt.changeRemote(&remoteEs)
+			}
+			local, remote := versionRuleLocalAndRemote(localEs, remoteEs)
+
+			changes, err := findChanges(local, remote, map[string]string{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotUpdate := len(changes.esUpdate) == 1; gotUpdate != tt.wantUpdate {
+				t.Errorf("update sent = %v, want %v", gotUpdate, tt.wantUpdate)
+			}
+			if len(changes.VersionMismatches) != 1 {
+				t.Fatalf("expected 1 version mismatch, got %+v", changes.VersionMismatches)
+			}
+			want := EventSpecVersionMismatch{
+				FileName: "/base/dp.yaml",
+				Index:    0,
+				Name:     localEs.Name,
+				Declared: 99,
+				Expected: tt.wantExpected,
+				IsNew:    false,
+				Changed:  tt.wantChanged,
+			}
+			if diff := cmp.Diff(want, changes.VersionMismatches[0]); diff != "" {
+				t.Errorf("version mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_findChanges_VersionMatchesNoMismatch(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Name = "Checkout Begun"
+	localEs.Version = intPtr(4)
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+	if v := changes.declaredVersion(localEs.ResourceName); v == nil || *v != 4 {
+		t.Errorf("expected declared version 4, got %v", v)
+	}
+}
+
+func Test_findChanges_NewEventSpecExpectsZero(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Version = intPtr(0)
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+	remote.EventSpecs = []console.RemoteEventSpec{}
+	remote.DataProducts[0].EventSpecs = nil
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esCreate) != 1 {
+		t.Fatalf("expected 1 event spec create, got %d", len(changes.esCreate))
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+
+	localEs.Version = intPtr(1)
+	local, _ = versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+	changes, err = findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []EventSpecVersionMismatch{{
+		FileName: "/base/dp.yaml",
+		Index:    0,
+		Name:     localEs.Name,
+		Declared: 1,
+		Expected: 0,
+		IsNew:    true,
+		Changed:  []string{},
+	}}
+	if diff := cmp.Diff(want, changes.VersionMismatches); diff != "" {
+		t.Errorf("version mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func Test_findChanges_NoVersionDeclared(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Name = "Checkout Begun"
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esUpdate) != 1 {
+		t.Errorf("expected 1 event spec update, got %d", len(changes.esUpdate))
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+	if v := changes.declaredVersion(localEs.ResourceName); v != nil {
+		t.Errorf("expected no declared version, got %d", *v)
+	}
+}
+
+func newEventSpecWriteServer(t *testing.T, bodies map[string]map[string]any) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("unexpected body: %v", err)
+		}
+		bodies[r.Method+" "+r.URL.Path] = body
+		switch {
+		case r.URL.Path == "/event-specs/v1" && r.Method == "POST":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{}`)
+		case strings.HasPrefix(r.URL.Path, "/event-specs/v1/") && r.Method == "PUT":
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func Test_ApplyDpChanges_UpdateExpectedVersionOnlyWhenDeclared(t *testing.T) {
+	bodies := map[string]map[string]any{}
+	server := newEventSpecWriteServer(t, bodies)
+	defer server.Close()
+	client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+	changes := DataProductChangeSet{
+		esUpdate:         []console.RemoteEventSpec{{Id: "es-update-declared", Name: "c"}, {Id: "es-update", Name: "d"}},
+		declaredVersions: map[string]int{"es-update-declared": 4},
+	}
+
+	err := ApplyDpChanges(changes, context.Background(), client)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if v, ok := bodies["PUT /event-specs/v1/es-update-declared"]["expectedVersion"]; !ok || v != float64(4) {
+		t.Errorf("update with a declared version should send expectedVersion 4, got %v", bodies["PUT /event-specs/v1/es-update-declared"])
+	}
+	if _, ok := bodies["PUT /event-specs/v1/es-update"]["expectedVersion"]; ok {
+		t.Errorf("update without a declared version should not send expectedVersion, got %v", bodies["PUT /event-specs/v1/es-update"])
+	}
+}
+
+func Test_ApplyDpChanges_CreateExpectedVersionOnlyWhenDeclared(t *testing.T) {
+	for _, tt := range []struct {
+		id       string
+		declared map[string]int
+		want     any
+		wantSent bool
+	}{
+		{id: "es-create-declared", declared: map[string]int{"es-create-declared": 0}, want: float64(0), wantSent: true},
+		{id: "es-create", declared: map[string]int{}, wantSent: false},
+	} {
+		t.Run(tt.id, func(t *testing.T) {
+			bodies := map[string]map[string]any{}
+			server := newEventSpecWriteServer(t, bodies)
+			defer server.Close()
+			client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+			changes := DataProductChangeSet{
+				esCreate:         []console.RemoteEventSpec{{Id: tt.id, Name: "a"}},
+				declaredVersions: tt.declared,
+			}
+			err := ApplyDpChanges(changes, context.Background(), client)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			v, ok := bodies["POST /event-specs/v1"]["expectedVersion"]
+			if ok != tt.wantSent || (tt.wantSent && v != tt.want) {
+				t.Errorf("expectedVersion sent = %v (%v), want %v (%v)", ok, v, tt.wantSent, tt.want)
+			}
+		})
+	}
+}
+
+func Test_Release_ExpectedVersionsOnlyForDeclared(t *testing.T) {
+	eventSpecsJSON := `[
+		{"id": "es-1", "status": "draft", "name": "ES 1", "version": 2, "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+		{"id": "es-2", "status": "draft", "name": "ES 2", "version": 5, "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}
+	]`
+
+	for _, tt := range []struct {
+		name     string
+		declared map[string]int
+		wantBody string
+	}{
+		{
+			name:     "no declared versions",
+			declared: nil,
+			wantBody: `{"eventSpecIds":["es-1","es-2"]}`,
+		},
+		{
+			name:     "one declared version",
+			declared: map[string]int{"es-2": 5, "es-not-released": 1},
+			wantBody: `{"eventSpecIds":["es-1","es-2"],"expectedVersions":[{"id":"es-2","version":5}]}`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var publishBody string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/data-products/v2" && r.Method == "GET":
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, fmt.Sprintf(`{"data": [], "includes": {"eventSpecs": %s}}`, eventSpecsJSON))
+				case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, `{"data": []}`)
+				case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+					b, _ := io.ReadAll(r.Body)
+					publishBody = string(b)
+					w.WriteHeader(http.StatusAccepted)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+			client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+			changeSet := &DataProductChangeSet{
+				IdToFileName:      map[string]string{},
+				localEventSpecIds: []string{"es-1", "es-2"},
+				declaredVersions:  tt.declared,
+			}
+
+			err := Release(context.Background(), client, changeSet, false)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if publishBody != tt.wantBody {
+				t.Errorf("publish body = %s, want %s", publishBody, tt.wantBody)
+			}
+		})
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/release"
 )
 
 type DPLookup struct {
@@ -273,6 +274,31 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 	}
 
 	return nil
+}
+
+func (lookup *DPLookup) AddVersionMismatches(versionMismatches []release.EventSpecVersionMismatch) {
+	for _, m := range versionMismatches {
+		path := fmt.Sprintf("/data/eventSpecifications/%d", m.Index)
+
+		summary := fmt.Sprintf("%s: version %d does not match", m.Name, m.Declared)
+		if !m.IsNew && len(m.Changed) > 0 && m.Expected > m.Declared {
+			summary = fmt.Sprintf("%s: version %d needs a bump", m.Name, m.Declared)
+		}
+		messages := []string{summary}
+		if m.IsNew {
+			messages = append(messages, "new event specification")
+		} else if len(m.Changed) > 0 {
+			messages = append(messages, fmt.Sprintf("changed: %s", strings.Join(m.Changed, ", ")))
+		}
+		messages = append(messages,
+			fmt.Sprintf("expected version: %d", m.Expected),
+			"run `snowplow-cli dp validate --fix` to update it",
+		)
+
+		v := lookup.Validations[m.FileName]
+		v.concat(DPValidations{ErrorsWithPaths: map[string][]string{path: messages}})
+		lookup.Validations[m.FileName] = v
+	}
 }
 
 func (lookup *DPLookup) ValidationErrorCount() int {

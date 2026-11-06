@@ -266,3 +266,120 @@ func Test_AddJson_Existing(t *testing.T) {
 		t.Fatalf("Result of adding the event specs is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
 	}
 }
+
+func Test_SetEventSpecVersionsYaml(t *testing.T) {
+	original := `# yaml-language-server: $schema=https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/data-product.json
+
+apiVersion: v1 # comment before
+resourceType: data-product
+resourceName: 3b7c9fce-9f33-4c91-800b-8c8804f388c9
+data:
+  name: xxx3
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: test1
+      version: 3 # keep me
+      entities: {tracked: [], enriched: []}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: test2
+      version: 0
+    - {resourceName: 4ac70141-c223-4172-ab39-86a0194e44e8, name: test3, version: 9}
+#comment after
+`
+	expected := `# yaml-language-server: $schema=https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/data-product.json
+
+apiVersion: v1 # comment before
+resourceType: data-product
+resourceName: 3b7c9fce-9f33-4c91-800b-8c8804f388c9
+data:
+  name: xxx3
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: test1
+      version: 4 # keep me
+      entities: {tracked: [], enriched: []}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: test2
+      version: 0
+    - {resourceName: 4ac70141-c223-4172-ab39-86a0194e44e8, name: test3, version: 10}
+#comment after
+`
+
+	res, err := SetEventSpecVersions(map[int]int{0: 4, 2: 10}, []byte(original), "test.yaml")
+	if err != nil {
+		t.Fatalf("Can't set event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of setting the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
+func Test_SetEventSpecVersionsJson(t *testing.T) {
+	original := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "3b7c9fce-9f33-4c91-800b-8c8804f388c9",
+  "data": {
+    "name": "xxx3",
+    "eventSpecifications": [
+      {
+        "resourceName": "15c70141-c223-4172-ab39-86a0194e44e8",
+        "name": "test1",
+        "version": 3
+      },
+      {
+        "resourceName": "c312c1cc-af41-450f-a086-1c2e8c04a39b",
+        "name": "test2",
+        "version": 0
+      }
+    ]
+  }
+}
+`
+	expected := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "3b7c9fce-9f33-4c91-800b-8c8804f388c9",
+  "data": {
+    "name": "xxx3",
+    "eventSpecifications": [
+      {
+        "resourceName": "15c70141-c223-4172-ab39-86a0194e44e8",
+        "name": "test1",
+        "version": 3
+      },
+      {
+        "resourceName": "c312c1cc-af41-450f-a086-1c2e8c04a39b",
+        "name": "test2",
+        "version": 12
+      }
+    ]
+  }
+}
+`
+
+	res, err := SetEventSpecVersions(map[int]int{1: 12}, []byte(original), "test.json")
+	if err != nil {
+		t.Fatalf("Can't set event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of setting the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
+func Test_SetEventSpecVersionsYamlMissingVersion(t *testing.T) {
+	original := `apiVersion: v1
+resourceType: data-product
+data:
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: test1
+`
+
+	_, err := SetEventSpecVersions(map[int]int{0: 1}, []byte(original), "test.yaml")
+	if err == nil {
+		t.Fatal("expected an error for an event spec without a version")
+	}
+}

@@ -53,6 +53,25 @@ type DataProductChangeSet struct {
 	imageCreate       []TriggerImageReference
 	IdToFileName      map[string]string
 	localEventSpecIds []string
+	declaredVersions  map[string]int
+	VersionMismatches []EventSpecVersionMismatch
+}
+
+type EventSpecVersionMismatch struct {
+	FileName string
+	Index    int
+	Name     string
+	Declared int
+	Expected int
+	IsNew    bool
+	Changed  []string
+}
+
+func (cs DataProductChangeSet) declaredVersion(id string) *int {
+	if v, ok := cs.declaredVersions[id]; ok {
+		return &v
+	}
+	return nil
 }
 
 func (cs DataProductChangeSet) isEmpty() bool {
@@ -217,6 +236,8 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 	var esDelete []console.RemoteEventSpec
 
 	esLocalIds := make(map[string]bool)
+	declaredVersions := make(map[string]int)
+	var versionMismatches []EventSpecVersionMismatch
 
 	var imageCreate []TriggerImageReference
 
@@ -237,9 +258,12 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			dpSaIds = append(dpSaIds, sa["id"])
 		}
 
-		for _, localEs := range localDp.Data.EventSpecifications {
+		for esIdx, localEs := range localDp.Data.EventSpecifications {
 			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
+			expectedVersion := 0
+			changedFields := []string{}
 			if remoteExists {
+				expectedVersion = remoteEs.Version
 				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
 				updateDiff, err := esToDiff(possibleUpdate)
 				if err != nil {
@@ -254,6 +278,13 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 				// assign remote variant urls to update where image hashes are the same
 				possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
 				if !reflect.DeepEqual(*remoteDiff, *updateDiff) || triggerChangeset.isChanged {
+					changedFields, err = changedStructuralFields(remoteEs, possibleUpdate)
+					if err != nil {
+						return nil, err
+					}
+					if len(changedFields) > 0 {
+						expectedVersion = remoteEs.Version + 1
+					}
 					esUpdate = append(esUpdate, possibleUpdate)
 					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 					imageCreate = append(imageCreate, triggerChangeset.imagesToUpload...)
@@ -272,6 +303,21 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			}
 
 			esLocalIds[localEs.ResourceName] = true
+
+			if localEs.Version != nil {
+				declaredVersions[localEs.ResourceName] = *localEs.Version
+				if *localEs.Version != expectedVersion {
+					versionMismatches = append(versionMismatches, EventSpecVersionMismatch{
+						FileName: local.IdToFileName[localEs.ResourceName],
+						Index:    esIdx,
+						Name:     localEs.Name,
+						Declared: *localEs.Version,
+						Expected: expectedVersion,
+						IsNew:    !remoteExists,
+						Changed:  changedFields,
+					})
+				}
+			}
 		}
 
 		for _, remoteEsId := range remoteDp.EventSpecs {
@@ -301,6 +347,8 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		imageCreate:       imageCreate,
 		IdToFileName:      idToFileName,
 		localEventSpecIds: localEsIds,
+		declaredVersions:  declaredVersions,
+		VersionMismatches: versionMismatches,
 	}, nil
 }
 
@@ -411,7 +459,7 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 		}
 	}
 	for _, esC := range changes.esCreate {
-		err := console.CreateEventSpec(cnx, client, esC)
+		err := console.CreateEventSpec(cnx, client, esC, changes.declaredVersion(esC.Id))
 		if err != nil {
 			return err
 		}
@@ -425,7 +473,7 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 		}
 	}
 	for _, esU := range changes.esUpdate {
-		err := console.UpdateEventSpec(cnx, client, esU)
+		err := console.UpdateEventSpec(cnx, client, esU, changes.declaredVersion(esU.Id))
 		if err != nil {
 			return err
 		}
@@ -627,10 +675,14 @@ func Release(cnx context.Context, client *console.ApiClient, changeSet *DataProd
 
 		if !dryRun {
 			ids := make([]string, len(toRelease))
+			var expectedVersions []console.EventSpecVersionRef
 			for i, es := range toRelease {
 				ids[i] = es.Id
+				if v := changeSet.declaredVersion(es.Id); v != nil {
+					expectedVersions = append(expectedVersions, console.EventSpecVersionRef{Id: es.Id, Version: *v})
+				}
 			}
-			err = console.BatchPublishEventSpecs(cnx, client, ids)
+			err = console.BatchPublishEventSpecs(cnx, client, ids, expectedVersions)
 			if err != nil {
 				return err
 			}

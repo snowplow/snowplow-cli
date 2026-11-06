@@ -13,6 +13,7 @@ package validation
 import (
 	"context"
 
+	"github.com/snowplow/snowplow-cli/internal/amend"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/release"
@@ -28,16 +29,17 @@ func ValidateDataProductsFromCmd(ctx context.Context, cmd *cobra.Command, paths 
 	ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 	full, _ := cmd.Flags().GetBool("full")
 	concurrentReq, _ := cmd.Flags().GetInt("concurrency")
+	fix, _ := cmd.Flags().GetBool("fix")
 
 	c, err := console.NewApiClient(ctx, host, apiKeyId, apiKeySecret, org)
 	if err != nil {
 		return err
 	}
 
-	return ValidateDataProductsWithClient(ctx, c, paths, basePath, ghOut, full, concurrentReq)
+	return ValidateDataProductsWithClient(ctx, c, paths, basePath, ghOut, full, concurrentReq, fix)
 }
 
-func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClient, paths []string, basePath string, ghOut bool, full bool, concurrentReq int) error {
+func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClient, paths []string, basePath string, ghOut bool, full bool, concurrentReq int, fix bool) error {
 	logger := logging.LoggerFromContext(ctx)
 
 	searchPaths := paths
@@ -62,5 +64,39 @@ func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClie
 		return err
 	}
 
-	return Validate(ctx, client, files, searchPaths, basePath, ghOut, full, changes.IdToFileName, concurrentReq)
+	versionMismatches := changes.VersionMismatches
+	if fix {
+		err = fixEventSpecVersions(ctx, versionMismatches)
+		if err != nil {
+			return err
+		}
+		versionMismatches = nil
+	}
+
+	return Validate(ctx, client, files, searchPaths, basePath, ghOut, full, changes.IdToFileName, versionMismatches, concurrentReq)
+}
+
+func fixEventSpecVersions(ctx context.Context, versionMismatches []release.EventSpecVersionMismatch) error {
+	logger := logging.LoggerFromContext(ctx)
+
+	versionsByFile := map[string]map[int]int{}
+	for _, m := range versionMismatches {
+		if versionsByFile[m.FileName] == nil {
+			versionsByFile[m.FileName] = map[int]int{}
+		}
+		versionsByFile[m.FileName][m.Index] = m.Expected
+	}
+
+	for f, versions := range versionsByFile {
+		err := amend.SetEventSpecVersionsInFile(versions, f)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, m := range versionMismatches {
+		logger.Info("validation", "msg", "updated event specification version", "file", m.FileName, "name", m.Name, "from", m.Declared, "to", m.Expected)
+	}
+
+	return nil
 }

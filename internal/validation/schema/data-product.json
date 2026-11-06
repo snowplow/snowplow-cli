@@ -156,6 +156,11 @@
                 "type": "string",
                 "minLength": 1
               },
+              "version": {
+                "description": "The version Snowplow Console assigns to this event specification. A new event specification starts at 0, and a change to its name, event or entities adds one. `snowplow-cli dp validate` checks it and `snowplow-cli dp validate --fix` updates it.",
+                "type": "integer",
+                "minimum": 0
+              },
               "description": {
                 "description": "A description of this event specification so that others are able to better understand how to use it.",
                 "type": "string",

@@ -11,7 +11,11 @@
 package validation
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
+
+	"github.com/snowplow/snowplow-cli/internal/release"
 )
 
 func Test_DPLookup_RelativePaths(t *testing.T) {
@@ -162,5 +166,45 @@ func Test_DPLookup_Ignored(t *testing.T) {
 
 	if len(v.Debug) != 1 {
 		t.Fatal("no debug?")
+	}
+}
+
+func Test_DPLookup_AddVersionMismatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		mismatch release.EventSpecVersionMismatch
+		want     []string
+	}{
+		{
+			name:     "structural change",
+			mismatch: release.EventSpecVersionMismatch{FileName: "/base/dp.yml", Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4, Changed: []string{"event", "entities"}},
+			want:     []string{"Checkout Started: version 3 needs a bump", "changed: event, entities", "expected version: 4", "run `snowplow-cli dp validate --fix` to update it"},
+		},
+		{
+			name:     "stale version without a change",
+			mismatch: release.EventSpecVersionMismatch{FileName: "/base/dp.yml", Index: 1, Name: "Checkout Started", Declared: 2, Expected: 3, Changed: []string{}},
+			want:     []string{"Checkout Started: version 2 does not match", "expected version: 3", "run `snowplow-cli dp validate --fix` to update it"},
+		},
+		{
+			name:     "new event specification",
+			mismatch: release.EventSpecVersionMismatch{FileName: "/base/dp.yml", Index: 2, Name: "Checkout Started", Declared: 1, Expected: 0, IsNew: true, Changed: []string{}},
+			want:     []string{"Checkout Started: version 1 does not match", "new event specification", "expected version: 0", "run `snowplow-cli dp validate --fix` to update it"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lookup := &DPLookup{Validations: map[string]DPValidations{}}
+			lookup.AddVersionMismatches([]release.EventSpecVersionMismatch{tt.mismatch})
+
+			path := fmt.Sprintf("/data/eventSpecifications/%d", tt.mismatch.Index)
+			got := lookup.Validations["/base/dp.yml"].ErrorsWithPaths[path]
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got: %q want: %q", got, tt.want)
+			}
+			if lookup.ValidationErrorCount() != 1 {
+				t.Errorf("expected 1 error, got %d", lookup.ValidationErrorCount())
+			}
+		})
 	}
 }
