@@ -520,7 +520,7 @@ func TestValidateDataProductsWithClient_DownloadThenValidate(t *testing.T) {
 			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 
 			files := util.Files{DataProductsLocation: tmpDir, SourceAppsLocation: "source-apps", ExtentionPreference: ext, ImagesLocation: "images"}
-			err := download.DownloadDataProductsAndRelatedResources(files, ctx, mockClient, false)
+			err := download.DownloadDataProductsAndRelatedResources(files, ctx, mockClient, false, true)
 			if err != nil {
 				t.Fatalf("download failed: %v", err)
 			}
@@ -626,6 +626,8 @@ func gitInTest(t *testing.T, dir string, args ...string) {
 
 func setupBaseRepo(t *testing.T) (string, string) {
 	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 	repo := t.TempDir()
 	tracking := filepath.Join(repo, "tracking")
 	if err := os.MkdirAll(tracking, 0755); err != nil {
@@ -823,5 +825,154 @@ func TestSyncWorkflow_StoppedByVersionMismatchBeforeWriting(t *testing.T) {
 	}
 	if len(transport.writes) != 0 {
 		t.Errorf("Expected nothing written before the validation step fails, got: %v", transport.writes)
+	}
+}
+
+func downloadInTest(t *testing.T, dir string, ext string, withVersions bool) string {
+	t.Helper()
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+	files := util.Files{DataProductsLocation: dir, SourceAppsLocation: "source-apps", ExtentionPreference: ext, ImagesLocation: "images"}
+	if err := download.DownloadDataProductsAndRelatedResources(files, ctx, mockClient, false, withVersions); err != nil {
+		t.Fatalf("download failed: %v", err)
+	}
+	written, err := os.ReadFile(filepath.Join(dir, "checkout."+ext))
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	return string(written)
+}
+
+func TestDownload_DefaultMatchesOutputBeforeVersions(t *testing.T) {
+	for _, ext := range []string{"yaml", "json"} {
+		t.Run(ext, func(t *testing.T) {
+			before, err := os.ReadFile(filepath.Join("..", "testdata", "validation", "download-before-versions."+ext))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			written := downloadInTest(t, t.TempDir(), ext, false)
+
+			if written != string(before) {
+				t.Errorf("default download should write what it wrote before versions existed\nwant:\n%s\ngot:\n%s", before, written)
+			}
+		})
+	}
+}
+
+func TestDownload_KeepsVersionsOnlyWhenOptedIn(t *testing.T) {
+	tests := []struct {
+		name         string
+		existing     string
+		withVersions bool
+		wantVersion  bool
+	}{
+		{name: "flag writes versions", withVersions: true, wantVersion: true},
+		{name: "existing file with versions keeps them", existing: fmt.Sprintf(baseDataProduct, 1, "1-0-0"), wantVersion: true},
+		{name: "existing file without versions writes none", existing: strings.Replace(fmt.Sprintf(baseDataProduct, 1, "1-0-0"), "      version: 1\n", "", 1), wantVersion: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			if tt.existing != "" {
+				if err := os.WriteFile(filepath.Join(tmpDir, "checkout.yaml"), []byte(tt.existing), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			written := downloadInTest(t, tmpDir, "yaml", tt.withVersions)
+
+			if got := strings.Contains(written, "version: 3"); got != tt.wantVersion {
+				t.Errorf("version written = %v, want %v, got:\n%s", got, tt.wantVersion, written)
+			}
+			if !tt.wantVersion && strings.Contains(written, "version:") {
+				t.Errorf("no version should be written, got:\n%s", written)
+			}
+		})
+	}
+}
+
+func TestValidateDataProductsAgainstBase_FindsSpecsAcrossBaseFiles(t *testing.T) {
+	newSpec := `    - resourceName: d77f712e-ee43-4e10-8b36-48a0f6f2e630
+      name: Checkout Abandoned
+      version: %d
+`
+	emptyDataProduct := `apiVersion: v1
+resourceType: data-product
+resourceName: ec68917a-3bcb-4640-a165-483de5fc033d
+data:
+  name: other
+  sourceApplications: []
+  eventSpecifications: []
+`
+
+	tests := []struct {
+		name    string
+		arrange func(t *testing.T, tracking string, dpFile string)
+		wantErr bool
+	}{
+		{
+			name: "renamed file keeps its versions",
+			arrange: func(t *testing.T, tracking string, dpFile string) {
+				if err := os.Rename(dpFile, filepath.Join(tracking, "renamed.yaml")); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "file moved to another directory keeps its versions",
+			arrange: func(t *testing.T, tracking string, dpFile string) {
+				if err := os.MkdirAll(filepath.Join(tracking, "nested"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(dpFile, filepath.Join(tracking, "nested", "checkout.yaml")); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "spec moved to another data product file keeps its version",
+			arrange: func(t *testing.T, tracking string, dpFile string) {
+				moved := strings.Replace(fmt.Sprintf(baseDataProduct, 3, "1-0-0"), "dbc68917-3bcb-4640-a165-483de5fc033c", "fd68917a-3bcb-4640-a165-483de5fc033e", 1)
+				if err := os.WriteFile(filepath.Join(tracking, "moved.yaml"), []byte(moved), 0644); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(dpFile, []byte(emptyDataProduct), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "truly new spec at 0 passes",
+			arrange: func(t *testing.T, tracking string, dpFile string) {
+				if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")+fmt.Sprintf(newSpec, 0)), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "truly new spec not at 0 fails",
+			arrange: func(t *testing.T, tracking string, dpFile string) {
+				if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")+fmt.Sprintf(newSpec, 1)), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tracking, dpFile := setupBaseRepo(t)
+			tt.arrange(t, tracking, dpFile)
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+			err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, want error %v", err, tt.wantErr)
+			}
+		})
 	}
 }

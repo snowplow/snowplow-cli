@@ -14,7 +14,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/spf13/pflag"
 )
 
 func gitInTest(t *testing.T, dir string, args ...string) {
@@ -26,7 +29,37 @@ func gitInTest(t *testing.T, dir string, args ...string) {
 	}
 }
 
+func isolateCommandInTest(t *testing.T, args ...string) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	for _, name := range []string{"SNOWPLOW_CONSOLE_API_KEY_ID", "SNOWPLOW_CONSOLE_API_KEY", "SNOWPLOW_CONSOLE_ORG_ID", "SNOWPLOW_CONSOLE_HOST"} {
+		t.Setenv(name, "")
+	}
+
+	t.Cleanup(func() {
+		RootCmd.SetArgs(nil)
+		found, _, err := RootCmd.Find(args)
+		if err != nil {
+			return
+		}
+		found.SilenceErrors = false
+		found.SilenceUsage = false
+		for c := found; c != nil; c = c.Parent() {
+			for _, fs := range []*pflag.FlagSet{c.Flags(), c.PersistentFlags()} {
+				fs.VisitAll(func(f *pflag.Flag) {
+					_ = f.Value.Set(f.DefValue)
+					f.Changed = false
+				})
+			}
+		}
+	})
+}
+
 func Test_ValidateBaseRefNeedsNoCredentials(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate")
 	repo := t.TempDir()
 	tracking := filepath.Join(repo, "tracking")
 	if err := os.MkdirAll(tracking, 0755); err != nil {
@@ -49,15 +82,26 @@ data:
 	gitInTest(t, repo, "init", "-q", "-b", "main")
 	gitInTest(t, repo, "commit", "-q", "--allow-empty", "-m", "base")
 
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	for _, name := range []string{"SNOWPLOW_CONSOLE_API_KEY_ID", "SNOWPLOW_CONSOLE_API_KEY", "SNOWPLOW_CONSOLE_ORG_ID", "SNOWPLOW_CONSOLE_HOST"} {
-		t.Setenv(name, "")
-	}
 	t.Chdir(tracking)
 
 	RootCmd.SetArgs([]string{"dp", "validate", "--base-ref", "main", "--host", "http://127.0.0.1:1", "."})
 	if err := RootCmd.Execute(); err != nil {
 		t.Fatalf("expected validate --base-ref to run without credentials, got: %v", err)
+	}
+}
+
+func Test_ValidateWithoutBaseRefStillNeedsCredentials(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate")
+	t.Chdir(t.TempDir())
+
+	RootCmd.SetArgs([]string{"dp", "validate", "."})
+	err := RootCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "not set") {
+		t.Fatalf("expected a missing configuration error, got: %v", err)
+	}
+
+	found, _, _ := RootCmd.Find([]string{"dp", "validate"})
+	if !found.SilenceUsage || !found.SilenceErrors {
+		t.Errorf("the configuration failure should be reported once by the logger, without usage")
 	}
 }

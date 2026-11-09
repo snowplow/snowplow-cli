@@ -11,11 +11,19 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package util
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func isolateGitInTest(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+}
 
 func gitInTest(t *testing.T, dir string, args ...string) {
 	t.Helper()
@@ -37,6 +45,7 @@ func writeInTest(t *testing.T, path string, content string) {
 }
 
 func Test_MaybeResourcesAtMergeBase(t *testing.T) {
+	isolateGitInTest(t)
 	repo := t.TempDir()
 	gitInTest(t, repo, "init", "-q", "-b", "main")
 	dpFile := filepath.Join(repo, "tracking", "dp.yaml")
@@ -51,26 +60,32 @@ func Test_MaybeResourcesAtMergeBase(t *testing.T) {
 	gitInTest(t, repo, "checkout", "-q", "feature")
 
 	writeInTest(t, dpFile, "resourceType: data-product\ndata:\n  name: local\n")
-	newFile := filepath.Join(repo, "tracking", "new.json")
-	writeInTest(t, newFile, `{"resourceType": "data-product"}`)
+	writeInTest(t, filepath.Join(repo, "tracking", "new.json"), `{"resourceType": "data-product"}`)
 	gitInTest(t, repo, "add", ".")
 	gitInTest(t, repo, "commit", "-q", "-m", "feature work")
 
-	res, err := MaybeResourcesAtMergeBase(filepath.Join(repo, "tracking"), "main", []string{dpFile, newFile})
+	t.Chdir(filepath.Join(repo, "tracking"))
+	res, err := MaybeResourcesAtMergeBase(context.Background(), ".", "main", []string{"."})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	data, _ := res[dpFile]["data"].(map[string]any)
-	if data["name"] != "at base" {
-		t.Errorf("expected the file at the merge base, got: %v", res[dpFile])
+	realRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := res[newFile]; ok {
-		t.Errorf("a file absent at base should be left out, got: %v", res[newFile])
+	baseDpFile := filepath.Join(realRepo, "tracking", "dp.yaml")
+	data, _ := res[baseDpFile]["data"].(map[string]any)
+	if data["name"] != "at base" {
+		t.Errorf("expected the file at the merge base, got: %v", res)
+	}
+	if len(res) != 1 {
+		t.Errorf("a file absent at base should be left out, got: %v", res)
 	}
 }
 
 func Test_MaybeResourcesAtMergeBase_InvalidRef(t *testing.T) {
+	isolateGitInTest(t)
 	repo := t.TempDir()
 	gitInTest(t, repo, "init", "-q", "-b", "main")
 	writeInTest(t, filepath.Join(repo, "dp.yaml"), "resourceType: data-product\n")
@@ -78,19 +93,29 @@ func Test_MaybeResourcesAtMergeBase_InvalidRef(t *testing.T) {
 	gitInTest(t, repo, "commit", "-q", "-m", "base")
 
 	for _, ref := range []string{"origin/does-not-exist", "--all"} {
-		_, err := MaybeResourcesAtMergeBase(repo, ref, []string{filepath.Join(repo, "dp.yaml")})
+		_, err := MaybeResourcesAtMergeBase(context.Background(), repo, ref, []string{repo})
 		if err == nil {
 			t.Errorf("expected an error for ref %s", ref)
 		}
 	}
 }
 
+func Test_MaybeResourcesAtMergeBase_MissingGit(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	_, err := MaybeResourcesAtMergeBase(context.Background(), t.TempDir(), "main", []string{"."})
+	if err == nil || !strings.Contains(err.Error(), "executable file not found") {
+		t.Errorf("expected the missing git binary in the error, got: %v", err)
+	}
+}
+
 func Test_MaybeResourcesAtMergeBase_NotARepo(t *testing.T) {
+	isolateGitInTest(t)
 	dir := t.TempDir()
 	writeInTest(t, filepath.Join(dir, "dp.yaml"), "resourceType: data-product\n")
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
 
-	_, err := MaybeResourcesAtMergeBase(dir, "main", []string{filepath.Join(dir, "dp.yaml")})
+	_, err := MaybeResourcesAtMergeBase(context.Background(), dir, "main", []string{dir})
 	if err == nil {
 		t.Error("expected an error outside a git repository")
 	}

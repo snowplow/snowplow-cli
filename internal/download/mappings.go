@@ -116,12 +116,10 @@ func remoteEsToLocal(remoteEs console.RemoteEventSpec, saIdToRef map[string]mode
 	}
 
 	entities := model.EntitiesDef{Tracked: trackedEntities, Enriched: enrichedEntities}
-	version := remoteEs.Version
 	return model.EventSpecCanonical{
 		ResourceName:               remoteEs.Id,
 		ExcludedSourceApplications: excludedSourceApps,
 		Name:                       remoteEs.Name,
-		Version:                    &version,
 		Description:                remoteEs.Description,
 		Event:                      &event,
 		Entities:                   entities,
@@ -177,7 +175,7 @@ func groupRemoteEsById(remoteEss []console.RemoteEventSpec) map[string]console.R
 	return esIdToRes
 }
 
-func remoteDpsToLocalResources(remoteDps []console.RemoteDataProduct, saIdToRef map[string]model.Ref, esIdToRes map[string]console.RemoteEventSpec, triggerIdsToImagePath map[string]string) []model.CliResource[model.DataProductCanonicalData] {
+func remoteDpsToLocalResources(remoteDps []console.RemoteDataProduct, saIdToRef map[string]model.Ref, esIdToRes map[string]console.RemoteEventSpec, triggerIdsToImagePath map[string]string, versionedDpIds map[string]bool) []model.CliResource[model.DataProductCanonicalData] {
 	var dps []model.CliResource[model.DataProductCanonicalData]
 	for _, dp := range remoteDps {
 		model := model.CliResource[model.DataProductCanonicalData]{
@@ -186,9 +184,35 @@ func remoteDpsToLocalResources(remoteDps []console.RemoteDataProduct, saIdToRef 
 			ResourceName: dp.Id,
 			Data:         remoteDpToLocal(dp, saIdToRef, esIdToRes, triggerIdsToImagePath),
 		}
+		if versionedDpIds[dp.Id] {
+			for i, es := range model.Data.EventSpecifications {
+				version := esIdToRes[es.ResourceName].Version
+				model.Data.EventSpecifications[i].Version = &version
+			}
+		}
 		dps = append(dps, model)
 	}
 	return dps
+}
+
+func dataProductsDeclaringVersions(files map[string]map[string]any) map[string]bool {
+	versionedDpIds := map[string]bool{}
+	for _, maybeDp := range files {
+		if resourceType, ok := maybeDp["resourceType"]; !ok || resourceType != "data-product" {
+			continue
+		}
+		resourceName, _ := maybeDp["resourceName"].(string)
+		data, _ := maybeDp["data"].(map[string]any)
+		specs, _ := data["eventSpecifications"].([]any)
+		for _, spec := range specs {
+			if specMap, ok := spec.(map[string]any); ok {
+				if _, hasVersion := specMap["version"]; hasVersion {
+					versionedDpIds[resourceName] = true
+				}
+			}
+		}
+	}
+	return versionedDpIds
 }
 
 type imgUrlFile struct {

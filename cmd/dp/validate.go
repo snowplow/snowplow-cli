@@ -41,7 +41,9 @@ var validateCmd = &cobra.Command{
 
 		if err := config.InitConsoleConfig(cmd); err != nil {
 			slog.Error("config failure", "error", err)
-			os.Exit(1)
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			return err
 		}
 
 		return nil

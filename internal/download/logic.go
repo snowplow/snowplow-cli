@@ -12,16 +12,31 @@ package download
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
-func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool) error {
+func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool, withVersions bool) error {
 	res, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
 		return err
+	}
+
+	versionedDpIds := map[string]bool{}
+	if withVersions {
+		for _, dp := range res.DataProducts {
+			versionedDpIds[dp.Id] = true
+		}
+	} else if _, err := os.Stat(files.DataProductsLocation); err == nil {
+		existing, err := util.MaybeResourcesfromPaths([]string{files.DataProductsLocation})
+		if err != nil {
+			slog.Debug("download", "msg", "could not read existing data products, versions not kept", "error", err)
+		} else {
+			versionedDpIds = dataProductsDeclaringVersions(existing)
+		}
 	}
 
 	sas := remoteSasToLocalResources(res.SourceApplication)
@@ -42,7 +57,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	triggerIdToFilePath, err := downloadTriggerImages(res.EventSpecs, cnx, client, files)
 
-	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes, triggerIdToFilePath)
+	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes, triggerIdToFilePath, versionedDpIds)
 
 	if err != nil {
 		return err

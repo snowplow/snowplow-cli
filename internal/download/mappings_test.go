@@ -184,7 +184,7 @@ func Test_localSasToRefs_AbsolutePath(t *testing.T) {
 }
 
 func Test_remoteDpsToLocalResources_OK(t *testing.T) {
-	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"})
+	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"}, map[string]bool{sampleRemoteDp.Id: true})
 	expected := []model.CliResource[model.DataProductCanonicalData]{{
 		ApiVersion:   "v1",
 		ResourceType: "data-product",

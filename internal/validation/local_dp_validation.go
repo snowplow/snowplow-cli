@@ -95,7 +95,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				shapeValidations, ok := ValidateDPShape(maybeDp)
 				v.concat(shapeValidations)
 				changed := changedFiles[f]
-				if ok {
+				if ok && cc != nil {
 					if validateAll {
 						v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
 					} else {

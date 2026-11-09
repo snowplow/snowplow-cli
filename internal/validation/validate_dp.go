@@ -72,6 +72,11 @@ func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClie
 			return err
 		}
 		versionMismatches = nil
+
+		files, err = util.MaybeResourcesfromPaths(searchPaths)
+		if err != nil {
+			return err
+		}
 	}
 
 	return Validate(ctx, client, files, searchPaths, basePath, ghOut, full, changes.IdToFileName, versionMismatches, concurrentReq)
@@ -93,14 +98,7 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 		return err
 	}
 
-	dpFiles := []string{}
-	for f, maybeDp := range files {
-		if resourceType, ok := maybeDp["resourceType"]; ok && resourceType == "data-product" {
-			dpFiles = append(dpFiles, f)
-		}
-	}
-
-	baseFiles, err := util.MaybeResourcesAtMergeBase(basePath, baseRef, dpFiles)
+	baseFiles, err := util.MaybeResourcesAtMergeBase(ctx, basePath, baseRef, paths)
 	if err != nil {
 		return err
 	}
@@ -120,6 +118,11 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 			return err
 		}
 		versionMismatches = nil
+
+		files, err = util.MaybeResourcesfromPaths(paths)
+		if err != nil {
+			return err
+		}
 	}
 
 	return ValidateLocal(ctx, files, paths, basePath, ghOut, versionMismatches)
