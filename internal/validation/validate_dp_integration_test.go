@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/snowplow/snowplow-cli/internal/amend"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/download"
 	"github.com/snowplow/snowplow-cli/internal/logging"
@@ -1137,5 +1138,30 @@ data:
 	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
 	if err == nil || !strings.Contains(err.Error(), "validation failed 1 errors") {
 		t.Errorf("Expected the base version behind the link to be compared, got: %v", err)
+	}
+}
+
+func TestValidateDataProductsWithClient_AddedSpecAtZeroPasses(t *testing.T) {
+	tmpDir := t.TempDir()
+	downloadInTest(t, tmpDir, "yaml", true)
+	dpFile := filepath.Join(tmpDir, "checkout.yaml")
+
+	if err := amend.AddEventSpecsToFile([]string{"Checkout Abandoned"}, dpFile); err != nil {
+		t.Fatalf("add-es failed: %v", err)
+	}
+	written, err := os.ReadFile(dpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "name: Checkout Abandoned\n          version: 0\n") {
+		t.Fatalf("expected the added spec to declare version 0, got:\n%s", written)
+	}
+
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+
+	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+	if err != nil {
+		t.Errorf("Expected a newly added spec at version 0 to validate, got: %v", err)
 	}
 }

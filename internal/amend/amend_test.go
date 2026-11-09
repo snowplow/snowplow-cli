@@ -12,6 +12,10 @@ package amend
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
@@ -435,5 +439,99 @@ func Test_SetEventSpecVersionsJsonMissingVersion(t *testing.T) {
 		if res != nil {
 			t.Errorf("expected no output on error, got: %s", res)
 		}
+	}
+}
+
+func addedResourceNames(t *testing.T, before string, after string) []string {
+	t.Helper()
+	re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	existing := map[string]bool{}
+	for _, id := range re.FindAllString(before, -1) {
+		existing[id] = true
+	}
+	var added []string
+	for _, id := range re.FindAllString(after, -1) {
+		if !existing[id] {
+			added = append(added, id)
+		}
+	}
+	return added
+}
+
+func Test_AddEventSpecsToFile_Versions(t *testing.T) {
+	yamlWithout := `apiVersion: v1
+resourceType: data-product
+resourceName: 3b7c9fce-9f33-4c91-800b-8c8804f388c9
+data:
+    name: xxx3
+    sourceApplications: []
+    eventSpecifications:
+        - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+          name: test1
+          entities:
+              tracked: []
+              enriched: []
+`
+	yamlWith := strings.Replace(yamlWithout, "          name: test1\n", "          name: test1\n          version: 2\n", 1)
+	jsonWithout := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "3b7c9fce-9f33-4c91-800b-8c8804f388c9",
+  "data": {
+    "name": "xxx3",
+    "eventSpecifications": [
+      {"resourceName": "15c70141-c223-4172-ab39-86a0194e44e8", "name": "test1", "entities": {"tracked": [], "enriched": []}}
+    ]
+  }
+}`
+	jsonWith := strings.Replace(jsonWithout, `"name": "test1",`, `"name": "test1", "version": 2,`, 1)
+
+	for _, tt := range []struct {
+		name        string
+		fileName    string
+		content     string
+		wantVersion bool
+	}{
+		{name: "yaml without versions", fileName: "dp.yaml", content: yamlWithout, wantVersion: false},
+		{name: "yaml with versions", fileName: "dp.yaml", content: yamlWith, wantVersion: true},
+		{name: "json without versions", fileName: "dp.json", content: jsonWithout, wantVersion: false},
+		{name: "json with versions", fileName: "dp.json", content: jsonWith, wantVersion: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dpFile := filepath.Join(t.TempDir(), tt.fileName)
+			if err := os.WriteFile(dpFile, []byte(tt.content), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := AddEventSpecsToFile([]string{"new spec"}, dpFile); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			written, err := os.ReadFile(dpFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			added := addedResourceNames(t, tt.content, string(written))
+			if len(added) != 1 {
+				t.Fatalf("expected one added event spec, got %v", added)
+			}
+			spec := model.EventSpecCanonical{ResourceName: added[0], Name: "new spec", Entities: model.EntitiesDef{}}
+			if tt.wantVersion {
+				version := 0
+				spec.Version = &version
+			}
+			expected, err := AddEventSpecs([]model.EventSpecCanonical{spec}, []byte(tt.content), tt.fileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(written) != string(expected) {
+				t.Errorf("unexpected output\nwant:\n%s\ngot:\n%s", expected, written)
+			}
+
+			hasZero := strings.Contains(string(written), "version: 0") || strings.Contains(string(written), `"version":0`)
+			if hasZero != tt.wantVersion {
+				t.Errorf("version 0 written = %v, want %v, got:\n%s", hasZero, tt.wantVersion, written)
+			}
+		})
 	}
 }

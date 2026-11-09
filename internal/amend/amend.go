@@ -12,6 +12,7 @@ import (
 	"github.com/goccy/go-yaml/parser"
 	"github.com/google/uuid"
 	"github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/tidwall/sjson"
 	googleyaml "gopkg.in/yaml.v3"
 )
@@ -51,13 +52,20 @@ func AddEventSpecsToFile(esNames []string, dpFileName string) error {
 		return fmt.Errorf("file does not exist at %s", dpFileName)
 	}
 
+	declaresVersions := fileDeclaresVersions(dpFileName)
+
 	var eventSpecifications []model.EventSpecCanonical
 	for _, spec := range esNames {
-		eventSpecifications = append(eventSpecifications, model.EventSpecCanonical{
+		eventSpec := model.EventSpecCanonical{
 			ResourceName: uuid.NewString(),
 			Name:         spec,
 			Entities:     model.EntitiesDef{},
-		})
+		}
+		if declaresVersions {
+			version := 0
+			eventSpec.Version = &version
+		}
+		eventSpecifications = append(eventSpecifications, eventSpec)
 	}
 
 	file, err := os.ReadFile(dpFileName)
@@ -75,6 +83,25 @@ func AddEventSpecsToFile(esNames []string, dpFileName string) error {
 	}
 
 	return nil
+}
+
+func fileDeclaresVersions(dpFileName string) bool {
+	resources, err := util.MaybeResourcesfromPaths([]string{dpFileName})
+	if err != nil {
+		return false
+	}
+	for _, maybeDp := range resources {
+		data, _ := maybeDp["data"].(map[string]any)
+		specs, _ := data["eventSpecifications"].([]any)
+		for _, spec := range specs {
+			if specMap, ok := spec.(map[string]any); ok {
+				if _, hasVersion := specMap["version"]; hasVersion {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func AddEventSpecs(ess []model.EventSpecCanonical, file []byte, dpFileName string) ([]byte, error) {
