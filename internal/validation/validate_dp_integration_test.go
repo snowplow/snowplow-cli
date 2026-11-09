@@ -1042,7 +1042,7 @@ func TestFixEventSpecVersions_LogsFilesInOrder(t *testing.T) {
 	a := strings.Index(logOutput.String(), "name=a.yaml")
 	b := strings.Index(logOutput.String(), "name=b.yaml")
 	c := strings.Index(logOutput.String(), "name=c.yaml")
-	if a < 0 || !(a < b && b < c) {
+	if a < 0 || a >= b || b >= c {
 		t.Errorf("expected one log line per file in sorted order, got:\n%s", logOutput.String())
 	}
 }
