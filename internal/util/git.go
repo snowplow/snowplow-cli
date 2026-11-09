@@ -52,7 +52,7 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 
 	out, err = runGit(ctx, dir, "merge-base", "HEAD", ref)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not find where the branch started from %s: fetch the full history (for example actions/checkout with fetch-depth: 0) and make sure %s is fetched: %w", ref, ref, err)
 	}
 	mergeBase := strings.TrimSpace(out)
 
@@ -69,7 +69,7 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasPrefix(relPath, "..") {
+		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
 			return nil, fmt.Errorf("path %s is outside the git repository %s", searchPath, topLevel)
 		}
 

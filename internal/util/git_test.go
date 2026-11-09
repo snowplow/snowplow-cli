@@ -98,6 +98,11 @@ func Test_MaybeResourcesAtMergeBase_InvalidRef(t *testing.T) {
 			t.Errorf("expected an error for ref %s", ref)
 		}
 	}
+
+	_, err := MaybeResourcesAtMergeBase(context.Background(), repo, "origin/does-not-exist", []string{repo})
+	if err == nil || !strings.Contains(err.Error(), "fetch-depth: 0") {
+		t.Errorf("expected an actionable error for an unknown ref, got: %v", err)
+	}
 }
 
 func Test_MaybeResourcesAtMergeBase_MissingGit(t *testing.T) {
@@ -118,5 +123,59 @@ func Test_MaybeResourcesAtMergeBase_NotARepo(t *testing.T) {
 	_, err := MaybeResourcesAtMergeBase(context.Background(), dir, "main", []string{dir})
 	if err == nil {
 		t.Error("expected an error outside a git repository")
+	}
+}
+
+func Test_MaybeResourcesAtMergeBase_ShallowClone(t *testing.T) {
+	isolateGitInTest(t)
+	origin := t.TempDir()
+	gitInTest(t, origin, "init", "-q", "-b", "main")
+	writeInTest(t, filepath.Join(origin, "dp.yaml"), "resourceType: data-product\n")
+	gitInTest(t, origin, "add", ".")
+	gitInTest(t, origin, "commit", "-q", "-m", "base")
+	gitInTest(t, origin, "checkout", "-q", "-b", "feature")
+	writeInTest(t, filepath.Join(origin, "dp.yaml"), "resourceType: data-product\ndata: {name: feature}\n")
+	gitInTest(t, origin, "commit", "-q", "-am", "feature")
+	gitInTest(t, origin, "checkout", "-q", "main")
+	writeInTest(t, filepath.Join(origin, "other.yaml"), "resourceType: data-product\n")
+	gitInTest(t, origin, "add", ".")
+	gitInTest(t, origin, "commit", "-q", "-m", "main moves on")
+
+	parent := t.TempDir()
+	gitInTest(t, parent, "clone", "-q", "--depth", "1", "--no-single-branch", "--branch", "feature", "file://"+origin, "clone")
+	clone := filepath.Join(parent, "clone")
+
+	_, err := MaybeResourcesAtMergeBase(context.Background(), clone, "origin/main", []string{clone})
+	if err == nil {
+		t.Fatal("expected an error when the merge base is not in a shallow clone")
+	}
+	want := "could not find where the branch started from origin/main: fetch the full history (for example actions/checkout with fetch-depth: 0) and make sure origin/main is fetched"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("expected an actionable error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "git merge-base HEAD origin/main failed") {
+		t.Errorf("expected the git error to stay wrapped, got: %v", err)
+	}
+}
+
+func Test_MaybeResourcesAtMergeBase_DotDotPrefixedDirectory(t *testing.T) {
+	isolateGitInTest(t)
+	repo := t.TempDir()
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	writeInTest(t, filepath.Join(repo, "..config", "dp.yaml"), "resourceType: data-product\ndata: {name: at base}\n")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	res, err := MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Join(repo, "..config")})
+	if err != nil {
+		t.Fatalf("a directory named ..config inside the repo should be accepted, got: %v", err)
+	}
+	if len(res) != 1 {
+		t.Errorf("expected the file under ..config, got: %v", res)
+	}
+
+	_, err = MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Dir(repo)})
+	if err == nil || !strings.Contains(err.Error(), "outside the git repository") {
+		t.Errorf("expected a path outside the repository to be rejected, got: %v", err)
 	}
 }

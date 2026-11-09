@@ -226,6 +226,8 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 	var esDelete []console.RemoteEventSpec
 
 	esLocalIds := make(map[string]bool)
+	esLocalFiles := make(map[string]string)
+	esLocalVersioned := make(map[string]bool)
 	declaredVersions := make(map[string]int)
 	var versionMismatches []model.EventSpecVersionMismatch
 
@@ -249,6 +251,15 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		}
 
 		for esIdx, localEs := range localDp.Data.EventSpecifications {
+			dpFile := local.IdToFileName[localDp.ResourceName]
+			if previousFile, seen := esLocalFiles[localEs.ResourceName]; seen && (localEs.Version != nil || esLocalVersioned[localEs.ResourceName]) {
+				return nil, duplicateEventSpecError(localEs.ResourceName, previousFile, dpFile)
+			}
+			esLocalFiles[localEs.ResourceName] = dpFile
+			if localEs.Version != nil {
+				esLocalVersioned[localEs.ResourceName] = true
+			}
+
 			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
 			expectedVersion := 0
 			changedFields := []string{}
@@ -763,13 +774,17 @@ func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
 	}
 }
 
+func duplicateEventSpecError(id string, firstFile string, secondFile string) error {
+	return fmt.Errorf("event specification %s is defined in both %s and %s", id, firstFile, secondFile)
+}
+
 type localEventSpec struct {
 	fileName string
 	index    int
 	spec     model.EventSpec
 }
 
-func localEventSpecsById(files map[string]map[string]any) (map[string]localEventSpec, []string, error) {
+func localEventSpecsById(files map[string]map[string]any, rejectDuplicates bool) (map[string]localEventSpec, []string, error) {
 	specs := make(map[string]localEventSpec)
 	var ids []string
 
@@ -787,6 +802,9 @@ func localEventSpecsById(files map[string]map[string]any) (map[string]localEvent
 				return nil, nil, err
 			}
 			for idx, es := range dp.Data.EventSpecifications {
+				if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates {
+					return nil, nil, duplicateEventSpecError(es.ResourceName, previous.fileName, f)
+				}
 				specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
 				ids = append(ids, es.ResourceName)
 			}
@@ -797,11 +815,11 @@ func localEventSpecsById(files map[string]map[string]any) (map[string]localEvent
 }
 
 func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]model.EventSpecVersionMismatch, []string, error) {
-	localSpecs, localIds, err := localEventSpecsById(local)
+	localSpecs, localIds, err := localEventSpecsById(local, true)
 	if err != nil {
 		return nil, nil, err
 	}
-	baseSpecs, _, err := localEventSpecsById(base)
+	baseSpecs, _, err := localEventSpecsById(base, false)
 	if err != nil {
 		return nil, nil, err
 	}

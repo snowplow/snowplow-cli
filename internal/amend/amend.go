@@ -218,15 +218,15 @@ func SetEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName s
 	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
 		output, err = setVersionsYaml(versionsByIndex, file)
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 	} else if strings.HasSuffix(dpFileName, ".json") {
 		output, err = setVersionsJson(versionsByIndex, file)
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 	} else {
-		return []byte{}, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
+		return nil, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
 	}
 	return output, nil
 }
@@ -239,14 +239,14 @@ func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(file, &dp); err != nil {
-		return []byte{}, fmt.Errorf("failed to parse data product JSON: %w", err)
+		return nil, fmt.Errorf("failed to parse data product JSON: %w", err)
 	}
 	for idx := range versionsByIndex {
 		if idx < 0 || idx >= len(dp.Data.EventSpecifications) {
-			return []byte{}, fmt.Errorf("version of event specification %d not found", idx)
+			return nil, fmt.Errorf("version of event specification %d not found", idx)
 		}
 		if _, ok := dp.Data.EventSpecifications[idx]["version"]; !ok {
-			return []byte{}, fmt.Errorf("version of event specification %d not found", idx)
+			return nil, fmt.Errorf("version of event specification %d not found", idx)
 		}
 	}
 
@@ -255,7 +255,7 @@ func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	for idx, version := range versionsByIndex {
 		updated, err := sjson.Set(updatedDp, fmt.Sprintf("data.eventSpecifications.%d.version", idx), version)
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 		updatedDp = updated
 	}
@@ -266,7 +266,7 @@ func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	parsed, err := parser.ParseBytes(file, parser.ParseComments)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to parse data product YAML: %w", err)
+		return nil, fmt.Errorf("failed to parse data product YAML: %w", err)
 	}
 
 	type replacement struct {
@@ -288,21 +288,21 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	for idx, version := range versionsByIndex {
 		path, err := yaml.PathString(fmt.Sprintf("$.data.eventSpecifications[%d].version", idx))
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 		node, err := path.FilterFile(parsed)
 		if err != nil {
-			return []byte{}, fmt.Errorf("version of event specification %d not found: %w", idx, err)
+			return nil, fmt.Errorf("version of event specification %d not found: %w", idx, err)
 		}
 		tk := node.GetToken()
 		line := tk.Position.Line - 1
 		if line < 0 || line >= len(lineStarts) {
-			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
+			return nil, fmt.Errorf("version of event specification %d could not be located", idx)
 		}
 		offset := lineStarts[line] + tk.Position.Column - 1
 		oldRunes := []rune(tk.Value)
 		if offset < 0 || offset+len(oldRunes) > len(runes) || string(runes[offset:offset+len(oldRunes)]) != tk.Value {
-			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
+			return nil, fmt.Errorf("version of event specification %d could not be located", idx)
 		}
 		replacements = append(replacements, replacement{offset: offset, old: tk.Value, new: fmt.Sprintf("%d", version)})
 	}

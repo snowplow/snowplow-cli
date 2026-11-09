@@ -26,8 +26,10 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/download"
 	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
+	"github.com/spf13/cobra"
 )
 
 func TestValidateDataProductsWithClient_HappyPath(t *testing.T) {
@@ -974,5 +976,73 @@ data:
 				t.Errorf("error = %v, want error %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateDataProductsAgainstBaseFromCmd_RejectsConsoleOnlyFlags(t *testing.T) {
+	for _, tt := range []struct {
+		flag    string
+		value   string
+		wantErr bool
+	}{
+		{flag: "full", value: "true", wantErr: true},
+		{flag: "concurrency", value: "3", wantErr: true},
+		{flag: "", wantErr: false},
+	} {
+		t.Run(tt.flag, func(t *testing.T) {
+			tracking, _ := setupBaseRepo(t)
+			cmd := &cobra.Command{}
+			cmd.Flags().Bool("gh-annotate", false, "")
+			cmd.Flags().Bool("full", false, "")
+			cmd.Flags().IntP("concurrency", "c", 3, "")
+			cmd.Flags().String("base-ref", "", "")
+			cmd.Flags().Bool("fix", false, "")
+			if err := cmd.Flags().Set("base-ref", "main"); err != nil {
+				t.Fatal(err)
+			}
+			if tt.flag != "" {
+				if err := cmd.Flags().Set(tt.flag, tt.value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+			err := ValidateDataProductsAgainstBaseFromCmd(ctx, cmd, []string{tracking}, tracking)
+
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			want := "--full and --concurrency only apply when validating against Snowplow Console and cannot be used with --base-ref"
+			if tt.wantErr && (err == nil || err.Error() != want) {
+				t.Errorf("error = %v, want %q", err, want)
+			}
+		})
+	}
+}
+
+func TestFixEventSpecVersions_LogsFilesInOrder(t *testing.T) {
+	tmpDir := t.TempDir()
+	names := []string{"b.yaml", "a.yaml", "c.yaml"}
+	var mismatches []model.EventSpecVersionMismatch
+	for _, name := range names {
+		f := filepath.Join(tmpDir, name)
+		if err := os.WriteFile(f, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")), 0644); err != nil {
+			t.Fatal(err)
+		}
+		mismatches = append(mismatches, model.EventSpecVersionMismatch{FileName: f, Index: 0, Name: name, Declared: 3, Expected: 4})
+	}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	if err := fixEventSpecVersions(ctx, mismatches); err != nil {
+		t.Fatal(err)
+	}
+
+	a := strings.Index(logOutput.String(), "name=a.yaml")
+	b := strings.Index(logOutput.String(), "name=b.yaml")
+	c := strings.Index(logOutput.String(), "name=c.yaml")
+	if a < 0 || !(a < b && b < c) {
+		t.Errorf("expected one log line per file in sorted order, got:\n%s", logOutput.String())
 	}
 }

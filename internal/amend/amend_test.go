@@ -428,9 +428,12 @@ func Test_SetEventSpecVersionsJsonMissingVersion(t *testing.T) {
 `
 
 	for _, idx := range []int{0, 1} {
-		_, err := SetEventSpecVersions(map[int]int{idx: 1}, []byte(original), "test.json")
+		res, err := SetEventSpecVersions(map[int]int{idx: 1}, []byte(original), "test.json")
 		if err == nil {
 			t.Fatalf("expected an error for event spec %d without a version", idx)
+		}
+		if res != nil {
+			t.Errorf("expected no output on error, got: %s", res)
 		}
 	}
 }

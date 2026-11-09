@@ -12,6 +12,8 @@ package validation
 
 import (
 	"context"
+	"errors"
+	"slices"
 
 	"github.com/snowplow/snowplow-cli/internal/amend"
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -87,6 +89,10 @@ func ValidateDataProductsAgainstBaseFromCmd(ctx context.Context, cmd *cobra.Comm
 	baseRef, _ := cmd.Flags().GetString("base-ref")
 	fix, _ := cmd.Flags().GetBool("fix")
 
+	if cmd.Flags().Changed("full") || cmd.Flags().Changed("concurrency") {
+		return errors.New("--full and --concurrency only apply when validating against Snowplow Console and cannot be used with --base-ref")
+	}
+
 	return ValidateDataProductsAgainstBase(ctx, paths, basePath, ghOut, baseRef, fix)
 }
 
@@ -136,7 +142,14 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 		mismatchesByFile[m.FileName] = append(mismatchesByFile[m.FileName], m)
 	}
 
-	for f, mismatches := range mismatchesByFile {
+	fileNames := make([]string, 0, len(mismatchesByFile))
+	for f := range mismatchesByFile {
+		fileNames = append(fileNames, f)
+	}
+	slices.Sort(fileNames)
+
+	for _, f := range fileNames {
+		mismatches := mismatchesByFile[f]
 		versions := map[int]int{}
 		for _, m := range mismatches {
 			versions[m.Index] = m.Expected
