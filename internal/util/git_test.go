@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -177,5 +178,50 @@ func Test_MaybeResourcesAtMergeBase_DotDotPrefixedDirectory(t *testing.T) {
 	_, err = MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Dir(repo)})
 	if err == nil || !strings.Contains(err.Error(), "outside the git repository") {
 		t.Errorf("expected a path outside the repository to be rejected, got: %v", err)
+	}
+}
+
+func Test_MaybeResourcesAtMergeBase_SymbolicLinks(t *testing.T) {
+	isolateGitInTest(t)
+	repo := t.TempDir()
+	writeInTest(t, filepath.Join(repo, "shared", "dp.yaml"), "resourceType: data-product\ndata: {name: behind link}\n")
+	writeInTest(t, filepath.Join(repo, "tracking", "plain.yaml"), "resourceType: data-product\ndata: {name: plain}\n")
+	links := map[string]string{
+		"linked.yaml":   filepath.Join("..", "shared", "dp.yaml"),
+		"chained.yaml":  "linked.yaml",
+		"outside.yaml":  filepath.Join("..", "..", "outside.yaml"),
+		"absolute.yaml": "/etc/hosts.yaml",
+		"missing.yaml":  "nowhere.yaml",
+		"loop-a.yaml":   "loop-b.yaml",
+		"loop-b.yaml":   "loop-a.yaml",
+	}
+	for name, target := range links {
+		if err := os.Symlink(target, filepath.Join(repo, "tracking", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	res, err := MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Join(repo, "tracking")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	realRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]string{}
+	for f, r := range res {
+		rel, _ := filepath.Rel(filepath.Join(realRepo, "tracking"), f)
+		data, _ := r["data"].(map[string]any)
+		name, _ := data["name"].(string)
+		names[rel] = name
+	}
+	want := map[string]string{"plain.yaml": "plain", "linked.yaml": "behind link", "chained.yaml": "behind link"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("got %v, want %v", names, want)
 	}
 }

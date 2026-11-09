@@ -14,7 +14,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -73,18 +75,35 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 			return nil, fmt.Errorf("path %s is outside the git repository %s", searchPath, topLevel)
 		}
 
-		listed, err := runGit(ctx, topLevel, "ls-tree", "-r", "-z", "--name-only", mergeBase, "--", filepath.ToSlash(relPath))
+		listed, err := runGit(ctx, topLevel, "ls-tree", "-r", "-z", mergeBase, "--", filepath.ToSlash(relPath))
 		if err != nil {
 			return nil, err
 		}
 
-		for _, gitPath := range strings.Split(listed, "\x00") {
+		for _, entry := range strings.Split(listed, "\x00") {
+			mode, _, gitPath, ok := parseLsTreeEntry(entry)
+			if !ok {
+				continue
+			}
 			ext := filepath.Ext(gitPath)
 			if ext != ".json" && ext != ".yaml" && ext != ".yml" {
 				continue
 			}
 
-			body, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, gitPath))
+			blobPath := gitPath
+			if mode == "120000" {
+				resolved, found, err := resolveLinkAtMergeBase(ctx, topLevel, mergeBase, gitPath)
+				if err != nil {
+					return nil, err
+				}
+				if !found {
+					slog.Debug("validation", "msg", "skipping symbolic link at base, its target is outside the repository, missing or loops", "file", gitPath, "base", mergeBase)
+					continue
+				}
+				blobPath = resolved
+			}
+
+			body, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, blobPath))
 			if err != nil {
 				return nil, err
 			}
@@ -105,4 +124,51 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 	}
 
 	return files, nil
+}
+
+func parseLsTreeEntry(entry string) (mode string, objectType string, gitPath string, ok bool) {
+	meta, gitPath, found := strings.Cut(entry, "\t")
+	if !found {
+		return "", "", "", false
+	}
+	fields := strings.Fields(meta)
+	if len(fields) != 3 {
+		return "", "", "", false
+	}
+	return fields[0], fields[1], gitPath, true
+}
+
+func resolveLinkAtMergeBase(ctx context.Context, topLevel string, mergeBase string, linkPath string) (string, bool, error) {
+	current := linkPath
+	for hop := 0; hop < 5; hop++ {
+		target, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, current))
+		if err != nil {
+			return "", false, err
+		}
+		if path.IsAbs(target) {
+			return "", false, nil
+		}
+		next := path.Clean(path.Join(path.Dir(current), target))
+		if next == ".." || strings.HasPrefix(next, "../") {
+			return "", false, nil
+		}
+
+		listed, err := runGit(ctx, topLevel, "ls-tree", "-z", mergeBase, "--", next)
+		if err != nil {
+			return "", false, err
+		}
+		mode, objectType, listedPath, ok := parseLsTreeEntry(strings.TrimSuffix(listed, "\x00"))
+		if !ok || listedPath != next {
+			return "", false, nil
+		}
+		if mode == "120000" {
+			current = next
+			continue
+		}
+		if objectType != "blob" {
+			return "", false, nil
+		}
+		return next, true, nil
+	}
+	return "", false, nil
 }

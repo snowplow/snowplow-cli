@@ -1046,3 +1046,96 @@ func TestFixEventSpecVersions_LogsFilesInOrder(t *testing.T) {
 		t.Errorf("expected one log line per file in sorted order, got:\n%s", logOutput.String())
 	}
 }
+
+func TestDownload_UnreadableFileKeepsOtherVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 1, "1-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "broken.yaml"), []byte("key: [unclosed\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	written := downloadInTest(t, tmpDir, "yaml", false)
+
+	if !strings.Contains(written, "version: 3") {
+		t.Errorf("a broken file should not drop the versions of another data product, got:\n%s", written)
+	}
+}
+
+func TestDownload_UnreadableFileWithoutVersionsMatchesOutputBeforeVersions(t *testing.T) {
+	before, err := os.ReadFile(filepath.Join("..", "testdata", "validation", "download-before-versions.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "broken.json"), []byte("{not json"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	written := downloadInTest(t, tmpDir, "yaml", false)
+
+	if written != string(before) {
+		t.Errorf("default download should write what it wrote before versions existed\nwant:\n%s\ngot:\n%s", before, written)
+	}
+}
+
+func TestValidateDataProductsAgainstBase_SymbolicLinksAtBase(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	repo := t.TempDir()
+	tracking := filepath.Join(repo, "tracking")
+	shared := filepath.Join(repo, "shared")
+	for _, dir := range []string{tracking, shared} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(shared, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "shared", "checkout.yaml"), filepath.Join(tracking, "checkout.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "..", "outside.yaml"), filepath.Join(tracking, "outside.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	outsideNow := `apiVersion: v1
+resourceType: data-product
+resourceName: ec68917a-3bcb-4640-a165-483de5fc033d
+data:
+  name: other
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: d77f712e-ee43-4e10-8b36-48a0f6f2e630
+      name: Checkout Abandoned
+      version: 0
+`
+	if err := os.Remove(filepath.Join(tracking, "outside.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tracking, "outside.yaml"), []byte(outsideNow), 0644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err != nil {
+		t.Fatalf("Expected the linked file to keep its version and the outside link to be skipped, got: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tracking, "checkout.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tracking, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-1")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err == nil || !strings.Contains(err.Error(), "validation failed 1 errors") {
+		t.Errorf("Expected the base version behind the link to be compared, got: %v", err)
+	}
+}
