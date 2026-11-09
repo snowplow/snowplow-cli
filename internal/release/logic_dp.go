@@ -758,3 +758,92 @@ func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
 		}
 	}
 }
+
+type localEventSpec struct {
+	fileName string
+	index    int
+	spec     model.EventSpec
+}
+
+func localEventSpecsById(files map[string]map[string]any) (map[string]localEventSpec, []string, error) {
+	specs := make(map[string]localEventSpec)
+	var ids []string
+
+	fileNames := make([]string, 0, len(files))
+	for f := range files {
+		fileNames = append(fileNames, f)
+	}
+	slices.Sort(fileNames)
+
+	for _, f := range fileNames {
+		maybeDp := files[f]
+		if resourceType, ok := maybeDp["resourceType"]; ok && resourceType == "data-product" {
+			var dp model.DataProduct
+			if err := mapstructure.Decode(maybeDp, &dp); err != nil {
+				return nil, nil, err
+			}
+			for idx, es := range dp.Data.EventSpecifications {
+				specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
+				ids = append(ids, es.ResourceName)
+			}
+		}
+	}
+
+	return specs, ids, nil
+}
+
+func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]EventSpecVersionMismatch, []string, error) {
+	localSpecs, localIds, err := localEventSpecsById(local)
+	if err != nil {
+		return nil, nil, err
+	}
+	baseSpecs, _, err := localEventSpecsById(base)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var versionMismatches []EventSpecVersionMismatch
+	var skipped []string
+
+	for _, id := range localIds {
+		localEs := localSpecs[id]
+		if localEs.spec.Version == nil {
+			continue
+		}
+
+		expectedVersion := 0
+		changedFields := []string{}
+		baseEs, baseExists := baseSpecs[id]
+		if baseExists {
+			if baseEs.spec.Version == nil {
+				skipped = append(skipped, localEs.spec.Name)
+				continue
+			}
+			changedFields, err = changedSentStructuralFields(
+				LocalEventSpecToRemote(baseEs.spec, nil, ""),
+				LocalEventSpecToRemote(localEs.spec, nil, ""),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			expectedVersion = *baseEs.spec.Version
+			if len(changedFields) > 0 {
+				expectedVersion = *baseEs.spec.Version + 1
+			}
+		}
+
+		if *localEs.spec.Version != expectedVersion {
+			versionMismatches = append(versionMismatches, EventSpecVersionMismatch{
+				FileName: localEs.fileName,
+				Index:    localEs.index,
+				Name:     localEs.spec.Name,
+				Declared: *localEs.spec.Version,
+				Expected: expectedVersion,
+				IsNew:    !baseExists,
+				Changed:  changedFields,
+			})
+		}
+	}
+
+	return versionMismatches, skipped, nil
+}

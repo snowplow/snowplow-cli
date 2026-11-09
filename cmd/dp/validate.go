@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/snowplow/snowplow-cli/internal/config"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/snowplow/snowplow-cli/internal/validation"
@@ -27,7 +28,24 @@ var validateCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	Long:  `Sends all data products and source applications from <path> for validation by Snowplow Console.`,
 	Example: `  $ snowplow-cli dp validate ./data-products ./source-applications
-  $ snowplow-cli dp validate ./src`,
+  $ snowplow-cli dp validate ./src
+  $ snowplow-cli dp validate --base-ref origin/main`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := snplog.InitLogging(cmd); err != nil {
+			return err
+		}
+
+		if baseRef, _ := cmd.Flags().GetString("base-ref"); baseRef != "" {
+			return nil
+		}
+
+		if err := config.InitConsoleConfig(cmd); err != nil {
+			slog.Error("config failure", "error", err)
+			os.Exit(1)
+		}
+
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 
@@ -45,7 +63,11 @@ var validateCmd = &cobra.Command{
 			snplog.LogFatal(err)
 		}
 
-		err = validation.ValidateDataProductsFromCmd(ctx, cmd, searchPaths, basePath)
+		if baseRef, _ := cmd.Flags().GetString("base-ref"); baseRef != "" {
+			err = validation.ValidateDataProductsAgainstBaseFromCmd(ctx, cmd, searchPaths, basePath)
+		} else {
+			err = validation.ValidateDataProductsFromCmd(ctx, cmd, searchPaths, basePath)
+		}
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -59,5 +81,6 @@ func init() {
 	validateCmd.PersistentFlags().Bool("gh-annotate", false, "Output suitable for github workflow annotation (ignores -s)")
 	validateCmd.PersistentFlags().Bool("full", false, "Perform compatibility check on all files, not only the ones that were changed")
 	validateCmd.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
+	validateCmd.PersistentFlags().String("base-ref", "", "Check declared event specification versions against the files at the merge base of HEAD and this git ref, without connecting to Snowplow Console")
 	validateCmd.PersistentFlags().Bool("fix", false, "Write the version Snowplow Console will assign into each event specification that declares a different one")
 }

@@ -247,13 +247,21 @@ func entitiesWithoutComments(entities []console.Entity) []console.Entity {
 }
 
 func changedStructuralFields(remote console.RemoteEventSpec, sent console.RemoteEventSpec) ([]string, error) {
+	return structuralDiff(remote, false, sent)
+}
+
+func changedSentStructuralFields(before console.RemoteEventSpec, after console.RemoteEventSpec) ([]string, error) {
+	return structuralDiff(before, true, after)
+}
+
+func structuralDiff(before console.RemoteEventSpec, beforeIsSent bool, sent console.RemoteEventSpec) ([]string, error) {
 	changed := []string{}
 
-	if remote.Name != sent.Name {
+	if before.Name != sent.Name {
 		changed = append(changed, "name")
 	}
 
-	remoteEvent, err := normalizeStructure(structuralEvent(remote.Event, false))
+	beforeEvent, err := normalizeStructure(structuralEvent(before.Event, beforeIsSent))
 	if err != nil {
 		return nil, err
 	}
@@ -261,11 +269,11 @@ func changedStructuralFields(remote console.RemoteEventSpec, sent console.Remote
 	if err != nil {
 		return nil, err
 	}
-	if !reflect.DeepEqual(remoteEvent, sentEvent) {
+	if !reflect.DeepEqual(beforeEvent, sentEvent) {
 		changed = append(changed, "event")
 	}
 
-	remoteEntities, err := normalizeStructure(structuralEntities(remote.Entities, false))
+	beforeEntities, err := normalizeStructure(structuralEntities(before.Entities, beforeIsSent))
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +281,7 @@ func changedStructuralFields(remote console.RemoteEventSpec, sent console.Remote
 	if err != nil {
 		return nil, err
 	}
-	if !reflect.DeepEqual(remoteEntities, sentEntities) {
+	if !reflect.DeepEqual(beforeEntities, sentEntities) {
 		changed = append(changed, "entities")
 	}
 

@@ -117,7 +117,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				shapeValidations, ok := ValidateSAShape(maybeDp)
 				v.concat(shapeValidations)
 				v.concat(ValidateSAEntitiesCardinalities(sa))
-				if ok {
+				if ok && sdc != nil {
 					v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
 				}
 			default:

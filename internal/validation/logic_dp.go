@@ -76,3 +76,52 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 
 	return nil
 }
+
+func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, versionMismatches []release.EventSpecVersionMismatch) error {
+
+	logger := logging.LoggerFromContext(ctx)
+
+	possibleFiles := []string{}
+	for n := range files {
+		possibleFiles = append(possibleFiles, n)
+	}
+
+	lookup, err := NewDPLookup(nil, nil, files, map[string]string{}, false, 1)
+	if err != nil {
+		return err
+	}
+
+	lookup.AddVersionMismatches(versionMismatches)
+
+	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
+
+	err = lookup.SlogValidations(ctx, basePath)
+	if err != nil {
+		return err
+	}
+
+	if ghOut {
+		err := lookup.GhAnnotateValidations(basePath)
+		if err != nil {
+			logging.LogFatal(err)
+		}
+	}
+
+	numErrors := lookup.ValidationErrorCount()
+
+	if numErrors > 0 {
+		return fmt.Errorf("validation failed %d errors", numErrors)
+	} else {
+		dpCount := 0
+		for range lookup.DataProducts {
+			dpCount++
+		}
+		saCount := 0
+		for range lookup.SourceApps {
+			saCount++
+		}
+		logger.Info("validation", "msg", "success", "data products found", dpCount, "source applications found", saCount)
+	}
+
+	return nil
+}

@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -592,5 +593,124 @@ func TestValidateDataProductsWithClient_VersionFix(t *testing.T) {
 	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 	if err != nil {
 		t.Errorf("Expected validate to pass after --fix, got: %v", err)
+	}
+}
+
+const baseDataProduct = `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started
+      version: %d
+      description: A checkout started
+      event:
+        source: iglu:com.example/checkout/jsonschema/%s
+      entities:
+        tracked: []
+        enriched: []
+`
+
+func gitInTest(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.email=test@example.com", "-c", "user.name=test", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+}
+
+func setupBaseRepo(t *testing.T) (string, string) {
+	t.Helper()
+	repo := t.TempDir()
+	tracking := filepath.Join(repo, "tracking")
+	if err := os.MkdirAll(tracking, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dpFile := filepath.Join(tracking, "checkout.yaml")
+
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+	gitInTest(t, repo, "checkout", "-q", "-b", "feature")
+
+	gitInTest(t, repo, "checkout", "-q", "main")
+	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 8, "3-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitInTest(t, repo, "commit", "-q", "-am", "main moves on")
+	gitInTest(t, repo, "checkout", "-q", "feature")
+
+	return tracking, dpFile
+}
+
+func TestValidateDataProductsAgainstBase_UnchangedUsesMergeBase(t *testing.T) {
+	tracking, _ := setupBaseRepo(t)
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err != nil {
+		t.Errorf("Expected an unchanged spec to match the merge base, not the tip of main, got: %v", err)
+	}
+}
+
+func TestValidateDataProductsAgainstBase_StructuralChangeNeedsBump(t *testing.T) {
+	tracking, dpFile := setupBaseRepo(t)
+	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-1")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	t.Chdir(tracking)
+	err := ValidateDataProductsAgainstBase(ctx, []string{"."}, tracking, false, "main", false)
+	if err == nil || !strings.Contains(err.Error(), "validation failed 1 errors") {
+		t.Fatalf("Expected a version validation failure, got: %v", err)
+	}
+	wantLog := `path=/data/eventSpecifications/0 errors="Checkout Started: version 3 needs a bump\nchanged: event\nexpected version: 4\nrun ` + "`snowplow-cli dp validate --fix`" + ` to update it\n"`
+	if !strings.Contains(logOutput.String(), wantLog) {
+		t.Errorf("Expected version error in logs\nwant: %s\ngot: %s", wantLog, logOutput.String())
+	}
+}
+
+func TestValidateDataProductsAgainstBase_Fix(t *testing.T) {
+	tracking, dpFile := setupBaseRepo(t)
+	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-1")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
+	if err != nil {
+		t.Fatalf("Expected --fix to succeed, got: %v", err)
+	}
+	fixed, err := os.ReadFile(dpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fixed) != fmt.Sprintf(baseDataProduct, 4, "1-0-1") {
+		t.Errorf("Expected only the version to change, got:\n%s", fixed)
+	}
+
+	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err != nil {
+		t.Errorf("Expected validate to pass after --fix, got: %v", err)
+	}
+}
+
+func TestValidateDataProductsAgainstBase_InvalidRef(t *testing.T) {
+	tracking, _ := setupBaseRepo(t)
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "origin/does-not-exist", false)
+	if err == nil || !strings.Contains(err.Error(), "merge-base") {
+		t.Errorf("Expected a git error for an unknown ref, got: %v", err)
 	}
 }

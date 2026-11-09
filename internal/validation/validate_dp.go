@@ -76,6 +76,54 @@ func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClie
 	return Validate(ctx, client, files, searchPaths, basePath, ghOut, full, changes.IdToFileName, versionMismatches, concurrentReq)
 }
 
+func ValidateDataProductsAgainstBaseFromCmd(ctx context.Context, cmd *cobra.Command, paths []string, basePath string) error {
+	ghOut, _ := cmd.Flags().GetBool("gh-annotate")
+	baseRef, _ := cmd.Flags().GetString("base-ref")
+	fix, _ := cmd.Flags().GetBool("fix")
+
+	return ValidateDataProductsAgainstBase(ctx, paths, basePath, ghOut, baseRef, fix)
+}
+
+func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePath string, ghOut bool, baseRef string, fix bool) error {
+	logger := logging.LoggerFromContext(ctx)
+
+	files, err := util.MaybeResourcesfromPaths(paths)
+	if err != nil {
+		return err
+	}
+
+	dpFiles := []string{}
+	for f, maybeDp := range files {
+		if resourceType, ok := maybeDp["resourceType"]; ok && resourceType == "data-product" {
+			dpFiles = append(dpFiles, f)
+		}
+	}
+
+	baseFiles, err := util.MaybeResourcesAtMergeBase(basePath, baseRef, dpFiles)
+	if err != nil {
+		return err
+	}
+
+	versionMismatches, skipped, err := release.FindVersionMismatchesAgainstBase(files, baseFiles)
+	if err != nil {
+		return err
+	}
+
+	for _, name := range skipped {
+		logger.Info("validation", "msg", "skipping version check, no version declared at base", "name", name, "base", baseRef)
+	}
+
+	if fix {
+		err = fixEventSpecVersions(ctx, versionMismatches)
+		if err != nil {
+			return err
+		}
+		versionMismatches = nil
+	}
+
+	return ValidateLocal(ctx, files, paths, basePath, ghOut, versionMismatches)
+}
+
 func fixEventSpecVersions(ctx context.Context, versionMismatches []release.EventSpecVersionMismatch) error {
 	logger := logging.LoggerFromContext(ctx)
 
