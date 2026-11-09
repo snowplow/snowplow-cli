@@ -186,7 +186,11 @@ func remoteDpsToLocalResources(remoteDps []console.RemoteDataProduct, saIdToRef 
 		}
 		if versionedDpIds[dp.Id] {
 			for i, es := range model.Data.EventSpecifications {
-				version := esIdToRes[es.ResourceName].Version
+				remoteEs, ok := esIdToRes[es.ResourceName]
+				if !ok {
+					continue
+				}
+				version := remoteEs.Version
 				model.Data.EventSpecifications[i].Version = &version
 			}
 		}

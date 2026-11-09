@@ -1617,3 +1617,46 @@ func Test_FindVersionMismatchesAgainstBase_DuplicateEventSpecId(t *testing.T) {
 		t.Errorf("a duplicate at base should not fail the check, got: %v", err)
 	}
 }
+
+func Test_findChanges_EntityCommentOnlyDifferenceWithoutVersion(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	remoteEs := versionRuleRemoteEs()
+	remoteEs.Entities.Tracked[0].Comment = strPtr("a note")
+	local, remote := versionRuleLocalAndRemote(localEs, remoteEs)
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esUpdate) != 0 {
+		t.Errorf("a comment-only difference sent no update before versions existed, got %d updates", len(changes.esUpdate))
+	}
+}
+
+func Test_findChanges_SourceAppEntityCommentOnlyDifference(t *testing.T) {
+	sa := model.SourceApp{
+		ResourceName: "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Data: model.SourceAppData{
+			Name:     "Source App 1",
+			Entities: &model.EntitiesDef{Tracked: []model.SchemaRef{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0)}}},
+		},
+	}
+	remoteSa := console.RemoteSourceApplication{
+		Id:   "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Name: "Source App 1",
+		Entities: console.Entities{
+			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0), Comment: strPtr("a note")}},
+			Enriched: []console.Entity{},
+		},
+	}
+	local := LocalFilesRefsResolved{SourceApps: []model.SourceApp{sa}}
+	remote := console.DataProductsAndRelatedResources{SourceApplication: []console.RemoteSourceApplication{remoteSa}}
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.saUpdate) != 0 {
+		t.Errorf("a comment-only difference sent no update before versions existed, got %d updates", len(changes.saUpdate))
+	}
+}

@@ -414,3 +414,24 @@ func Test_remoteEsToLocal_NoExclusions(t *testing.T) {
 		t.Errorf("Expected no exclusions when ES includes all DP source apps, got %v", result.ExcludedSourceApplications)
 	}
 }
+
+func Test_remoteDpsToLocalResources_NoVersionWithoutRemoteSpec(t *testing.T) {
+	dp := console.RemoteDataProduct{
+		Id:         "46d47289-f3d5-4ef8-a82c-b19597e6e503",
+		Name:       "test DP",
+		EventSpecs: []console.EventSpecReference{{Id: sampleRemoteEs.Id}, {Id: "0e6e4e4c-c34a-483c-a5e7-f728d66a53b4"}},
+	}
+
+	res := remoteDpsToLocalResources([]console.RemoteDataProduct{dp}, sampleSaRefs, sampleEsIdToEs, map[string]string{}, map[string]bool{dp.Id: true})
+
+	specs := res[0].Data.EventSpecifications
+	if len(specs) != 2 {
+		t.Fatalf("expected 2 event specs, got %d", len(specs))
+	}
+	if specs[0].Version == nil || *specs[0].Version != 7 {
+		t.Errorf("expected the known spec to carry version 7, got %v", specs[0].Version)
+	}
+	if specs[1].Version != nil {
+		t.Errorf("expected no version for a spec missing from the lookup, got %d", *specs[1].Version)
+	}
+}
