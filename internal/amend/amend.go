@@ -233,6 +233,23 @@ func SetEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName s
 
 func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 
+	var dp struct {
+		Data struct {
+			EventSpecifications []map[string]json.RawMessage `json:"eventSpecifications"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(file, &dp); err != nil {
+		return []byte{}, fmt.Errorf("failed to parse data product JSON: %w", err)
+	}
+	for idx := range versionsByIndex {
+		if idx < 0 || idx >= len(dp.Data.EventSpecifications) {
+			return []byte{}, fmt.Errorf("version of event specification %d not found", idx)
+		}
+		if _, ok := dp.Data.EventSpecifications[idx]["version"]; !ok {
+			return []byte{}, fmt.Errorf("version of event specification %d not found", idx)
+		}
+	}
+
 	updatedDp := string(file)
 
 	for idx, version := range versionsByIndex {
@@ -258,9 +275,11 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 		new    string
 	}
 
+	runes := []rune(string(file))
+
 	lineStarts := []int{0}
-	for i, b := range file {
-		if b == '\n' {
+	for i, r := range runes {
+		if r == '\n' {
 			lineStarts = append(lineStarts, i+1)
 		}
 	}
@@ -281,7 +300,8 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
 		}
 		offset := lineStarts[line] + tk.Position.Column - 1
-		if offset < 0 || offset+len(tk.Value) > len(file) || string(file[offset:offset+len(tk.Value)]) != tk.Value {
+		oldRunes := []rune(tk.Value)
+		if offset < 0 || offset+len(oldRunes) > len(runes) || string(runes[offset:offset+len(oldRunes)]) != tk.Value {
 			return []byte{}, fmt.Errorf("version of event specification %d could not be located", idx)
 		}
 		replacements = append(replacements, replacement{offset: offset, old: tk.Value, new: fmt.Sprintf("%d", version)})
@@ -289,10 +309,11 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 
 	sort.Slice(replacements, func(i, j int) bool { return replacements[i].offset > replacements[j].offset })
 
-	output := string(file)
 	for _, r := range replacements {
-		output = output[:r.offset] + r.new + output[r.offset+len(r.old):]
+		updated := append([]rune{}, runes[:r.offset]...)
+		updated = append(updated, []rune(r.new)...)
+		runes = append(updated, runes[r.offset+len([]rune(r.old)):]...)
 	}
 
-	return []byte(output), nil
+	return []byte(string(runes)), nil
 }

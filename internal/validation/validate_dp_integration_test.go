@@ -26,6 +26,7 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/download"
 	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
@@ -712,5 +713,115 @@ func TestValidateDataProductsAgainstBase_InvalidRef(t *testing.T) {
 	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "origin/does-not-exist", false)
 	if err == nil || !strings.Contains(err.Error(), "merge-base") {
 		t.Errorf("Expected a git error for an unknown ref, got: %v", err)
+	}
+}
+
+const twoSpecsRemoteDataProducts = `{
+  "data": [{
+    "id": "dbc68917-3bcb-4640-a165-483de5fc033c",
+    "name": "checkout",
+    "status": "draft",
+    "sourceApplications": [],
+    "eventSpecs": [{"id": "b57f712e-ee43-4e10-8b36-48a0f6f2e628"}, {"id": "c67f712e-ee43-4e10-8b36-48a0f6f2e629"}]
+  }],
+  "includes": {"eventSpecs": [
+    {"id": "b57f712e-ee43-4e10-8b36-48a0f6f2e628", "name": "Checkout Started", "status": "published", "version": 3, "sourceApplications": [], "dataProductId": "dbc68917-3bcb-4640-a165-483de5fc033c", "entities": {"tracked": [], "enriched": []}},
+    {"id": "c67f712e-ee43-4e10-8b36-48a0f6f2e629", "name": "Checkout Finished", "status": "published", "version": 10, "sourceApplications": [], "dataProductId": "dbc68917-3bcb-4640-a165-483de5fc033c", "entities": {"tracked": [], "enriched": []}}
+  ]}
+}`
+
+const twoSpecsLocalDataProduct = `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started Renamed
+      version: %d
+      entities:
+        tracked: []
+        enriched: []
+    - {resourceName: c67f712e-ee43-4e10-8b36-48a0f6f2e629, name: Checkout Finished Renamed, version: %d, entities: {tracked: [], enriched: []}}
+`
+
+func TestValidateDataProductsWithClient_TwoMismatchesInOneFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	dpFile := filepath.Join(tmpDir, "checkout.yaml")
+	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(twoSpecsLocalDataProduct, 3, 9)), 0644); err != nil {
+		t.Fatalf("Failed to write data product file: %v", err)
+	}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: twoSpecsRemoteDataProducts})
+
+	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+	if err == nil || !strings.Contains(err.Error(), "validation failed 2 errors") {
+		t.Fatalf("Expected two version errors, got: %v", err)
+	}
+
+	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true)
+	if err != nil {
+		t.Fatalf("Expected --fix to succeed, got: %v", err)
+	}
+	fixed, err := os.ReadFile(dpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(fixed) != fmt.Sprintf(twoSpecsLocalDataProduct, 4, 11) {
+		t.Errorf("Expected both versions to be fixed, got:\n%s", fixed)
+	}
+	if strings.Count(logOutput.String(), "updated event specification version") != 2 {
+		t.Errorf("Expected one log line per fixed spec, got:\n%s", logOutput.String())
+	}
+
+	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+	if err != nil {
+		t.Errorf("Expected validate to pass after --fix, got: %v", err)
+	}
+}
+
+type MockDataProductRecordingTransport struct {
+	MockDataProductRemoteTransport
+	writes []string
+}
+
+func (m *MockDataProductRecordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method != "GET" && !strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") {
+		m.writes = append(m.writes, req.Method+" "+req.URL.Path)
+	}
+	return m.MockDataProductRemoteTransport.RoundTrip(req)
+}
+
+func TestSyncWorkflow_StoppedByVersionMismatchBeforeWriting(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "checkout.yaml"), []byte(versionLocalDataProduct), 0644); err != nil {
+		t.Fatalf("Failed to write data product file: %v", err)
+	}
+
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	transport := &MockDataProductRecordingTransport{MockDataProductRemoteTransport: MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts}}
+	mockClient := createMockDataProductClient(transport)
+
+	files, err := util.MaybeResourcesfromPaths([]string{tmpDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes, err := release.FindChanges(ctx, mockClient, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changes.VersionMismatches) != 1 {
+		t.Fatalf("expected the sync change set to carry 1 version mismatch, got %+v", changes.VersionMismatches)
+	}
+
+	err = Validate(ctx, mockClient, files, []string{tmpDir}, tmpDir, false, false, changes.IdToFileName, changes.VersionMismatches, 1)
+	if err == nil || !strings.Contains(err.Error(), "validation failed") {
+		t.Fatalf("Expected the validation step of sync to fail, got: %v", err)
+	}
+	if len(transport.writes) != 0 {
+		t.Errorf("Expected nothing written before the validation step fails, got: %v", transport.writes)
 	}
 }

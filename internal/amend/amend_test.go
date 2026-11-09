@@ -383,3 +383,54 @@ data:
 		t.Fatal("expected an error for an event spec without a version")
 	}
 }
+
+func Test_SetEventSpecVersionsYamlMultiByteBeforeVersion(t *testing.T) {
+	original := `apiVersion: v1
+resourceType: data-product
+data:
+  name: Café ñandú
+  eventSpecifications:
+    - {resourceName: 15c70141-c223-4172-ab39-86a0194e44e8, name: Café añadido 🛒, version: 3}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: Pedido ñ
+      version: 7 # versión
+`
+	expected := `apiVersion: v1
+resourceType: data-product
+data:
+  name: Café ñandú
+  eventSpecifications:
+    - {resourceName: 15c70141-c223-4172-ab39-86a0194e44e8, name: Café añadido 🛒, version: 14}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: Pedido ñ
+      version: 8 # versión
+`
+
+	res, err := SetEventSpecVersions(map[int]int{0: 14, 1: 8}, []byte(original), "test.yaml")
+	if err != nil {
+		t.Fatalf("Can't set event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of setting the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
+func Test_SetEventSpecVersionsJsonMissingVersion(t *testing.T) {
+	original := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "data": {
+    "eventSpecifications": [
+      {"resourceName": "15c70141-c223-4172-ab39-86a0194e44e8", "name": "test1"}
+    ]
+  }
+}
+`
+
+	for _, idx := range []int{0, 1} {
+		_, err := SetEventSpecVersions(map[int]int{idx: 1}, []byte(original), "test.json")
+		if err == nil {
+			t.Fatalf("expected an error for event spec %d without a version", idx)
+		}
+	}
+}

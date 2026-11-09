@@ -407,6 +407,10 @@ func Test_CreateEventSpec(t *testing.T) {
 	if _, ok := body["expectedVersion"]; ok {
 		t.Errorf("expectedVersion sent without a declared version, got: %v", body)
 	}
+	spec, _ := body["spec"].(map[string]any)
+	if _, ok := spec["version"]; ok {
+		t.Errorf("the cli should not send a version, got: %v", spec["version"])
+	}
 
 }
 
@@ -477,8 +481,8 @@ func Test_UpdateEventSpec(t *testing.T) {
 		t.Errorf("expectedVersion sent without a declared version, got: %v", body)
 	}
 	spec, _ := body["spec"].(map[string]any)
-	if spec["version"] != float64(0) {
-		t.Errorf("the cli should not compute a version, got: %v", spec["version"])
+	if _, ok := spec["version"]; ok {
+		t.Errorf("the cli should not send a version, got: %v", spec["version"])
 	}
 	if spec["status"] != "draft" {
 		t.Errorf("status should be draft, got: %v", spec["status"])

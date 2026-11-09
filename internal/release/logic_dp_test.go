@@ -999,6 +999,8 @@ func Test_findChanges_VersionRule(t *testing.T) {
 		wantUpdate   bool
 		wantExpected int
 		wantChanged  []string
+
+		wantCommentsRemoved bool
 	}{
 		{
 			name:         "unchanged keeps the version",
@@ -1077,6 +1079,16 @@ func Test_findChanges_VersionRule(t *testing.T) {
 			wantUpdate:   true,
 			wantExpected: 4,
 			wantChanged:  []string{"entities"},
+
+			wantCommentsRemoved: true,
+		},
+		{
+			name:         "remote entity comment alongside a real entity change is not the only cause",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
 		},
 		{
 			name:         "missing min cardinality is sent as null and treated as 0",
@@ -1133,7 +1145,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 			if len(changes.VersionMismatches) != 1 {
 				t.Fatalf("expected 1 version mismatch, got %+v", changes.VersionMismatches)
 			}
-			want := EventSpecVersionMismatch{
+			want := model.EventSpecVersionMismatch{
 				FileName: "/base/dp.yaml",
 				Index:    0,
 				Name:     localEs.Name,
@@ -1141,6 +1153,8 @@ func Test_findChanges_VersionRule(t *testing.T) {
 				Expected: tt.wantExpected,
 				IsNew:    false,
 				Changed:  tt.wantChanged,
+
+				EntityCommentsRemoved: tt.wantCommentsRemoved,
 			}
 			if diff := cmp.Diff(want, changes.VersionMismatches[0]); diff != "" {
 				t.Errorf("version mismatch (-want +got):\n%s", diff)
@@ -1191,7 +1205,7 @@ func Test_findChanges_NewEventSpecExpectsZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := []EventSpecVersionMismatch{{
+	want := []model.EventSpecVersionMismatch{{
 		FileName: "/base/dp.yaml",
 		Index:    0,
 		Name:     localEs.Name,
@@ -1461,7 +1475,7 @@ func Test_FindVersionMismatchesAgainstBase(t *testing.T) {
 			if len(skipped) != 0 {
 				t.Errorf("expected nothing skipped, got %v", skipped)
 			}
-			want := []EventSpecVersionMismatch{{
+			want := []model.EventSpecVersionMismatch{{
 				FileName: "/base/dp.yaml",
 				Index:    0,
 				Name:     localSpec["name"].(string),
@@ -1510,7 +1524,7 @@ func Test_FindVersionMismatchesAgainstBase_NewSpec(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			want := []EventSpecVersionMismatch{{FileName: "/base/dp.yaml", Index: 0, Name: "Checkout Started", Declared: 2, Expected: 0, IsNew: true, Changed: []string{}}}
+			want := []model.EventSpecVersionMismatch{{FileName: "/base/dp.yaml", Index: 0, Name: "Checkout Started", Declared: 2, Expected: 0, IsNew: true, Changed: []string{}}}
 			if diff := cmp.Diff(want, mismatches); diff != "" {
 				t.Errorf("version mismatch (-want +got):\n%s", diff)
 			}

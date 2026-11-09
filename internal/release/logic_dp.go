@@ -54,17 +54,7 @@ type DataProductChangeSet struct {
 	IdToFileName      map[string]string
 	localEventSpecIds []string
 	declaredVersions  map[string]int
-	VersionMismatches []EventSpecVersionMismatch
-}
-
-type EventSpecVersionMismatch struct {
-	FileName string
-	Index    int
-	Name     string
-	Declared int
-	Expected int
-	IsNew    bool
-	Changed  []string
+	VersionMismatches []model.EventSpecVersionMismatch
 }
 
 func (cs DataProductChangeSet) declaredVersion(id string) *int {
@@ -237,7 +227,7 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 
 	esLocalIds := make(map[string]bool)
 	declaredVersions := make(map[string]int)
-	var versionMismatches []EventSpecVersionMismatch
+	var versionMismatches []model.EventSpecVersionMismatch
 
 	var imageCreate []TriggerImageReference
 
@@ -262,6 +252,7 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
 			expectedVersion := 0
 			changedFields := []string{}
+			entityCommentsRemoved := false
 			if remoteExists {
 				expectedVersion = remoteEs.Version
 				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
@@ -285,6 +276,18 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 					if len(changedFields) > 0 {
 						expectedVersion = remoteEs.Version + 1
 					}
+					if slices.Contains(changedFields, "entities") {
+						remoteWithoutComments := remoteEs
+						remoteWithoutComments.Entities = console.Entities{
+							Tracked:  entitiesWithoutComments(remoteEs.Entities.Tracked),
+							Enriched: entitiesWithoutComments(remoteEs.Entities.Enriched),
+						}
+						changedIgnoringComments, err := changedStructuralFields(remoteWithoutComments, possibleUpdate)
+						if err != nil {
+							return nil, err
+						}
+						entityCommentsRemoved = !slices.Contains(changedIgnoringComments, "entities")
+					}
 					esUpdate = append(esUpdate, possibleUpdate)
 					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 					imageCreate = append(imageCreate, triggerChangeset.imagesToUpload...)
@@ -307,14 +310,15 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			if localEs.Version != nil {
 				declaredVersions[localEs.ResourceName] = *localEs.Version
 				if *localEs.Version != expectedVersion {
-					versionMismatches = append(versionMismatches, EventSpecVersionMismatch{
-						FileName: local.IdToFileName[localEs.ResourceName],
-						Index:    esIdx,
-						Name:     localEs.Name,
-						Declared: *localEs.Version,
-						Expected: expectedVersion,
-						IsNew:    !remoteExists,
-						Changed:  changedFields,
+					versionMismatches = append(versionMismatches, model.EventSpecVersionMismatch{
+						FileName:              local.IdToFileName[localEs.ResourceName],
+						Index:                 esIdx,
+						Name:                  localEs.Name,
+						Declared:              *localEs.Version,
+						Expected:              expectedVersion,
+						IsNew:                 !remoteExists,
+						Changed:               changedFields,
+						EntityCommentsRemoved: entityCommentsRemoved,
 					})
 				}
 			}
@@ -792,7 +796,7 @@ func localEventSpecsById(files map[string]map[string]any) (map[string]localEvent
 	return specs, ids, nil
 }
 
-func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]EventSpecVersionMismatch, []string, error) {
+func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]model.EventSpecVersionMismatch, []string, error) {
 	localSpecs, localIds, err := localEventSpecsById(local)
 	if err != nil {
 		return nil, nil, err
@@ -802,7 +806,7 @@ func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[
 		return nil, nil, err
 	}
 
-	var versionMismatches []EventSpecVersionMismatch
+	var versionMismatches []model.EventSpecVersionMismatch
 	var skipped []string
 
 	for _, id := range localIds {
@@ -833,7 +837,7 @@ func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[
 		}
 
 		if *localEs.spec.Version != expectedVersion {
-			versionMismatches = append(versionMismatches, EventSpecVersionMismatch{
+			versionMismatches = append(versionMismatches, model.EventSpecVersionMismatch{
 				FileName: localEs.fileName,
 				Index:    localEs.index,
 				Name:     localEs.spec.Name,

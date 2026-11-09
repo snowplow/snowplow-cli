@@ -63,7 +63,7 @@ type RemoteEventSpec struct {
 	Description          string          `json:"description"`
 	Triggers             []RemoteTrigger `json:"triggers,omitempty"`
 	Status               string          `json:"status"`
-	Version              int             `json:"version"`
+	Version              int             `json:"version,omitempty"`
 	Event                *EventWrapper   `json:"event,omitempty"`
 	Entities             Entities        `json:"entities"`
 	DataProductId        string          `json:"dataProductId"`

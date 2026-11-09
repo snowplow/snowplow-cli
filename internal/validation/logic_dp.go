@@ -16,10 +16,10 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/release"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
-func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, versionMismatches []release.EventSpecVersionMismatch, concurrency int) error {
+func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, versionMismatches []model.EventSpecVersionMismatch, concurrency int) error {
 
 	logger := logging.LoggerFromContext(ctx)
 
@@ -77,7 +77,7 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 	return nil
 }
 
-func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, versionMismatches []release.EventSpecVersionMismatch) error {
+func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, versionMismatches []model.EventSpecVersionMismatch) error {
 
 	logger := logging.LoggerFromContext(ctx)
 

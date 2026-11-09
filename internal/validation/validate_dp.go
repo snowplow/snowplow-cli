@@ -16,6 +16,7 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/amend"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -124,26 +125,26 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 	return ValidateLocal(ctx, files, paths, basePath, ghOut, versionMismatches)
 }
 
-func fixEventSpecVersions(ctx context.Context, versionMismatches []release.EventSpecVersionMismatch) error {
+func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSpecVersionMismatch) error {
 	logger := logging.LoggerFromContext(ctx)
 
-	versionsByFile := map[string]map[int]int{}
+	mismatchesByFile := map[string][]model.EventSpecVersionMismatch{}
 	for _, m := range versionMismatches {
-		if versionsByFile[m.FileName] == nil {
-			versionsByFile[m.FileName] = map[int]int{}
-		}
-		versionsByFile[m.FileName][m.Index] = m.Expected
+		mismatchesByFile[m.FileName] = append(mismatchesByFile[m.FileName], m)
 	}
 
-	for f, versions := range versionsByFile {
+	for f, mismatches := range mismatchesByFile {
+		versions := map[int]int{}
+		for _, m := range mismatches {
+			versions[m.Index] = m.Expected
+		}
 		err := amend.SetEventSpecVersionsInFile(versions, f)
 		if err != nil {
 			return err
 		}
-	}
-
-	for _, m := range versionMismatches {
-		logger.Info("validation", "msg", "updated event specification version", "file", m.FileName, "name", m.Name, "from", m.Declared, "to", m.Expected)
+		for _, m := range mismatches {
+			logger.Info("validation", "msg", "updated event specification version", "file", f, "name", m.Name, "from", m.Declared, "to", m.Expected)
+		}
 	}
 
 	return nil

@@ -21,7 +21,6 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/model"
-	"github.com/snowplow/snowplow-cli/internal/release"
 )
 
 type DPLookup struct {
@@ -276,7 +275,7 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 	return nil
 }
 
-func (lookup *DPLookup) AddVersionMismatches(versionMismatches []release.EventSpecVersionMismatch) {
+func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpecVersionMismatch) {
 	for _, m := range versionMismatches {
 		path := fmt.Sprintf("/data/eventSpecifications/%d", m.Index)
 
@@ -289,6 +288,9 @@ func (lookup *DPLookup) AddVersionMismatches(versionMismatches []release.EventSp
 			messages = append(messages, "new event specification")
 		} else if len(m.Changed) > 0 {
 			messages = append(messages, fmt.Sprintf("changed: %s", strings.Join(m.Changed, ", ")))
+		}
+		if m.EntityCommentsRemoved {
+			messages = append(messages, "entities: a comment set in Console will be removed")
 		}
 		messages = append(messages,
 			fmt.Sprintf("expected version: %d", m.Expected),

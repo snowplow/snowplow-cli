@@ -152,3 +152,14 @@ type Image struct {
 	Ext  string
 	Data []byte
 }
+
+type EventSpecVersionMismatch struct {
+	FileName              string
+	Index                 int
+	Name                  string
+	Declared              int
+	Expected              int
+	IsNew                 bool
+	Changed               []string
+	EntityCommentsRemoved bool
+}
