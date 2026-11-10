@@ -12,7 +12,6 @@ package console
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +27,18 @@ type ApiClient struct {
 	Jwt     string
 	BaseUrl string
 	OrgId   string
+}
+
+type TokenError struct {
+	StatusCode int
+}
+
+func (e *TokenError) Error() string {
+	return fmt.Sprintf("bad token request: %d %s", e.StatusCode, http.StatusText(e.StatusCode))
+}
+
+func (e *TokenError) Rejected() bool {
+	return e.StatusCode >= 400 && e.StatusCode < 500 && e.StatusCode != http.StatusTooManyRequests
 }
 
 type tokenResponse struct {
@@ -81,11 +92,11 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	if err != nil {
 		return nil, err
 	}
+	defer util.LoggingCloser(ctx, resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("bad token request")
+		return nil, &TokenError{StatusCode: resp.StatusCode}
 	}
 	body, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(ctx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
