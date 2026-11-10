@@ -5,12 +5,38 @@ on:
     tags:
       - 'v*.*.*'
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  goreleaser:
+  preflight:
     runs-on: ubuntu-latest
+    steps:
+      -
+        name: Check homebrew taps token
+        run: |
+          push=$(gh api repos/snowplow/homebrew-taps --jq .permissions.push)
+          if [ "$push" != "true" ]; then
+            echo "::error::HOMEBREW_TAPS_GITHUB_TOKEN has no push access to snowplow/homebrew-taps"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAPS_GITHUB_TOKEN }}
+      -
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 # zizmor: ignore[cache-poisoning] setup-node@v4 does not cache unless the cache input is set
+        with:
+          node-version: 'latest'
+          registry-url: 'https://registry.npmjs.org'
+      -
+        name: Check npm token
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISHING_AUTOMATION_TOKEN }}
+
+  goreleaser:
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       -
         name: Checkout
