@@ -77,8 +77,8 @@ var SetupCmd = &cobra.Command{
 func init() {
 	config.InitConsoleFlags(SetupCmd)
 
-	SetupCmd.Flags().String("client-id", "EXQ3csSDr6D7wTIiebNPhXpgkSsOzCzi", "Auth0 Client ID for device auth")
-	SetupCmd.Flags().String("auth0-domain", "id.snowplowanalytics.com", "Auth0 domain")
+	SetupCmd.Flags().String("client-id", setup.DefaultClientID, "Auth0 Client ID for device auth")
+	SetupCmd.Flags().String("auth0-domain", setup.DefaultAuth0Domain, "Auth0 domain")
 	SetupCmd.Flags().Bool("read-only", false, "Create a read-only API key")
 	SetupCmd.Flags().Bool("dotenv", false, "Store as .env file in current working directory")
 }
