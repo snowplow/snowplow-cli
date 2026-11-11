@@ -90,6 +90,44 @@ data:
 	}
 }
 
+func Test_ValidateBaseRefReturnsValidationFailure(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate")
+	repo := t.TempDir()
+	tracking := filepath.Join(repo, "tracking")
+	if err := os.MkdirAll(tracking, 0755); err != nil {
+		t.Fatal(err)
+	}
+	dp := `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started
+      version: 5
+`
+	if err := os.WriteFile(filepath.Join(tracking, "checkout.yaml"), []byte(dp), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	gitInTest(t, repo, "commit", "-q", "--allow-empty", "-m", "base")
+
+	t.Chdir(tracking)
+
+	RootCmd.SetArgs([]string{"dp", "validate", "--base-ref", "main", "."})
+	err := RootCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "validation failed") {
+		t.Fatalf("expected a validation failure, got: %v", err)
+	}
+
+	found, _, _ := RootCmd.Find([]string{"dp", "validate"})
+	if !found.SilenceUsage || !found.SilenceErrors {
+		t.Errorf("the validation failure should be reported once by the logger, without usage")
+	}
+}
+
 func Test_ValidateWithoutBaseRefStillNeedsCredentials(t *testing.T) {
 	isolateCommandInTest(t, "dp", "validate")
 	t.Chdir(t.TempDir())

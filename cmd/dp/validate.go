@@ -48,7 +48,7 @@ var validateCmd = &cobra.Command{
 
 		return nil
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
 		searchPaths := []string{}
@@ -62,7 +62,10 @@ var validateCmd = &cobra.Command{
 
 		basePath, err := os.Getwd()
 		if err != nil {
-			snplog.LogFatal(err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			return err
 		}
 
 		if baseRef, _ := cmd.Flags().GetString("base-ref"); baseRef != "" {
@@ -71,9 +74,13 @@ var validateCmd = &cobra.Command{
 			err = validation.ValidateDataProductsFromCmd(ctx, cmd, searchPaths, basePath)
 		}
 		if err != nil {
-			snplog.LogFatal(err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
+			return err
 		}
 
+		return nil
 	},
 }
 
