@@ -62,7 +62,7 @@ go vet ./...
 golangci-lint run        # config in .golangci.yml (see CI workflow)
 ```
 
-The release pipeline is GitHub Actions (`.github/workflows/cd.yaml`) and publishes to GitHub Releases, Homebrew (`snowplow/taps`), and npm (`@snowplow/snowplow-cli` via `npm/`).
+The release pipeline is GitHub Actions (`.github/workflows/cd.yaml`) and publishes to GitHub Releases, Homebrew (`snowplow/taps`), and npm (`@snowplow/snowplow-cli` via `npm/`). Release steps and known issues are in `RELEASING.md`.
 
 ## Working with this codebase
 
