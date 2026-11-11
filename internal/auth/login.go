@@ -152,6 +152,19 @@ func write(login *Login, path string) error {
 
 // Load returns nil when nobody has logged in to host.
 func Load(host string) (*Login, error) {
+	login, err := loadAny()
+	if err != nil || login == nil {
+		return nil, err
+	}
+	if login.AccessToken == "" || strings.TrimRight(login.Host, "/") != strings.TrimRight(host, "/") {
+		slog.Debug("saved login ignored: it has no token or is for another host", "file", Path(), "login-host", login.Host, "host", host)
+		return nil, nil
+	}
+	return login, nil
+}
+
+// loadAny returns the saved login whatever host it is for, or nil when there is none.
+func loadAny() (*Login, error) {
 	data, err := os.ReadFile(Path())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -162,10 +175,6 @@ func Load(host string) (*Login, error) {
 	var login Login
 	if err := json.Unmarshal(data, &login); err != nil {
 		return nil, fmt.Errorf("failed to parse login file %s: %w", Path(), err)
-	}
-	if login.AccessToken == "" || strings.TrimRight(login.Host, "/") != strings.TrimRight(host, "/") {
-		slog.Debug("saved login ignored: it has no token or is for another host", "file", Path(), "login-host", login.Host, "host", host)
-		return nil, nil
 	}
 	return &login, nil
 }
@@ -221,15 +230,19 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	if token.RefreshToken != "" {
 		login.RefreshToken = token.RefreshToken
 	}
-	// Checked and written under the lock, so no login can land in between
+	// Checked and written under the lock, so no login can land in between.
+	// Whatever is in the file now, for this host or another, is newer unless
+	// it still holds the refresh token that was just used.
 	err = withLock(func(path string) error {
-		if current, err := Load(host); err == nil && current != nil && current.RefreshToken != usedRefreshToken {
+		current, err := loadAny()
+		if err != nil || current == nil || current.RefreshToken != usedRefreshToken {
 			return nil
 		}
 		return write(login, path)
 	})
 	if err != nil {
-		return nil, err
+		// The refreshed token is good for this command even if it cannot be kept
+		slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
 	}
 	return login, nil
 }

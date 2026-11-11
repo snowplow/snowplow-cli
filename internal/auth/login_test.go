@@ -542,3 +542,65 @@ func Test_Save_WritesExpiryAsUTCMilliseconds(t *testing.T) {
 		t.Errorf("want %s in %s", want, data)
 	}
 }
+
+func Test_Valid_DoesNotReplaceLoginForAnotherHostMadeDuringRefresh(t *testing.T) {
+	useTempPath(t)
+	other := login(time.Hour)
+	other.AccessToken = "other-host-token"
+	other.RefreshToken = "other-host-refresh"
+	other.Host = "https://next.console.snowplowanalytics.com"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := Save(other); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access-2", "token_type": "Bearer", "expires_in": 3600})
+	}))
+	old := tokenURL
+	tokenURL = func(string) string { return server.URL }
+	t.Cleanup(func() { tokenURL = old; server.Close() })
+
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Valid(context.Background(), host)
+	if err != nil || got == nil || got.AccessToken != "access-2" {
+		t.Fatalf("the command in hand should still get the refreshed token, got %v, %v", got, err)
+	}
+
+	saved, err := Load(other.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved == nil || saved.AccessToken != "other-host-token" {
+		t.Errorf("the login for the other host was replaced, got %+v", saved)
+	}
+}
+
+func Test_Valid_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
+	path := useTempPath(t)
+	oldWait := lockWait
+	lockWait = 50 * time.Millisecond
+	t.Cleanup(func() { lockWait = oldWait })
+	useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "access-2",
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	// A lock left behind by a crash
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil {
+		t.Fatalf("a refresh that worked must not fail the command: %v", err)
+	}
+	if got == nil || got.AccessToken != "access-2" {
+		t.Errorf("got %+v want access-2", got)
+	}
+}
