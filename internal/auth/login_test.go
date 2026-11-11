@@ -350,3 +350,84 @@ func Test_Valid_ExpiredWithoutClient(t *testing.T) {
 		t.Errorf("token endpoint called %d times, want 0", *calls)
 	}
 }
+
+func Test_Valid_RefreshRateLimited(t *testing.T) {
+	useTempPath(t)
+	useTokenServer(t, http.StatusTooManyRequests, map[string]any{"error": "too_many_requests"})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := Valid(context.Background(), host); err == nil {
+		t.Fatalf("a rate limit must not read as logged out, got %v, nil", got)
+	}
+}
+
+func Test_Valid_RefreshGrantNotEnabled(t *testing.T) {
+	useTempPath(t)
+	useTokenServer(t, http.StatusForbidden, map[string]any{"error": "unauthorized_client"})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil || got != nil {
+		t.Fatalf("got %v, %v want nil, nil", got, err)
+	}
+}
+
+func Test_Valid_LoginWithoutExpiryIsUsed(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, nil)
+	noExpiry := login(time.Hour)
+	noExpiry.ExpiresAt = time.Time{}
+	noExpiry.RefreshToken = ""
+	if err := Save(noExpiry); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil || got == nil || got.AccessToken != "access-1" {
+		t.Fatalf("got %v, %v want access-1", got, err)
+	}
+	if *calls != 0 {
+		t.Errorf("token endpoint called %d times, want 0", *calls)
+	}
+}
+
+// Snowtype reads and writes this file, so its keys are a contract between
+// the two tools. Change them in both or not at all.
+func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
+	path := useTempPath(t)
+	want := login(time.Hour)
+	if err := Save(want); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := map[string]any{
+		"access_token":  "access-1",
+		"refresh_token": "refresh-1",
+		"expires_at":    want.ExpiresAt.Format(time.RFC3339),
+		"org_id":        "org-1",
+		"host":          host,
+		"client_id":     "client-1",
+		"auth0_domain":  "id.example.com",
+	}
+	if len(got) != len(expected) {
+		t.Errorf("keys got %v want %v", got, expected)
+	}
+	for key, value := range expected {
+		if got[key] != value {
+			t.Errorf("%s got %v want %v", key, got[key], value)
+		}
+	}
+}

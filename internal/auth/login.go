@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,6 +90,11 @@ func Save(login *Login) error {
 		_ = tmp.Close()
 		return fmt.Errorf("failed to write login file: %w", err)
 	}
+	// Synced so that a crash cannot leave an empty file behind the rename
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to write login file: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("failed to write login file: %w", err)
 	}
@@ -131,7 +137,8 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	if err != nil || login == nil {
 		return nil, err
 	}
-	if time.Until(login.ExpiresAt) > expiryMargin {
+	// A login without an expiry is used as it is, as oauth2 does
+	if login.ExpiresAt.IsZero() || time.Until(login.ExpiresAt) > expiryMargin {
 		return login, nil
 	}
 	if login.RefreshToken == "" || login.ClientID == "" || login.Auth0Domain == "" {
@@ -145,9 +152,9 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	token, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: login.RefreshToken}).Token()
 	if err != nil {
 		var retrieveErr *oauth2.RetrieveError
-		// Only a rejected refresh token means logging in again. Anything
-		// else, such as a rate limit or an outage, is reported as it is.
-		if errors.As(err, &retrieveErr) && (retrieveErr.ErrorCode == "invalid_grant" || retrieveErr.ErrorCode == "invalid_client") {
+		// A rejected refresh means logging in again. Anything else, such as
+		// a rate limit or an outage, is reported as it is.
+		if errors.As(err, &retrieveErr) && rejected(retrieveErr) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to refresh login: %w", err)
@@ -166,4 +173,13 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 		return nil, err
 	}
 	return login, nil
+}
+
+// rejected mirrors console.TokenError.Rejected: any client error except a rate limit.
+func rejected(err *oauth2.RetrieveError) bool {
+	if err.Response == nil {
+		return false
+	}
+	status := err.Response.StatusCode
+	return status >= 400 && status < 500 && status != http.StatusTooManyRequests
 }
