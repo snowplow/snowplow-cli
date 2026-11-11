@@ -42,7 +42,7 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 		return err
 	}
 
-	lookup.AddVersionMismatches(versionMismatches)
+	lookup.AddVersionMismatches(versionMismatches, "snowplow-cli dp validate --fix")
 
 	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
 
@@ -77,7 +77,7 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 	return nil
 }
 
-func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, versionMismatches []model.EventSpecVersionMismatch) error {
+func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, baseRef string, versionMismatches []model.EventSpecVersionMismatch) error {
 
 	logger := logging.LoggerFromContext(ctx)
 
@@ -91,7 +91,7 @@ func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchP
 		return err
 	}
 
-	lookup.AddVersionMismatches(versionMismatches)
+	lookup.AddVersionMismatches(versionMismatches, fmt.Sprintf("snowplow-cli dp validate offline --base-ref %s --fix", baseRef))
 
 	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
 

@@ -679,7 +679,7 @@ func TestValidateDataProductsAgainstBase_StructuralChangeNeedsBump(t *testing.T)
 	if err == nil || !strings.Contains(err.Error(), "validation failed 1 errors") {
 		t.Fatalf("Expected a version validation failure, got: %v", err)
 	}
-	wantLog := `path=/data/eventSpecifications/0 errors="Checkout Started: version 3 needs a bump\nchanged: event\nexpected version: 4\nrun ` + "`snowplow-cli dp validate --fix`" + ` to update it\n"`
+	wantLog := `path=/data/eventSpecifications/0 errors="Checkout Started: version 3 needs a bump\nchanged: event\nexpected version: 4\nrun ` + "`snowplow-cli dp validate offline --base-ref main --fix`" + ` to update it\n"`
 	if !strings.Contains(logOutput.String(), wantLog) {
 		t.Errorf("Expected version error in logs\nwant: %s\ngot: %s", wantLog, logOutput.String())
 	}

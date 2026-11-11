@@ -131,7 +131,7 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 		}
 	}
 
-	return ValidateLocal(ctx, files, paths, basePath, ghOut, versionMismatches)
+	return ValidateLocal(ctx, files, paths, basePath, ghOut, baseRef, versionMismatches)
 }
 
 func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSpecVersionMismatch, missingVersions []model.EventSpecMissingVersion) error {

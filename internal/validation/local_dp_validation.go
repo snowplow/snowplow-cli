@@ -275,7 +275,7 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 	return nil
 }
 
-func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpecVersionMismatch) {
+func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpecVersionMismatch, fixCommand string) {
 	for _, m := range versionMismatches {
 		path := fmt.Sprintf("/data/eventSpecifications/%d", m.Index)
 
@@ -294,7 +294,7 @@ func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpec
 		}
 		messages = append(messages,
 			fmt.Sprintf("expected version: %d", m.Expected),
-			"run `snowplow-cli dp validate --fix` to update it",
+			fmt.Sprintf("run `%s` to update it", fixCommand),
 		)
 
 		v := lookup.Validations[m.FileName]

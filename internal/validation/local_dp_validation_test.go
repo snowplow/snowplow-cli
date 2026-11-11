@@ -200,7 +200,7 @@ func Test_DPLookup_AddVersionMismatches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lookup := &DPLookup{Validations: map[string]DPValidations{}}
-			lookup.AddVersionMismatches([]model.EventSpecVersionMismatch{tt.mismatch})
+			lookup.AddVersionMismatches([]model.EventSpecVersionMismatch{tt.mismatch}, "snowplow-cli dp validate --fix")
 
 			path := fmt.Sprintf("/data/eventSpecifications/%d", tt.mismatch.Index)
 			got := lookup.Validations["/base/dp.yml"].ErrorsWithPaths[path]
