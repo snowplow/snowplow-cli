@@ -517,3 +517,72 @@ func Test_Save_TakesOverStaleLock(t *testing.T) {
 		t.Error("the login was not saved")
 	}
 }
+
+func Test_Save_GivesUpWhenLockCannotBeRemoved(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can remove files from a read-only directory")
+	}
+	path := useTempPath(t)
+	old := lockWait
+	lockWait = 50 * time.Millisecond
+	t.Cleanup(func() { lockWait = old })
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
+
+	done := make(chan error, 1)
+	go func() { done <- Save(login(time.Hour)) }()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("expected an error when the lock cannot be removed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Save did not return")
+	}
+}
+
+func Test_Save_GivesUpWhenLockIsRetakenAfterTakeover(t *testing.T) {
+	path := useTempPath(t)
+	old := lockWait
+	lockWait = 50 * time.Millisecond
+	t.Cleanup(func() { lockWait = old })
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	lock := path + ".lock"
+	stop := make(chan struct{})
+	t.Cleanup(func() { close(stop) })
+	// Another process that keeps the lock no matter what
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = os.WriteFile(lock, nil, 0600)
+			}
+		}
+	}()
+	time.Sleep(10 * time.Millisecond)
+
+	done := make(chan error, 1)
+	go func() { done <- Save(login(time.Hour)) }()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Save did not return")
+	}
+}

@@ -90,6 +90,7 @@ func withLock(fn func(path string) error) error {
 
 	lock := path + ".lock"
 	deadline := time.Now().Add(lockWait)
+	tookOver := false
 	for {
 		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err == nil {
@@ -100,8 +101,14 @@ func withLock(fn func(path string) error) error {
 			return fmt.Errorf("failed to lock login file: %w", err)
 		}
 		if time.Now().After(deadline) {
-			// Left behind by a process that crashed
-			_ = os.Remove(lock)
+			// Left behind by a process that crashed: take it over, once
+			if tookOver {
+				return fmt.Errorf("failed to lock login file: %s is held by another process", lock)
+			}
+			if err := os.Remove(lock); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("failed to lock login file: %w", err)
+			}
+			tookOver = true
 			continue
 		}
 		time.Sleep(25 * time.Millisecond)
