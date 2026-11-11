@@ -170,8 +170,17 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 	})
 
 	required := []string{"api-key-id", "api-key", "host", "org-id"}
-	if err == nil && useSavedLogin(cmd) {
-		required = []string{"host", "org-id"}
+	if err == nil {
+		login, loginErr := savedLogin(cmd)
+		switch {
+		case loginErr != nil && !skipMissingCheck:
+			return fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
+		case login != nil:
+			required = []string{"host", "org-id"}
+			if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
+				err = cmd.Flags().Set("org-id", login.OrgID)
+			}
+		}
 	}
 
 	var missingVars []string
@@ -223,28 +232,21 @@ Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console
 	return nil
 }
 
-// useSavedLogin reports whether the command runs on the login saved by
-// `snowplow-cli login` because no API key is configured. The organization
-// defaults to the one chosen at login.
-func useSavedLogin(cmd *cobra.Command) bool {
+// savedLogin returns the login saved by `snowplow-cli login` when the command
+// runs on it because no API key is configured.
+func savedLogin(cmd *cobra.Command) (*auth.Login, error) {
 	apiKeyID, _ := cmd.Flags().GetString("api-key-id")
 	apiKey, _ := cmd.Flags().GetString("api-key")
 	host, _ := cmd.Flags().GetString("host")
 	if apiKeyID != "" || apiKey != "" {
-		return false
+		return nil, nil
 	}
 
 	login, err := auth.Load(host)
-	if err != nil || login == nil {
-		slog.Debug("no saved login to use", "file", auth.Path(), "err", err)
-		return false
+	if err == nil && login != nil {
+		slog.Debug("no api key configured, using saved login", "file", auth.Path())
 	}
-
-	slog.Debug("no api key configured, using saved login", "file", auth.Path())
-	if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
-		_ = cmd.Flags().Set("org-id", login.OrgID)
-	}
-	return true
+	return login, err
 }
 
 func PersistConfig(orgID, apiKeyID, apiKeySecret, consoleHost string, isDotEnv bool) error {

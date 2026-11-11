@@ -13,6 +13,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/joho/godotenv"
@@ -753,5 +754,24 @@ func Test_ConfigApiKeyWinsOverSavedLogin(t *testing.T) {
 	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "key-id", "-S", "key"}
 	if err := build().Execute(); err == nil {
 		t.Error("should have failed: the organization of the login must not be used with an api key")
+	}
+}
+
+func Test_ConfigUnreadableSavedLogin(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	if err := os.WriteFile(auth.Path(), []byte("{not json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	err := build().Execute()
+	if err == nil || !strings.Contains(err.Error(), "failed to parse login file") {
+		t.Errorf("expected the unreadable login file to be reported, got: %v", err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "id", "-S", "key", "-o", "org"}
+	if err := build().Execute(); err != nil {
+		t.Errorf("an api key should make the login file irrelevant: %v", err)
 	}
 }

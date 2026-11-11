@@ -57,7 +57,8 @@ configured, and Snowtype shares the same login.`,
 }
 
 func init() {
-	LoginCmd.Flags().StringP("host", "H", "https://console.snowplowanalytics.com", "Snowplow Console host")
+	config.InitConsoleFlags(LoginCmd)
+
 	LoginCmd.Flags().String("client-id", setup.DefaultClientID, "Auth0 Client ID for device auth")
 	LoginCmd.Flags().String("auth0-domain", setup.DefaultAuth0Domain, "Auth0 domain")
 }

@@ -49,6 +49,10 @@ var tokenURL = func(auth0Domain string) string {
 	return fmt.Sprintf("https://%s/oauth/token", auth0Domain)
 }
 
+// Save replaces the file in one step, so that another process reading it
+// never sees a partial write. Two processes refreshing at the same moment can
+// still invalidate each other's refresh token when the provider rotates them;
+// logging in again recovers.
 func Save(login *Login) error {
 	path := Path()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -58,11 +62,25 @@ func Save(login *Login) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
+
+	// CreateTemp makes the file with mode 0600, before any token is written
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".login-*.json")
+	if err != nil {
 		return fmt.Errorf("failed to write login file: %w", err)
 	}
-	// WriteFile only applies the mode when it creates the file
-	return os.Chmod(path, 0600)
+	defer func() { _ = os.Remove(tmp.Name()) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to write login file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to write login file: %w", err)
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return fmt.Errorf("failed to write login file: %w", err)
+	}
+	return nil
 }
 
 // Load returns nil when nobody has logged in to host.
@@ -106,7 +124,9 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	token, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: login.RefreshToken}).Token()
 	if err != nil {
 		var retrieveErr *oauth2.RetrieveError
-		if errors.As(err, &retrieveErr) {
+		// Only a rejected refresh token means logging in again. Anything
+		// else, such as a rate limit or an outage, is reported as it is.
+		if errors.As(err, &retrieveErr) && (retrieveErr.ErrorCode == "invalid_grant" || retrieveErr.ErrorCode == "invalid_client") {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to refresh login: %w", err)

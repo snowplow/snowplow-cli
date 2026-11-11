@@ -247,3 +247,31 @@ func Test_Valid_RefreshRejected(t *testing.T) {
 		t.Fatalf("got %v, %v want nil, nil", got, err)
 	}
 }
+
+func Test_Valid_RefreshServerError(t *testing.T) {
+	useTempPath(t)
+	useTokenServer(t, http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err == nil {
+		t.Fatalf("an outage must not read as logged out, got %v, nil", got)
+	}
+}
+
+func Test_Save_LeavesNoTemporaryFile(t *testing.T) {
+	path := useTempPath(t)
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "login.json" {
+		t.Errorf("expected only login.json, got %v", entries)
+	}
+}
