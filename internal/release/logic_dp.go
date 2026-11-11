@@ -795,6 +795,7 @@ type localEventSpec struct {
 
 func localEventSpecsById(files map[string]map[string]any, rejectDuplicates bool) (map[string]localEventSpec, []string, error) {
 	specs := make(map[string]localEventSpec)
+	versioned := make(map[string]bool)
 	var ids []string
 
 	fileNames := make([]string, 0, len(files))
@@ -811,10 +812,13 @@ func localEventSpecsById(files map[string]map[string]any, rejectDuplicates bool)
 				return nil, nil, err
 			}
 			for idx, es := range dp.Data.EventSpecifications {
-				if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates {
+				if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates && (es.Version != nil || versioned[es.ResourceName]) {
 					return nil, nil, duplicateEventSpecError(es.ResourceName, previous.fileName, f)
 				}
 				specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
+				if es.Version != nil {
+					versioned[es.ResourceName] = true
+				}
 				ids = append(ids, es.ResourceName)
 			}
 		}

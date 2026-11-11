@@ -1641,18 +1641,34 @@ func Test_ReadLocalDataProducts_SortsDataProductsByFileName(t *testing.T) {
 }
 
 func Test_FindVersionMismatchesAgainstBase_DuplicateEventSpecId(t *testing.T) {
-	local := baseRuleFile(baseRuleSpec(3))
-	local["/base/other.yaml"] = baseRuleFile(baseRuleSpec(nil))["/base/dp.yaml"]
+	for _, tt := range []struct {
+		name         string
+		dpVersion    any
+		otherVersion any
+		wantErr      bool
+	}{
+		{name: "no version declared keeps the old behaviour", dpVersion: nil, otherVersion: nil, wantErr: false},
+		{name: "first declares a version", dpVersion: 3, otherVersion: nil, wantErr: true},
+		{name: "second declares a version", dpVersion: nil, otherVersion: 3, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			local := baseRuleFile(baseRuleSpec(tt.dpVersion))
+			local["/base/other.yaml"] = baseRuleFile(baseRuleSpec(tt.otherVersion))["/base/dp.yaml"]
 
-	_, _, err := FindVersionMismatchesAgainstBase(local, baseRuleFile(baseRuleSpec(3)))
-	want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/dp.yaml and /base/other.yaml"
-	if err == nil || err.Error() != want {
-		t.Errorf("error = %v, want %q", err, want)
+			_, _, err := FindVersionMismatchesAgainstBase(local, baseRuleFile(baseRuleSpec(3)))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, want error %v", err, tt.wantErr)
+			}
+			want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/dp.yaml and /base/other.yaml"
+			if tt.wantErr && err.Error() != want {
+				t.Errorf("error = %q, want %q", err.Error(), want)
+			}
+		})
 	}
 
 	base := baseRuleFile(baseRuleSpec(3))
 	base["/base/other.yaml"] = baseRuleFile(baseRuleSpec(3))["/base/dp.yaml"]
-	_, _, err = FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(3)), base)
+	_, _, err := FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(3)), base)
 	if err != nil {
 		t.Errorf("a duplicate at base should not fail the check, got: %v", err)
 	}
