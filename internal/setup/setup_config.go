@@ -71,7 +71,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 
 // LoginConfig signs in and saves the login itself, so that commands can run
 // without an API key.
-func LoginConfig(clientID, auth0Domain, consoleHost string, ctx context.Context) error {
+func LoginConfig(clientID, auth0Domain, consoleHost string, hasAPIKey bool, ctx context.Context) error {
 	session, err := Login(ctx, clientID, auth0Domain, consoleHost, false)
 	if err != nil {
 		return err
@@ -95,6 +95,9 @@ func LoginConfig(clientID, auth0Domain, consoleHost string, ctx context.Context)
 	}
 	slog.Info("Logged in to Snowplow Console", "email", session.Email, "org-id", session.Org.ID)
 	slog.Info("Login saved", "file", auth.Path())
+	if hasAPIKey {
+		slog.Warn("An API key is configured and takes precedence over this login. Remove it to use the login")
+	}
 
 	return nil
 }

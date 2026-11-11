@@ -28,6 +28,7 @@ No API key is created. Commands use the saved login when no API key is
 configured, and Snowtype shares the same login.`,
 	Example:      `  $ snowplow-cli login`,
 	SilenceUsage: true,
+	Args:         cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := snplog.InitLogging(cmd); err != nil {
 			return err
@@ -56,7 +57,10 @@ configured, and Snowtype shares the same login.`,
 			return fmt.Errorf("client-id is required. Use --client-id flag")
 		}
 
-		return setup.LoginConfig(clientID, auth0Domain, consoleHost, cmd.Context())
+		apiKeyID, _ := cmd.Flags().GetString("api-key-id")
+		apiKey, _ := cmd.Flags().GetString("api-key")
+
+		return setup.LoginConfig(clientID, auth0Domain, consoleHost, apiKeyID != "" || apiKey != "", cmd.Context())
 	},
 }
 

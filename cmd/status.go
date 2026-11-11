@@ -52,7 +52,13 @@ var StatusCmd = &cobra.Command{
 		orgID, _ := cmd.Flags().GetString("org-id")
 		host, _ := cmd.Flags().GetString("host")
 
+		authMethod := "api-key"
+		if apiKeyID == "" && apiKey == "" {
+			authMethod = "login"
+		}
+
 		slog.Info("API credentials configured",
+			"auth", authMethod,
 			"api_key_id", apiKeyID,
 			"org_id", orgID,
 			"host", host)

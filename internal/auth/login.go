@@ -48,8 +48,7 @@ var refreshMu sync.Mutex
 
 const refreshTimeout = 30 * time.Second
 
-// lockWait is long enough for another process to finish a write, after which
-// a lock left behind by a crash is taken over
+// lockWait is far longer than another process needs to finish a write
 var lockWait = 5 * time.Second
 
 // Path is a variable holding the function to get the login file path (for testability)
@@ -79,6 +78,11 @@ func Save(login *Login) error {
 // withLock runs fn while holding login.json.lock, the lock Snowtype takes
 // too, so that a check of the file and the write that follows it cannot be
 // interleaved with a write by another process.
+//
+// The lock is never taken from another process. A holder keeps it only for
+// one small file write, so a lock that outlasts lockWait was left by a crash,
+// and deciding that automatically would let two waiters in at once. The error
+// names the file to delete instead.
 func withLock(fn func(path string) error) error {
 	path := Path()
 	if path == "" {
@@ -90,7 +94,6 @@ func withLock(fn func(path string) error) error {
 
 	lock := path + ".lock"
 	deadline := time.Now().Add(lockWait)
-	tookOver := false
 	for {
 		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err == nil {
@@ -101,25 +104,23 @@ func withLock(fn func(path string) error) error {
 			return fmt.Errorf("failed to lock login file: %w", err)
 		}
 		if time.Now().After(deadline) {
-			// Left behind by a process that crashed: take it over, once
-			if tookOver {
-				return fmt.Errorf("failed to lock login file: %s is held by another process", lock)
-			}
-			if err := os.Remove(lock); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("failed to lock login file: %w", err)
-			}
-			tookOver = true
-			continue
+			return fmt.Errorf("failed to lock login file: %s exists. If no other snowplow-cli or snowtype command is running, delete it and try again", lock)
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
+	// Only this process created the lock, so only its own lock is removed
 	defer func() { _ = os.Remove(lock) }()
 
 	return fn(path)
 }
 
 func write(login *Login, path string) error {
-	data, err := json.MarshalIndent(login, "", "  ")
+	// UTC to the millisecond, the form Snowtype writes too
+	saved := *login
+	if !saved.ExpiresAt.IsZero() {
+		saved.ExpiresAt = saved.ExpiresAt.UTC().Truncate(time.Millisecond)
+	}
+	data, err := json.MarshalIndent(&saved, "", "  ")
 	if err != nil {
 		return err
 	}
