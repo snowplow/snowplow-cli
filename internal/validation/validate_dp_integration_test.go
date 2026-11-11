@@ -1194,6 +1194,55 @@ const missingVersionsLocalJson = `{
 }
 `
 
+const missingVersionsFixedJson = `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "dbc68917-3bcb-4640-a165-483de5fc033c",
+  "data": {
+    "name": "checkout",
+    "sourceApplications": [],
+    "eventSpecifications": [
+      {
+        "resourceName": "b57f712e-ee43-4e10-8b36-48a0f6f2e628",
+        "name": "Checkout Started",
+        "version": 3,
+        "entities": {
+          "tracked": [],
+          "enriched": []
+        }
+      },
+      {
+        "resourceName": "c67f712e-ee43-4e10-8b36-48a0f6f2e629",
+        "name": "Checkout Finished Renamed",
+        "version": 11,
+        "entities": {
+          "tracked": [],
+          "enriched": []
+        }
+      },
+      {
+        "resourceName": "d77f712e-ee43-4e10-8b36-48a0f6f2e630",
+        "name": "Pedido añadido 🛒",
+        "version": 0,
+        "entities": {
+          "tracked": [],
+          "enriched": []
+        }
+      },
+      {
+        "resourceName": "e87f712e-ee43-4e10-8b36-48a0f6f2e631",
+        "name": "Checkout Abandoned",
+        "version": 0,
+        "entities": {
+          "tracked": [],
+          "enriched": []
+        }
+      }
+    ]
+  }
+}
+`
+
 func TestValidateDataProductsWithClient_FixAddsMissingVersions(t *testing.T) {
 	for _, tt := range []struct {
 		ext      string
@@ -1208,7 +1257,7 @@ func TestValidateDataProductsWithClient_FixAddsMissingVersions(t *testing.T) {
 		{
 			ext:      "json",
 			original: fmt.Sprintf(missingVersionsLocalJson, "", "", "", 2),
-			want:     fmt.Sprintf(missingVersionsLocalJson, ",\n        \"version\": 3", `, "version": 11`, `, "version": 0`, 0),
+			want:     missingVersionsFixedJson,
 		},
 	} {
 		t.Run(tt.ext, func(t *testing.T) {
