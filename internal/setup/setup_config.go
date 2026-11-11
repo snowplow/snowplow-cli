@@ -90,6 +90,9 @@ func LoginConfig(clientID, auth0Domain, consoleHost string, ctx context.Context)
 		return fmt.Errorf("failed to save login: %w", err)
 	}
 
+	if session.RefreshToken == "" {
+		slog.Warn("No refresh token was issued, so this login ends when its token expires", "expires-at", session.Expiry)
+	}
 	slog.Info("Logged in to Snowplow Console", "email", session.Email, "org-id", session.Org.ID)
 	slog.Info("Login saved", "file", auth.Path())
 

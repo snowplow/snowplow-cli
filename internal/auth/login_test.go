@@ -464,3 +464,56 @@ func Test_Valid_DoesNotReplaceLoginMadeDuringRefresh(t *testing.T) {
 		t.Errorf("the newer login was replaced, got %+v", saved)
 	}
 }
+
+func Test_Save_WaitsForLock(t *testing.T) {
+	path := useTempPath(t)
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	lock := path + ".lock"
+	if err := os.WriteFile(lock, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	released := time.Now().Add(150 * time.Millisecond)
+	go func() {
+		time.Sleep(time.Until(released))
+		_ = os.Remove(lock)
+	}()
+
+	later := login(time.Hour)
+	later.AccessToken = "after-wait"
+	if err := Save(later); err != nil {
+		t.Fatal(err)
+	}
+
+	if time.Now().Before(released) {
+		t.Error("saved while another process held the lock")
+	}
+	if saved, _ := Load(host); saved == nil || saved.AccessToken != "after-wait" {
+		t.Errorf("got %+v want after-wait", saved)
+	}
+	if _, err := os.Stat(lock); !os.IsNotExist(err) {
+		t.Error("the lock was left behind")
+	}
+}
+
+func Test_Save_TakesOverStaleLock(t *testing.T) {
+	path := useTempPath(t)
+	old := lockWait
+	lockWait = 50 * time.Millisecond
+	t.Cleanup(func() { lockWait = old })
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if saved, _ := Load(host); saved == nil {
+		t.Error("the login was not saved")
+	}
+}

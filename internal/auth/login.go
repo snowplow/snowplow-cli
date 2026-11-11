@@ -46,6 +46,12 @@ const defaultLifetime = time.Hour
 
 var refreshMu sync.Mutex
 
+const refreshTimeout = 30 * time.Second
+
+// lockWait is long enough for another process to finish a write, after which
+// a lock left behind by a crash is taken over
+var lockWait = 5 * time.Second
+
 // Path is a variable holding the function to get the login file path (for testability)
 // It returns "" when the home directory is unknown, so that tokens are never
 // written relative to the working directory.
@@ -67,6 +73,13 @@ var tokenURL = func(auth0Domain string) string {
 // still invalidate each other's refresh token when the provider rotates them;
 // logging in again recovers.
 func Save(login *Login) error {
+	return withLock(func(path string) error { return write(login, path) })
+}
+
+// withLock runs fn while holding login.json.lock, the lock Snowtype takes
+// too, so that a check of the file and the write that follows it cannot be
+// interleaved with a write by another process.
+func withLock(fn func(path string) error) error {
 	path := Path()
 	if path == "" {
 		return errors.New("failed to write login file: home directory not found")
@@ -74,6 +87,31 @@ func Save(login *Login) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
+
+	lock := path + ".lock"
+	deadline := time.Now().Add(lockWait)
+	for {
+		f, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err == nil {
+			_ = f.Close()
+			break
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("failed to lock login file: %w", err)
+		}
+		if time.Now().After(deadline) {
+			// Left behind by a process that crashed
+			_ = os.Remove(lock)
+			continue
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	defer func() { _ = os.Remove(lock) }()
+
+	return fn(path)
+}
+
+func write(login *Login, path string) error {
 	data, err := json.MarshalIndent(login, "", "  ")
 	if err != nil {
 		return err
@@ -149,12 +187,16 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 		ClientID: login.ClientID,
 		Endpoint: oauth2.Endpoint{TokenURL: tokenURL(login.Auth0Domain), AuthStyle: oauth2.AuthStyleInParams},
 	}
+	// Bounded, as the refresh holds refreshMu and the default client never times out
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, &http.Client{Timeout: refreshTimeout})
 	token, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: login.RefreshToken}).Token()
 	if err != nil {
 		var retrieveErr *oauth2.RetrieveError
 		// A rejected refresh means logging in again. Anything else, such as
 		// a rate limit or an outage, is reported as it is.
 		if errors.As(err, &retrieveErr) && rejected(retrieveErr) {
+			slog.Debug("saved login rejected at refresh, logging in again is needed",
+				"error-code", retrieveErr.ErrorCode, "error-description", retrieveErr.ErrorDescription)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to refresh login: %w", err)
@@ -171,10 +213,14 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	if token.RefreshToken != "" {
 		login.RefreshToken = token.RefreshToken
 	}
-	if current, err := Load(host); err == nil && current != nil && current.RefreshToken != usedRefreshToken {
-		return login, nil
-	}
-	if err := Save(login); err != nil {
+	// Checked and written under the lock, so no login can land in between
+	err = withLock(func(path string) error {
+		if current, err := Load(host); err == nil && current != nil && current.RefreshToken != usedRefreshToken {
+			return nil
+		}
+		return write(login, path)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return login, nil
