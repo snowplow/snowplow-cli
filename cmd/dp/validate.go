@@ -79,7 +79,7 @@ var validateOfflineCmd = &cobra.Command{
 	Use:   "offline [paths...]",
 	Short: "Validate event specification versions against a git ref, without Snowplow Console",
 	Args:  cobra.ArbitraryArgs,
-	Long:  `Checks the event specification versions declared in data products from <path> against the files at the merge base of HEAD and --base-ref, without connecting to Snowplow Console. Needs the full git history and the ref fetched (for example actions/checkout with fetch-depth: 0).`,
+	Long:  `Checks the event specification versions declared in data products from <path> against the files at the merge base of HEAD and --base-ref, without connecting to Snowplow Console. Needs git installed, the full git history and the ref fetched (for example actions/checkout with fetch-depth: 0).`,
 	Example: `  $ snowplow-cli dp validate offline --base-ref origin/main
   $ snowplow-cli dp validate offline --base-ref origin/main --fix ./data-products`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
