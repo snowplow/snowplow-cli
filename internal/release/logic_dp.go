@@ -107,7 +107,14 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 		}
 	}
 
-	for dpFile, dp := range filenameToDp {
+	dpFiles := make([]string, 0, len(filenameToDp))
+	for f := range filenameToDp {
+		dpFiles = append(dpFiles, f)
+	}
+	slices.Sort(dpFiles)
+
+	for _, dpFile := range dpFiles {
+		dp := filenameToDp[dpFile]
 		var sourceApps []map[string]string
 		for _, sa := range dp.Data.SourceApplications {
 			ids := map[string]string{}
@@ -775,7 +782,9 @@ func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
 }
 
 func duplicateEventSpecError(id string, firstFile string, secondFile string) error {
-	return fmt.Errorf("event specification %s is defined in both %s and %s", id, firstFile, secondFile)
+	files := []string{firstFile, secondFile}
+	slices.Sort(files)
+	return fmt.Errorf("event specification %s is defined in both %s and %s", id, files[0], files[1])
 }
 
 type localEventSpec struct {

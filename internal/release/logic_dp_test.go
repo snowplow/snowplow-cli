@@ -1600,6 +1600,46 @@ func Test_findChanges_DuplicateEventSpecId(t *testing.T) {
 	}
 }
 
+func Test_findChanges_DuplicateEventSpecIdNamesFilesInOrder(t *testing.T) {
+	local := duplicateSpecLocal(intPtr(1), intPtr(1))
+	slices.Reverse(local.DataProudcts)
+
+	_, err := findChanges(local, console.DataProductsAndRelatedResources{}, map[string]string{})
+	want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/one.yaml and /base/two.yaml"
+	if err == nil || err.Error() != want {
+		t.Errorf("error = %v, want %q", err, want)
+	}
+}
+
+func Test_ReadLocalDataProducts_SortsDataProductsByFileName(t *testing.T) {
+	input := map[string]map[string]any{}
+	var want []string
+	for _, name := range []string{"e", "c", "a", "d", "b"} {
+		resourceName := fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name)
+		input[fmt.Sprintf("/base/%s.yaml", name)] = map[string]any{
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"resourceName": resourceName,
+			"data":         map[string]any{"name": name},
+		}
+	}
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		want = append(want, fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name))
+	}
+
+	result, err := ReadLocalDataProducts(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var got []string
+	for _, dp := range result.DataProudcts {
+		got = append(got, dp.ResourceName)
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("data products not in file name order (-want +got):\n%s", diff)
+	}
+}
+
 func Test_FindVersionMismatchesAgainstBase_DuplicateEventSpecId(t *testing.T) {
 	local := baseRuleFile(baseRuleSpec(3))
 	local["/base/other.yaml"] = baseRuleFile(baseRuleSpec(nil))["/base/dp.yaml"]
