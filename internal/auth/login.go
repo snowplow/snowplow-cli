@@ -17,9 +17,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -37,6 +39,11 @@ type Login struct {
 
 // expiryMargin avoids sending a token that expires while a command runs its first requests
 const expiryMargin = time.Minute
+
+// defaultLifetime is assumed when the provider does not say when a token expires
+const defaultLifetime = time.Hour
+
+var refreshMu sync.Mutex
 
 // Path is a variable holding the function to get the login file path (for testability)
 // It returns "" when the home directory is unknown, so that tokens are never
@@ -105,6 +112,7 @@ func Load(host string) (*Login, error) {
 		return nil, fmt.Errorf("failed to parse login file %s: %w", Path(), err)
 	}
 	if login.AccessToken == "" || strings.TrimRight(login.Host, "/") != strings.TrimRight(host, "/") {
+		slog.Debug("saved login ignored: it has no token or is for another host", "file", Path(), "login-host", login.Host, "host", host)
 		return nil, nil
 	}
 	return &login, nil
@@ -114,6 +122,11 @@ func Load(host string) (*Login, error) {
 // refreshing and saving it when it has expired. It returns nil when there is
 // no login or it can no longer be refreshed.
 func Valid(ctx context.Context, host string) (*Login, error) {
+	// One refresh at a time in this process: a second caller then finds the
+	// refreshed token on disk instead of spending the same refresh token.
+	refreshMu.Lock()
+	defer refreshMu.Unlock()
+
 	login, err := Load(host)
 	if err != nil || login == nil {
 		return nil, err
@@ -121,7 +134,7 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	if time.Until(login.ExpiresAt) > expiryMargin {
 		return login, nil
 	}
-	if login.RefreshToken == "" {
+	if login.RefreshToken == "" || login.ClientID == "" || login.Auth0Domain == "" {
 		return nil, nil
 	}
 
@@ -142,6 +155,10 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 
 	login.AccessToken = token.AccessToken
 	login.ExpiresAt = token.Expiry
+	if token.Expiry.IsZero() {
+		// Without an expiry every command would refresh again
+		login.ExpiresAt = time.Now().Add(defaultLifetime)
+	}
 	if token.RefreshToken != "" {
 		login.RefreshToken = token.RefreshToken
 	}

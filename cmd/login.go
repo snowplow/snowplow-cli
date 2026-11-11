@@ -11,6 +11,8 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/snowplow/snowplow-cli/internal/config"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/setup"
@@ -48,6 +50,10 @@ configured, and Snowtype shares the same login.`,
 		consoleHost, err := cmd.Flags().GetString("host")
 		if err != nil {
 			return err
+		}
+
+		if clientID == "" {
+			return fmt.Errorf("client-id is required. Use --client-id flag")
 		}
 
 		return setup.LoginConfig(clientID, auth0Domain, consoleHost, cmd.Context())

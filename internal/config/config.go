@@ -178,7 +178,9 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		case login != nil:
 			required = []string{"host", "org-id"}
 			if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
-				err = cmd.Flags().Set("org-id", login.OrgID)
+				if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
+					return err
+				}
 			}
 		}
 	}

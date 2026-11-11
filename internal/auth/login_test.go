@@ -292,3 +292,61 @@ func Test_UnknownHomeDirectory(t *testing.T) {
 		t.Errorf("nothing should be written to the working directory, got %v", entries)
 	}
 }
+
+func Test_Valid_RefreshesTokenAboutToExpire(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "access-2",
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+	if err := Save(login(30 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessToken != "access-2" || *calls != 1 {
+		t.Errorf("got %s after %d refreshes, want access-2 after 1", got.AccessToken, *calls)
+	}
+}
+
+func Test_Valid_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "access-2",
+		"token_type":   "Bearer",
+	})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		if _, err := Valid(context.Background(), host); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if *calls != 1 {
+		t.Errorf("token endpoint called %d times, want 1", *calls)
+	}
+}
+
+func Test_Valid_ExpiredWithoutClient(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, nil)
+	expired := login(-time.Hour)
+	expired.ClientID = ""
+	if err := Save(expired); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil || got != nil {
+		t.Fatalf("got %v, %v want nil, nil", got, err)
+	}
+	if *calls != 0 {
+		t.Errorf("token endpoint called %d times, want 0", *calls)
+	}
+}
