@@ -695,7 +695,13 @@ func useLogin(t *testing.T, login *auth.Login) {
 	for _, name := range []string{"API_KEY_ID", "API_KEY", "ORG_ID", "HOST"} {
 		t.Setenv(envNamePrefix+name, "")
 	}
-	t.Chdir(t.TempDir())
+	// No snowplow.yml or .env of the person running the tests is picked up
+	home := t.TempDir()
+	t.Chdir(home)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
 	path := filepath.Join(t.TempDir(), "login.json")
 	old := auth.Path
 	auth.Path = func() string { return path }

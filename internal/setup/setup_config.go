@@ -90,9 +90,8 @@ func LoginConfig(clientID, auth0Domain, consoleHost string, ctx context.Context)
 		return fmt.Errorf("failed to save login: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Printf("✓ Logged in to Snowplow Console as %s\n", session.Email)
-	green.Printf("✓ Login saved to %s\n", auth.Path())
+	slog.Info("Logged in to Snowplow Console", "email", session.Email, "org-id", session.Org.ID)
+	slog.Info("Login saved", "file", auth.Path())
 
 	return nil
 }
