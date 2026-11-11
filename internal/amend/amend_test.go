@@ -535,3 +535,178 @@ data:
 		})
 	}
 }
+
+func Test_AddEventSpecVersionsYaml(t *testing.T) {
+	original := `# yaml-language-server: $schema=https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/data-product.json
+
+apiVersion: v1 # comment before
+resourceType: data-product
+resourceName: 3b7c9fce-9f33-4c91-800b-8c8804f388c9
+data:
+  name: Café ñandú
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: "Café añadido 🛒" # keep me
+      # about the entities
+      entities: {tracked: [], enriched: []}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: test2
+      version: 7
+    - {resourceName: 4ac70141-c223-4172-ab39-86a0194e44e8, name: 'ñ, 🛒', entities: {tracked: []}}
+    - {resourceName: 5bc70141-c223-4172-ab39-86a0194e44e8, name: last  }
+    - name: first
+      resourceName: 6cc70141-c223-4172-ab39-86a0194e44e8
+    - resourceName: 7dc70141-c223-4172-ab39-86a0194e44e8
+      name: only key left
+#comment after
+`
+	expected := `# yaml-language-server: $schema=https://raw.githubusercontent.com/snowplow/snowplow-cli/refs/heads/main/internal/validation/schema/data-product.json
+
+apiVersion: v1 # comment before
+resourceType: data-product
+resourceName: 3b7c9fce-9f33-4c91-800b-8c8804f388c9
+data:
+  name: Café ñandú
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: "Café añadido 🛒" # keep me
+      version: 4
+      # about the entities
+      entities: {tracked: [], enriched: []}
+    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b
+      name: test2
+      version: 7
+    - {resourceName: 4ac70141-c223-4172-ab39-86a0194e44e8, name: 'ñ, 🛒', version: 0, entities: {tracked: []}}
+    - {resourceName: 5bc70141-c223-4172-ab39-86a0194e44e8, name: last, version: 2  }
+    - name: first
+      version: 1
+      resourceName: 6cc70141-c223-4172-ab39-86a0194e44e8
+    - resourceName: 7dc70141-c223-4172-ab39-86a0194e44e8
+      name: only key left
+      version: 5
+#comment after
+`
+
+	res, err := AddEventSpecVersions(map[int]int{0: 4, 2: 0, 3: 2, 4: 1, 5: 5}, []byte(original), "test.yaml")
+	if err != nil {
+		t.Fatalf("Can't add event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of adding the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
+func Test_AddEventSpecVersionsYamlLastLineWithoutNewline(t *testing.T) {
+	original := "apiVersion: v1\r\ndata:\r\n  eventSpecifications:\r\n    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8\r\n      name: test1\r\n    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b\r\n      name: test2"
+	expected := "apiVersion: v1\r\ndata:\r\n  eventSpecifications:\r\n    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8\r\n      name: test1\r\n      version: 3\r\n    - resourceName: c312c1cc-af41-450f-a086-1c2e8c04a39b\r\n      name: test2\r\n      version: 0"
+
+	res, err := AddEventSpecVersions(map[int]int{0: 3, 1: 0}, []byte(original), "test.yml")
+	if err != nil {
+		t.Fatalf("Can't add event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of adding the versions is not expected, expected:\n%q\nactual:\n%q", expected, string(res))
+	}
+}
+
+func Test_AddEventSpecVersionsYamlRefusesUnsafeEdits(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		original string
+	}{
+		{name: "already declares a version", original: "data:\n  eventSpecifications:\n    - name: test1\n      version: 2\n"},
+		{name: "index out of range", original: "data:\n  eventSpecifications: []\n"},
+		{name: "no name", original: "data:\n  eventSpecifications:\n    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8\n"},
+		{name: "literal name", original: "data:\n  eventSpecifications:\n    - name: |\n        test1\n      resourceName: a\n"},
+		{name: "name continued on the next line", original: "data:\n  eventSpecifications:\n    - name: test\n        one\n      resourceName: a\n"},
+		{name: "name on the next line", original: "data:\n  eventSpecifications:\n    - name:\n        test1\n      resourceName: a\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := AddEventSpecVersions(map[int]int{0: 1}, []byte(tt.original), "test.yaml")
+			if err == nil {
+				t.Fatalf("expected an error, got:\n%s", res)
+			}
+		})
+	}
+}
+
+func Test_AddEventSpecVersionsJson(t *testing.T) {
+	original := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "3b7c9fce-9f33-4c91-800b-8c8804f388c9",
+  "data": {
+    "name": "Café ñandú",
+    "eventSpecifications": [
+      {
+        "resourceName": "15c70141-c223-4172-ab39-86a0194e44e8",
+        "name": "Café añadido 🛒",
+        "entities": {"tracked": [], "enriched": []}
+      },
+      {
+        "resourceName": "c312c1cc-af41-450f-a086-1c2e8c04a39b",
+        "name": "test2",
+        "version": 7
+      },
+      {"resourceName": "4ac70141-c223-4172-ab39-86a0194e44e8", "name":"ñ, 🛒"},
+      {
+        "name" : "first",
+        "resourceName": "6cc70141-c223-4172-ab39-86a0194e44e8"
+      }
+    ]
+  }
+}
+`
+	expected := `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "3b7c9fce-9f33-4c91-800b-8c8804f388c9",
+  "data": {
+    "name": "Café ñandú",
+    "eventSpecifications": [
+      {
+        "resourceName": "15c70141-c223-4172-ab39-86a0194e44e8",
+        "name": "Café añadido 🛒",
+        "version": 4,
+        "entities": {"tracked": [], "enriched": []}
+      },
+      {
+        "resourceName": "c312c1cc-af41-450f-a086-1c2e8c04a39b",
+        "name": "test2",
+        "version": 7
+      },
+      {"resourceName": "4ac70141-c223-4172-ab39-86a0194e44e8", "name":"ñ, 🛒", "version":0},
+      {
+        "name" : "first",
+        "version" : 1,
+        "resourceName": "6cc70141-c223-4172-ab39-86a0194e44e8"
+      }
+    ]
+  }
+}
+`
+
+	res, err := AddEventSpecVersions(map[int]int{0: 4, 2: 0, 3: 1}, []byte(original), "test.json")
+	if err != nil {
+		t.Fatalf("Can't add event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of adding the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
+func Test_AddEventSpecVersionsJsonRefusesUnsafeEdits(t *testing.T) {
+	original := `{"data": {"eventSpecifications": [{"name": "test1", "version": 2}, {"resourceName": "15c70141-c223-4172-ab39-86a0194e44e8"}]}}`
+
+	for _, idx := range []int{0, 1, 2, -1} {
+		res, err := AddEventSpecVersions(map[int]int{idx: 1}, []byte(original), "test.json")
+		if err == nil {
+			t.Fatalf("expected an error for event spec %d, got: %s", idx, res)
+		}
+		if res != nil {
+			t.Errorf("expected no output on error, got: %s", res)
+		}
+	}
+}

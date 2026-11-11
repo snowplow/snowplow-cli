@@ -6,13 +6,16 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/goccy/go-yaml/token"
 	"github.com/google/uuid"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	googleyaml "gopkg.in/yaml.v3"
 )
@@ -340,6 +343,241 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 		updated := append([]rune{}, runes[:r.offset]...)
 		updated = append(updated, []rune(r.new)...)
 		runes = append(updated, runes[r.offset+len([]rune(r.old)):]...)
+	}
+
+	return []byte(string(runes)), nil
+}
+
+func AddEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) error {
+	file, err := os.ReadFile(dpFileName)
+	if err != nil {
+		return err
+	}
+
+	output, err := AddEventSpecVersions(versionsByIndex, file, dpFileName)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(dpFileName, output, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+func AddEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName string) ([]byte, error) {
+	var output []byte
+	var err error
+	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
+		output, err = addVersionsYaml(versionsByIndex, file)
+		if err != nil {
+			return nil, err
+		}
+	} else if strings.HasSuffix(dpFileName, ".json") {
+		output, err = addVersionsJson(versionsByIndex, file)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
+	}
+	return output, nil
+}
+
+func isJsonSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+// The version goes right after the name, where dp download writes it, copying the spacing of the name member.
+func addVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
+	content := string(file)
+
+	type insertion struct {
+		offset int
+		text   string
+	}
+
+	count := gjson.Get(content, "data.eventSpecifications.#").Int()
+
+	var insertions []insertion
+	for idx, version := range versionsByIndex {
+		if idx < 0 || int64(idx) >= count {
+			return nil, fmt.Errorf("event specification %d not found", idx)
+		}
+		if gjson.Get(content, fmt.Sprintf("data.eventSpecifications.%d.version", idx)).Exists() {
+			return nil, fmt.Errorf("event specification %d already declares a version", idx)
+		}
+		name := gjson.Get(content, fmt.Sprintf("data.eventSpecifications.%d.name", idx))
+		if !name.Exists() || name.Index <= 0 {
+			return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+		}
+
+		keyEnd := name.Index
+		for keyEnd > 0 && isJsonSpace(content[keyEnd-1]) {
+			keyEnd--
+		}
+		if keyEnd == 0 || content[keyEnd-1] != ':' {
+			return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+		}
+		keyEnd--
+		for keyEnd > 0 && isJsonSpace(content[keyEnd-1]) {
+			keyEnd--
+		}
+		keyStart := keyEnd - len(`"name"`)
+		if keyStart < 0 || content[keyStart:keyEnd] != `"name"` {
+			return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+		}
+		memberStart := keyStart
+		for memberStart > 0 && isJsonSpace(content[memberStart-1]) {
+			memberStart--
+		}
+		if memberStart == 0 || (content[memberStart-1] != '{' && content[memberStart-1] != ',') {
+			return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+		}
+
+		text := fmt.Sprintf(`,%s"version"%s%d`, content[memberStart:keyStart], content[keyEnd:name.Index], version)
+		insertions = append(insertions, insertion{offset: name.Index + len(name.Raw), text: text})
+	}
+
+	sort.Slice(insertions, func(i, j int) bool { return insertions[i].offset > insertions[j].offset })
+
+	for _, ins := range insertions {
+		content = content[:ins.offset] + ins.text + content[ins.offset:]
+	}
+
+	return []byte(content), nil
+}
+
+// The version goes right after the name, where dp download writes it: on its own line in block style, as the next entry in flow style.
+func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
+	parsed, err := parser.ParseBytes(file, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse data product YAML: %w", err)
+	}
+
+	type insertion struct {
+		offset int
+		text   string
+	}
+
+	runes := []rune(string(file))
+
+	lineStarts := []int{0}
+	for i, r := range runes {
+		if r == '\n' {
+			lineStarts = append(lineStarts, i+1)
+		}
+	}
+
+	runeOffset := func(pos *token.Position) (int, bool) {
+		line := pos.Line - 1
+		if line < 0 || line >= len(lineStarts) {
+			return 0, false
+		}
+		offset := lineStarts[line] + pos.Column - 1
+		if offset < 0 || offset > len(runes) {
+			return 0, false
+		}
+		return offset, true
+	}
+
+	var insertions []insertion
+	for idx, version := range versionsByIndex {
+		path, err := yaml.PathString(fmt.Sprintf("$.data.eventSpecifications[%d]", idx))
+		if err != nil {
+			return nil, err
+		}
+		node, err := path.FilterFile(parsed)
+		if err != nil {
+			return nil, fmt.Errorf("event specification %d not found: %w", idx, err)
+		}
+
+		var values []*ast.MappingValueNode
+		isFlowStyle := false
+		var flowEnd *token.Token
+		switch n := node.(type) {
+		case *ast.MappingNode:
+			values = n.Values
+			isFlowStyle = n.IsFlowStyle
+			flowEnd = n.End
+		case *ast.MappingValueNode:
+			values = []*ast.MappingValueNode{n}
+		default:
+			return nil, fmt.Errorf("event specification %d is not a mapping", idx)
+		}
+
+		nameIdx := -1
+		for i, v := range values {
+			switch v.Key.GetToken().Value {
+			case "version":
+				return nil, fmt.Errorf("event specification %d already declares a version", idx)
+			case "name":
+				nameIdx = i
+			}
+		}
+		if nameIdx < 0 {
+			return nil, fmt.Errorf("name of event specification %d not found", idx)
+		}
+
+		nameKey := values[nameIdx].Key.GetToken()
+		nameValue := values[nameIdx].Value.GetToken()
+		if nameValue.Type == token.LiteralType || nameValue.Type == token.FoldedType || nameValue.Position.Line != nameKey.Position.Line || strings.Contains(strings.TrimSpace(nameValue.Origin), "\n") {
+			return nil, fmt.Errorf("name of event specification %d spans several lines, add its version by hand", idx)
+		}
+
+		if isFlowStyle {
+			if nameIdx+1 < len(values) {
+				offset, ok := runeOffset(values[nameIdx+1].Key.GetToken().Position)
+				if !ok {
+					return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+				}
+				insertions = append(insertions, insertion{offset: offset, text: fmt.Sprintf("version: %d, ", version)})
+				continue
+			}
+			if flowEnd == nil {
+				return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+			}
+			offset, ok := runeOffset(flowEnd.Position)
+			if !ok || offset >= len(runes) || runes[offset] != '}' {
+				return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+			}
+			for offset > 0 && unicode.IsSpace(runes[offset-1]) {
+				offset--
+			}
+			text := fmt.Sprintf(", version: %d", version)
+			if offset > 0 && runes[offset-1] == ',' {
+				text = fmt.Sprintf(" version: %d,", version)
+			}
+			insertions = append(insertions, insertion{offset: offset, text: text})
+			continue
+		}
+
+		line := nameKey.Position.Line - 1
+		if line < 0 || line >= len(lineStarts) {
+			return nil, fmt.Errorf("name of event specification %d could not be located", idx)
+		}
+		lineEnd := len(runes)
+		if line+1 < len(lineStarts) {
+			lineEnd = lineStarts[line+1] - 1
+		}
+		newline := "\n"
+		if strings.Contains(string(file), "\r\n") {
+			newline = "\r\n"
+		}
+		if lineEnd > 0 && runes[lineEnd-1] == '\r' {
+			lineEnd--
+		}
+		indent := strings.Repeat(" ", nameKey.Position.Column-1)
+		insertions = append(insertions, insertion{offset: lineEnd, text: fmt.Sprintf("%s%sversion: %d", newline, indent, version)})
+	}
+
+	sort.Slice(insertions, func(i, j int) bool { return insertions[i].offset > insertions[j].offset })
+
+	for _, ins := range insertions {
+		updated := append([]rune{}, runes[:ins.offset]...)
+		updated = append(updated, []rune(ins.text)...)
+		runes = append(updated, runes[ins.offset:]...)
 	}
 
 	return []byte(string(runes)), nil

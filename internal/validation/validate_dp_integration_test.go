@@ -1036,7 +1036,7 @@ func TestFixEventSpecVersions_LogsFilesInOrder(t *testing.T) {
 	var logOutput bytes.Buffer
 	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
 
-	if err := fixEventSpecVersions(ctx, mismatches); err != nil {
+	if err := fixEventSpecVersions(ctx, mismatches, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1163,5 +1163,300 @@ func TestValidateDataProductsWithClient_AddedSpecAtZeroPasses(t *testing.T) {
 	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
 	if err != nil {
 		t.Errorf("Expected a newly added spec at version 0 to validate, got: %v", err)
+	}
+}
+
+const missingVersionsLocalYaml = `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    # unchanged in Console
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started # café
+%[1]s      entities:
+        tracked: []
+        enriched: []
+    - {resourceName: c67f712e-ee43-4e10-8b36-48a0f6f2e629, name: Checkout Finished Renamed, %[2]sentities: {tracked: [], enriched: []}}
+    - {resourceName: d77f712e-ee43-4e10-8b36-48a0f6f2e630, name: Pedido añadido 🛒, %[3]sentities: {tracked: [], enriched: []}}
+    - resourceName: e87f712e-ee43-4e10-8b36-48a0f6f2e631
+      name: Checkout Abandoned
+      version: %[4]d
+      entities:
+        tracked: []
+        enriched: []
+`
+
+const missingVersionsLocalJson = `{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "dbc68917-3bcb-4640-a165-483de5fc033c",
+  "data": {
+    "name": "checkout",
+    "sourceApplications": [],
+    "eventSpecifications": [
+      {
+        "resourceName": "b57f712e-ee43-4e10-8b36-48a0f6f2e628",
+        "name": "Checkout Started"%[1]s,
+        "entities": {"tracked": [], "enriched": []}
+      },
+      {"resourceName": "c67f712e-ee43-4e10-8b36-48a0f6f2e629", "name": "Checkout Finished Renamed"%[2]s, "entities": {"tracked": [], "enriched": []}},
+      {"resourceName": "d77f712e-ee43-4e10-8b36-48a0f6f2e630", "name": "Pedido añadido 🛒"%[3]s, "entities": {"tracked": [], "enriched": []}},
+      {
+        "resourceName": "e87f712e-ee43-4e10-8b36-48a0f6f2e631",
+        "name": "Checkout Abandoned",
+        "version": %[4]d,
+        "entities": {"tracked": [], "enriched": []}
+      }
+    ]
+  }
+}
+`
+
+func TestValidateDataProductsWithClient_FixAddsMissingVersions(t *testing.T) {
+	for _, tt := range []struct {
+		ext      string
+		original string
+		want     string
+	}{
+		{
+			ext:      "yaml",
+			original: fmt.Sprintf(missingVersionsLocalYaml, "", "", "", 2),
+			want:     fmt.Sprintf(missingVersionsLocalYaml, "      version: 3\n", "version: 11, ", "version: 0, ", 0),
+		},
+		{
+			ext:      "json",
+			original: fmt.Sprintf(missingVersionsLocalJson, "", "", "", 2),
+			want:     fmt.Sprintf(missingVersionsLocalJson, ",\n        \"version\": 3", `, "version": 11`, `, "version": 0`, 0),
+		},
+	} {
+		t.Run(tt.ext, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			dpFile := filepath.Join(tmpDir, "checkout."+tt.ext)
+			if err := os.WriteFile(dpFile, []byte(tt.original), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			var logOutput bytes.Buffer
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: twoSpecsRemoteDataProducts})
+
+			err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true)
+			if err != nil {
+				t.Fatalf("Expected --fix to succeed, got: %v", err)
+			}
+			fixed, err := os.ReadFile(dpFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(fixed) != tt.want {
+				t.Errorf("Expected only the versions to change\nwant:\n%s\ngot:\n%s", tt.want, fixed)
+			}
+			if strings.Count(logOutput.String(), "added event specification version") != 3 || strings.Count(logOutput.String(), "updated event specification version") != 1 {
+				t.Errorf("Expected one log line per added or updated version, got:\n%s", logOutput.String())
+			}
+
+			err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+			if err != nil {
+				t.Errorf("Expected validate to pass after --fix, got: %v", err)
+			}
+			err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true)
+			if err != nil {
+				t.Errorf("Expected a second --fix to succeed, got: %v", err)
+			}
+			again, err := os.ReadFile(dpFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(again) != tt.want {
+				t.Errorf("Expected a second --fix to change nothing, got:\n%s", again)
+			}
+		})
+	}
+}
+
+func TestValidateDataProductsWithClient_NoVersionsWithoutFixUnchanged(t *testing.T) {
+	for _, tt := range []struct {
+		ext      string
+		original string
+	}{
+		{ext: "yaml", original: strings.Replace(fmt.Sprintf(missingVersionsLocalYaml, "", "", "", 0), "      version: 0\n", "", 1)},
+		{ext: "json", original: strings.Replace(fmt.Sprintf(missingVersionsLocalJson, "", "", "", 0), "        \"version\": 0,\n", "", 1)},
+	} {
+		t.Run(tt.ext, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			dpFile := filepath.Join(tmpDir, "checkout."+tt.ext)
+			if err := os.WriteFile(dpFile, []byte(tt.original), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(tt.original, "version") {
+				t.Fatalf("fixture should declare no versions:\n%s", tt.original)
+			}
+
+			var logOutput bytes.Buffer
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: twoSpecsRemoteDataProducts})
+
+			err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
+			if err != nil {
+				t.Fatalf("Expected validate without versions to pass, got: %v", err)
+			}
+			after, err := os.ReadFile(dpFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(after) != tt.original {
+				t.Errorf("Expected the file to be left untouched, got:\n%s", after)
+			}
+			if strings.Contains(logOutput.String(), "version") {
+				t.Errorf("Expected no version output without --fix, got:\n%s", logOutput.String())
+			}
+		})
+	}
+}
+
+func TestValidateDataProductsWithClient_FixOnDownloadMatchesDownloadWithVersions(t *testing.T) {
+	for _, ext := range []string{"yaml", "json"} {
+		t.Run(ext, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			downloadInTest(t, tmpDir, ext, false)
+
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
+			if err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true); err != nil {
+				t.Fatalf("Expected --fix to succeed, got: %v", err)
+			}
+			fixed, err := os.ReadFile(filepath.Join(tmpDir, "checkout."+ext))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			downloaded := downloadInTest(t, tmpDir, ext, true)
+			if string(fixed) != downloaded {
+				t.Errorf("Expected --fix to write the version where dp download --versions does\nfixed:\n%s\ndownloaded:\n%s", fixed, downloaded)
+			}
+		})
+	}
+}
+
+func writeRepoFiles(t *testing.T, dir string, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func missingVersionsBaseFile(resourceName string, specs string) string {
+	return fmt.Sprintf(`apiVersion: v1
+resourceType: data-product
+resourceName: %s
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+%s`, resourceName, specs)
+}
+
+func TestValidateDataProductsAgainstBase_FixAddsMissingVersions(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	repo := t.TempDir()
+	tracking := filepath.Join(repo, "tracking")
+	if err := os.MkdirAll(tracking, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	unversionedAtBase := "    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628\n      name: Checkout Started\n"
+	versionedAtBase := "    - resourceName: c67f712e-ee43-4e10-8b36-48a0f6f2e629\n      name: Checkout Finished\n      version: 3\n"
+	duplicated := "    - resourceName: f97f712e-ee43-4e10-8b36-48a0f6f2e632\n      name: Shared\n"
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	writeRepoFiles(t, tracking, map[string]string{
+		"checkout.yaml": missingVersionsBaseFile("dbc68917-3bcb-4640-a165-483de5fc033c", unversionedAtBase+versionedAtBase+duplicated),
+		"other.yaml":    missingVersionsBaseFile("aaa68917-3bcb-4640-a165-483de5fc033c", duplicated),
+	})
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	localWithoutVersions := func(finishedName string, added string) string {
+		return missingVersionsBaseFile("dbc68917-3bcb-4640-a165-483de5fc033c",
+			unversionedAtBase+
+				"    - resourceName: c67f712e-ee43-4e10-8b36-48a0f6f2e629\n      name: "+finishedName+"\n"+
+				duplicated+
+				"    - resourceName: d77f712e-ee43-4e10-8b36-48a0f6f2e630\n      name: Pedido añadido 🛒\n"+added)
+	}
+	other := missingVersionsBaseFile("aaa68917-3bcb-4640-a165-483de5fc033c", duplicated)
+
+	for _, tt := range []struct {
+		name         string
+		finishedName string
+		wantFinished int
+	}{
+		{name: "unchanged since the base", finishedName: "Checkout Finished", wantFinished: 3},
+		{name: "renamed since the base", finishedName: "Checkout Finished Renamed", wantFinished: 4},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			original := localWithoutVersions(tt.finishedName, "")
+			writeRepoFiles(t, tracking, map[string]string{"checkout.yaml": original, "other.yaml": other})
+
+			var logOutput bytes.Buffer
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+			err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+			if err != nil {
+				t.Fatalf("Expected validate without versions to pass, got: %v", err)
+			}
+			if strings.Contains(logOutput.String(), "version") {
+				t.Errorf("Expected no version output without --fix, got:\n%s", logOutput.String())
+			}
+
+			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
+			if err != nil {
+				t.Fatalf("Expected --fix to succeed, got: %v", err)
+			}
+			fixed, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := strings.Replace(original, "      name: "+tt.finishedName+"\n", fmt.Sprintf("      name: %s\n      version: %d\n", tt.finishedName, tt.wantFinished), 1)
+			want = strings.Replace(want, "      name: Pedido añadido 🛒\n", "      name: Pedido añadido 🛒\n      version: 0\n", 1)
+			if string(fixed) != want {
+				t.Errorf("Expected versions only where they are known offline\nwant:\n%s\ngot:\n%s", want, fixed)
+			}
+			untouched, err := os.ReadFile(filepath.Join(tracking, "other.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(untouched) != other {
+				t.Errorf("Expected the file holding only a duplicated spec to be left untouched, got:\n%s", untouched)
+			}
+			for _, want := range []string{
+				`msg="event specification version not added" file=` + filepath.Join(tracking, "checkout.yaml") + ` name="Checkout Started" reason="no version declared at the base, run dp validate --fix against Snowplow Console to add it"`,
+				`msg="event specification version not added" file=` + filepath.Join(tracking, "other.yaml") + ` name=Shared reason="defined in more than one file"`,
+			} {
+				if !strings.Contains(logOutput.String(), want) {
+					t.Errorf("Expected log line\nwant: %s\ngot:\n%s", want, logOutput.String())
+				}
+			}
+
+			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+			if err != nil {
+				t.Errorf("Expected validate to pass after --fix, got: %v", err)
+			}
+			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
+			if err != nil {
+				t.Errorf("Expected a second --fix to succeed, got: %v", err)
+			}
+			again, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(again) != want {
+				t.Errorf("Expected a second --fix to change nothing, got:\n%s", again)
+			}
+		})
 	}
 }

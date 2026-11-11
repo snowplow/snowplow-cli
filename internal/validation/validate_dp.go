@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/amend"
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -69,7 +70,7 @@ func ValidateDataProductsWithClient(ctx context.Context, client *console.ApiClie
 
 	versionMismatches := changes.VersionMismatches
 	if fix {
-		err = fixEventSpecVersions(ctx, versionMismatches)
+		err = fixEventSpecVersions(ctx, versionMismatches, changes.MissingVersions)
 		if err != nil {
 			return err
 		}
@@ -119,7 +120,11 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 	}
 
 	if fix {
-		err = fixEventSpecVersions(ctx, versionMismatches)
+		missingVersions, err := release.FindMissingVersionsAgainstBase(files, baseFiles)
+		if err != nil {
+			return err
+		}
+		err = fixEventSpecVersions(ctx, versionMismatches, missingVersions)
 		if err != nil {
 			return err
 		}
@@ -134,7 +139,7 @@ func ValidateDataProductsAgainstBase(ctx context.Context, paths []string, basePa
 	return ValidateLocal(ctx, files, paths, basePath, ghOut, versionMismatches)
 }
 
-func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSpecVersionMismatch) error {
+func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSpecVersionMismatch, missingVersions []model.EventSpecMissingVersion) error {
 	logger := logging.LoggerFromContext(ctx)
 
 	mismatchesByFile := map[string][]model.EventSpecVersionMismatch{}
@@ -142,25 +147,65 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 		mismatchesByFile[m.FileName] = append(mismatchesByFile[m.FileName], m)
 	}
 
-	fileNames := make([]string, 0, len(mismatchesByFile))
+	missingByFile := map[string][]model.EventSpecMissingVersion{}
+	var notAdded []model.EventSpecMissingVersion
+	for _, m := range missingVersions {
+		if m.Expected == nil {
+			notAdded = append(notAdded, m)
+			continue
+		}
+		missingByFile[m.FileName] = append(missingByFile[m.FileName], m)
+	}
+
+	fileNames := make([]string, 0, len(mismatchesByFile)+len(missingByFile))
 	for f := range mismatchesByFile {
 		fileNames = append(fileNames, f)
+	}
+	for f := range missingByFile {
+		if _, ok := mismatchesByFile[f]; !ok {
+			fileNames = append(fileNames, f)
+		}
 	}
 	slices.Sort(fileNames)
 
 	for _, f := range fileNames {
-		mismatches := mismatchesByFile[f]
-		versions := map[int]int{}
-		for _, m := range mismatches {
-			versions[m.Index] = m.Expected
+		if mismatches := mismatchesByFile[f]; len(mismatches) > 0 {
+			versions := map[int]int{}
+			for _, m := range mismatches {
+				versions[m.Index] = m.Expected
+			}
+			err := amend.SetEventSpecVersionsInFile(versions, f)
+			if err != nil {
+				return err
+			}
+			for _, m := range mismatches {
+				logger.Info("validation", "msg", "updated event specification version", "file", f, "name", m.Name, "from", m.Declared, "to", m.Expected)
+			}
 		}
-		err := amend.SetEventSpecVersionsInFile(versions, f)
-		if err != nil {
-			return err
+
+		if missing := missingByFile[f]; len(missing) > 0 {
+			versions := map[int]int{}
+			for _, m := range missing {
+				versions[m.Index] = *m.Expected
+			}
+			err := amend.AddEventSpecVersionsInFile(versions, f)
+			if err != nil {
+				return err
+			}
+			for _, m := range missing {
+				logger.Info("validation", "msg", "added event specification version", "file", f, "name", m.Name, "version", *m.Expected)
+			}
 		}
-		for _, m := range mismatches {
-			logger.Info("validation", "msg", "updated event specification version", "file", f, "name", m.Name, "from", m.Declared, "to", m.Expected)
+	}
+
+	slices.SortStableFunc(notAdded, func(a, b model.EventSpecMissingVersion) int {
+		if c := strings.Compare(a.FileName, b.FileName); c != 0 {
+			return c
 		}
+		return a.Index - b.Index
+	})
+	for _, m := range notAdded {
+		logger.Warn("validation", "msg", "event specification version not added", "file", m.FileName, "name", m.Name, "reason", m.Reason)
 	}
 
 	return nil

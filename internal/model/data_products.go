@@ -163,3 +163,11 @@ type EventSpecVersionMismatch struct {
 	Changed               []string
 	EntityCommentsRemoved bool
 }
+
+type EventSpecMissingVersion struct {
+	FileName string
+	Index    int
+	Name     string
+	Expected *int
+	Reason   string
+}

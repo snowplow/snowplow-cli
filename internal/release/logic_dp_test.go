@@ -1716,3 +1716,16 @@ func Test_findChanges_SourceAppEntityCommentOnlyDifference(t *testing.T) {
 		t.Errorf("a comment-only difference sent no update before versions existed, got %d updates", len(changes.saUpdate))
 	}
 }
+
+func Test_findChanges_MissingVersionOfDuplicateIsNotAdded(t *testing.T) {
+	changes, err := findChanges(duplicateSpecLocal(nil, nil), console.DataProductsAndRelatedResources{}, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.MissingVersions) != 1 {
+		t.Fatalf("expected the duplicated spec to be reported once, got %+v", changes.MissingVersions)
+	}
+	if m := changes.MissingVersions[0]; m.Expected != nil || m.Reason != "defined in more than one file" || m.FileName != "/base/two.yaml" {
+		t.Errorf("expected no version for a duplicated spec, reported in the last file, got %+v", m)
+	}
+}

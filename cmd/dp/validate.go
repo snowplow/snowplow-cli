@@ -91,5 +91,5 @@ func init() {
 	validateCmd.PersistentFlags().Bool("full", false, "Perform compatibility check on all files, not only the ones that were changed")
 	validateCmd.PersistentFlags().IntP("concurrency", "c", 3, "The number of validation requests to perform at once (maximum 10)")
 	validateCmd.PersistentFlags().String("base-ref", "", "Check declared event specification versions against the files at the merge base of HEAD and this git ref, without connecting to Snowplow Console. Needs the full git history and the ref fetched (for example actions/checkout with fetch-depth: 0)")
-	validateCmd.PersistentFlags().Bool("fix", false, "Write the version Snowplow Console will assign into each event specification that declares a different one")
+	validateCmd.PersistentFlags().Bool("fix", false, "Write the version Snowplow Console will assign into each event specification, replacing a declared one that differs and adding it where none is declared and it can be known")
 }
