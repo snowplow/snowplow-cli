@@ -30,7 +30,6 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/snowplow/snowplow-cli/internal/util"
-	"github.com/spf13/cobra"
 )
 
 func TestValidateDataProductsWithClient_HappyPath(t *testing.T) {
@@ -975,47 +974,6 @@ data:
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %v, want error %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestValidateDataProductsAgainstBaseFromCmd_RejectsConsoleOnlyFlags(t *testing.T) {
-	for _, tt := range []struct {
-		flag    string
-		value   string
-		wantErr bool
-	}{
-		{flag: "full", value: "true", wantErr: true},
-		{flag: "concurrency", value: "3", wantErr: true},
-		{flag: "", wantErr: false},
-	} {
-		t.Run(tt.flag, func(t *testing.T) {
-			tracking, _ := setupBaseRepo(t)
-			cmd := &cobra.Command{}
-			cmd.Flags().Bool("gh-annotate", false, "")
-			cmd.Flags().Bool("full", false, "")
-			cmd.Flags().IntP("concurrency", "c", 3, "")
-			cmd.Flags().String("base-ref", "", "")
-			cmd.Flags().Bool("fix", false, "")
-			if err := cmd.Flags().Set("base-ref", "main"); err != nil {
-				t.Fatal(err)
-			}
-			if tt.flag != "" {
-				if err := cmd.Flags().Set(tt.flag, tt.value); err != nil {
-					t.Fatal(err)
-				}
-			}
-			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
-
-			err := ValidateDataProductsAgainstBaseFromCmd(ctx, cmd, []string{tracking}, tracking)
-
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			want := "--full and --concurrency only apply when validating against Snowplow Console and cannot be used with --base-ref"
-			if tt.wantErr && (err == nil || err.Error() != want) {
-				t.Errorf("error = %v, want %q", err, want)
 			}
 		})
 	}

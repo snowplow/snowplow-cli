@@ -12,7 +12,6 @@ package validation
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"strings"
 
@@ -89,10 +88,6 @@ func ValidateDataProductsAgainstBaseFromCmd(ctx context.Context, cmd *cobra.Comm
 	ghOut, _ := cmd.Flags().GetBool("gh-annotate")
 	baseRef, _ := cmd.Flags().GetString("base-ref")
 	fix, _ := cmd.Flags().GetBool("fix")
-
-	if cmd.Flags().Changed("full") || cmd.Flags().Changed("concurrency") {
-		return errors.New("--full and --concurrency only apply when validating against Snowplow Console and cannot be used with --base-ref")
-	}
 
 	return ValidateDataProductsAgainstBase(ctx, paths, basePath, ghOut, baseRef, fix)
 }

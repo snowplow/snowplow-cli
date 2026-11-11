@@ -58,8 +58,8 @@ func isolateCommandInTest(t *testing.T, args ...string) {
 	})
 }
 
-func Test_ValidateBaseRefNeedsNoCredentials(t *testing.T) {
-	isolateCommandInTest(t, "dp", "validate")
+func Test_ValidateOfflineNeedsNoCredentials(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate", "offline")
 	repo := t.TempDir()
 	tracking := filepath.Join(repo, "tracking")
 	if err := os.MkdirAll(tracking, 0755); err != nil {
@@ -84,14 +84,14 @@ data:
 
 	t.Chdir(tracking)
 
-	RootCmd.SetArgs([]string{"dp", "validate", "--base-ref", "main", "--host", "http://127.0.0.1:1", "."})
+	RootCmd.SetArgs([]string{"dp", "validate", "offline", "--base-ref", "main", "--host", "http://127.0.0.1:1", "."})
 	if err := RootCmd.Execute(); err != nil {
-		t.Fatalf("expected validate --base-ref to run without credentials, got: %v", err)
+		t.Fatalf("expected validate offline to run without credentials, got: %v", err)
 	}
 }
 
-func Test_ValidateBaseRefReturnsValidationFailure(t *testing.T) {
-	isolateCommandInTest(t, "dp", "validate")
+func Test_ValidateOfflineReturnsValidationFailure(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate", "offline")
 	repo := t.TempDir()
 	tracking := filepath.Join(repo, "tracking")
 	if err := os.MkdirAll(tracking, 0755); err != nil {
@@ -116,19 +116,19 @@ data:
 
 	t.Chdir(tracking)
 
-	RootCmd.SetArgs([]string{"dp", "validate", "--base-ref", "main", "."})
+	RootCmd.SetArgs([]string{"dp", "validate", "offline", "--base-ref", "main", "."})
 	err := RootCmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "validation failed") {
 		t.Fatalf("expected a validation failure, got: %v", err)
 	}
 
-	found, _, _ := RootCmd.Find([]string{"dp", "validate"})
+	found, _, _ := RootCmd.Find([]string{"dp", "validate", "offline"})
 	if !found.SilenceUsage || !found.SilenceErrors {
 		t.Errorf("the validation failure should be reported once by the logger, without usage")
 	}
 }
 
-func Test_ValidateWithoutBaseRefStillNeedsCredentials(t *testing.T) {
+func Test_ValidateStillNeedsCredentials(t *testing.T) {
 	isolateCommandInTest(t, "dp", "validate")
 	t.Chdir(t.TempDir())
 
@@ -141,5 +141,16 @@ func Test_ValidateWithoutBaseRefStillNeedsCredentials(t *testing.T) {
 	found, _, _ := RootCmd.Find([]string{"dp", "validate"})
 	if !found.SilenceUsage || !found.SilenceErrors {
 		t.Errorf("the configuration failure should be reported once by the logger, without usage")
+	}
+}
+
+func Test_ValidateOfflineNeedsBaseRef(t *testing.T) {
+	isolateCommandInTest(t, "dp", "validate", "offline")
+	t.Chdir(t.TempDir())
+
+	RootCmd.SetArgs([]string{"dp", "validate", "offline", "."})
+	err := RootCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), `required flag(s) "base-ref" not set`) {
+		t.Fatalf("expected a missing --base-ref error, got: %v", err)
 	}
 }
