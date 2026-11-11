@@ -17,11 +17,13 @@ cmd/                       Cobra command tree
   dp/                      `data-products` (alias `dp`) — download, validate, generate, sync, release, purge, add-es
   ds/                      `data-structures` (alias `ds`) — download, validate, generate, publish dev/prod
   signals/                 `signals` — setup (credentials + coding agent), status (check app credentials)
+  login.go                 Browser login saved for reuse, no API key created
   setup.go                 Interactive credential setup wizard
   status.go                Print current resolved config
   mcp.go                   MCP server (model context protocol)
   docs.go                  Generate command docs
 internal/
+  auth/                    Saved Console login (`login.json`), shared with Snowtype; token refresh
   config/                  Viper-based config: flag/env/.env/yaml precedence, Console credentials
   console/                 Console API client (OAuth2, requests for DP/DS/keys/org/migrations)
   download/                Shared download helpers
@@ -45,7 +47,7 @@ env.example                Template for SNOWPLOW_CONSOLE_* credentials
 
 **License header:** Every Go source file starts with the Snowplow Limited Use License Agreement v1.0 header. Match the exact wording used in existing files when creating new ones.
 
-**Config precedence (highest → lowest):** CLI flags → env vars (`SNOWPLOW_CONSOLE_*`) → `.env` file → YAML at `~/.config/snowplow/snowplow.yml` (or platform equivalent). Console credentials (`org-id`, `api-key-id`, `api-key`) are required for any command that hits Console — initialize them in a command's `PersistentPreRunE` via `config.InitConsoleConfig(cmd)` and register flags with `config.InitConsoleFlags(cmd)` (see `cmd/dp/data_products.go`).
+**Config precedence (highest → lowest):** CLI flags → env vars (`SNOWPLOW_CONSOLE_*`) → `.env` file → YAML at `~/.config/snowplow/snowplow.yml` (or platform equivalent). Console credentials (`org-id`, `api-key-id`, `api-key`) are required for any command that hits Console, unless a login saved by `snowplow-cli login` stands in for the API key — initialize them in a command's `PersistentPreRunE` via `config.InitConsoleConfig(cmd)` and register flags with `config.InitConsoleFlags(cmd)` (see `cmd/dp/data_products.go`).
 
 **Logging:** Use `slog` via `internal/logging`. Don't write to stdout/stderr directly from command code. Respect `--debug`, `--quiet`, `--silent`, `--json-output` — these are persistent root flags and `snplog.InitLogging(cmd)` wires them up.
 

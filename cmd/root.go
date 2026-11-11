@@ -26,9 +26,10 @@ var RootCmd = &cobra.Command{
 	Short: "Snowplow CLI",
 	Long: `Work with Snowplow from the command line
 
-Configuration required: org-id, api-key-id, api-key
+Sign in with 'snowplow-cli login', or configure: org-id, api-key-id, api-key
 Get credentials: https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/`,
-	Example: `  $ snowplow-cli setup
+	Example: `  $ snowplow-cli login
+  $ snowplow-cli setup
   $ snowplow-cli data-structures download
   $ snowplow-cli ds validate
   $ snowplow-cli mcp`,
@@ -64,6 +65,7 @@ Then on:
 	RootCmd.AddCommand(ds.DataStructuresCmd)
 	RootCmd.AddCommand(dp.DataProductsCmd)
 	RootCmd.AddCommand(McpCmd)
+	RootCmd.AddCommand(LoginCmd)
 	RootCmd.AddCommand(SetupCmd)
 	RootCmd.AddCommand(StatusCmd)
 	RootCmd.AddCommand(events.EventsCmd)

@@ -12,11 +12,13 @@ package console
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/snowplow/snowplow-cli/internal/auth"
 	"github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/util"
 	kjson "k8s.io/apimachinery/pkg/util/json"
@@ -75,6 +77,18 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	}
 
 	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
+
+	// Without an API key, use the login saved by `snowplow-cli login`
+	if apiKeyId == "" && apiKeySecret == "" {
+		login, err := auth.Valid(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		if login == nil {
+			return nil, errors.New("not logged in: run 'snowplow-cli login' or provide an API key")
+		}
+		return &ApiClient{Http: h, Jwt: login.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
+	}
 
 	url := fmt.Sprintf("%s/credentials/v3/token", baseUrl)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)

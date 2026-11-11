@@ -1,0 +1,124 @@
+/*
+Copyright (c) 2013-present Snowplow Analytics Ltd.
+All rights reserved.
+This software is made available by Snowplow Analytics, Ltd.,
+under the terms of the Snowplow Limited Use License Agreement, Version 1.0
+located at https://docs.snowplow.io/limited-use-license-1.0
+BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
+OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
+*/
+
+// Package auth stores the Console login made with `snowplow-cli login`.
+// Snowtype reads and writes the same file, so one login serves both tools.
+package auth
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"golang.org/x/oauth2"
+)
+
+type Login struct {
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	OrgID        string    `json:"org_id"`
+	Host         string    `json:"host"`
+	ClientID     string    `json:"client_id"`
+	Auth0Domain  string    `json:"auth0_domain"`
+}
+
+// expiryMargin avoids sending a token that expires while a command runs its first requests
+const expiryMargin = time.Minute
+
+// Path is a variable holding the function to get the login file path (for testability)
+var Path = func() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "snowplow", "login.json")
+}
+
+// tokenURL is a variable holding the function to get the token endpoint (for testability)
+var tokenURL = func(auth0Domain string) string {
+	return fmt.Sprintf("https://%s/oauth/token", auth0Domain)
+}
+
+func Save(login *Login) error {
+	path := Path()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	data, err := json.MarshalIndent(login, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return fmt.Errorf("failed to write login file: %w", err)
+	}
+	// WriteFile only applies the mode when it creates the file
+	return os.Chmod(path, 0600)
+}
+
+// Load returns nil when nobody has logged in to host.
+func Load(host string) (*Login, error) {
+	data, err := os.ReadFile(Path())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var login Login
+	if err := json.Unmarshal(data, &login); err != nil {
+		return nil, fmt.Errorf("failed to parse login file %s: %w", Path(), err)
+	}
+	if login.AccessToken == "" || strings.TrimRight(login.Host, "/") != strings.TrimRight(host, "/") {
+		return nil, nil
+	}
+	return &login, nil
+}
+
+// Valid returns the login for host with an access token that can be used now,
+// refreshing and saving it when it has expired. It returns nil when there is
+// no login or it can no longer be refreshed.
+func Valid(ctx context.Context, host string) (*Login, error) {
+	login, err := Load(host)
+	if err != nil || login == nil {
+		return nil, err
+	}
+	if time.Until(login.ExpiresAt) > expiryMargin {
+		return login, nil
+	}
+	if login.RefreshToken == "" {
+		return nil, nil
+	}
+
+	conf := &oauth2.Config{
+		ClientID: login.ClientID,
+		Endpoint: oauth2.Endpoint{TokenURL: tokenURL(login.Auth0Domain), AuthStyle: oauth2.AuthStyleInParams},
+	}
+	token, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: login.RefreshToken}).Token()
+	if err != nil {
+		var retrieveErr *oauth2.RetrieveError
+		if errors.As(err, &retrieveErr) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to refresh login: %w", err)
+	}
+
+	login.AccessToken = token.AccessToken
+	login.ExpiresAt = token.Expiry
+	if token.RefreshToken != "" {
+		login.RefreshToken = token.RefreshToken
+	}
+	if err := Save(login); err != nil {
+		return nil, err
+	}
+	return login, nil
+}

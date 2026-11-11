@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/joho/godotenv"
+	"github.com/snowplow/snowplow-cli/internal/auth"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -685,4 +686,72 @@ OTHER_VAR=other_value`
 			t.Error("SNOWPLOW_CONSOLE_HOST should not be saved when it's the default value")
 		}
 	})
+}
+
+func useLogin(t *testing.T, login *auth.Login) {
+	t.Helper()
+	// godotenv.Load in earlier tests leaves these set for the whole process
+	for _, name := range []string{"API_KEY_ID", "API_KEY", "ORG_ID", "HOST"} {
+		t.Setenv(envNamePrefix+name, "")
+	}
+	t.Chdir(t.TempDir())
+	path := filepath.Join(t.TempDir(), "login.json")
+	old := auth.Path
+	auth.Path = func() string { return path }
+	t.Cleanup(func() { auth.Path = old })
+	if login != nil {
+		if err := auth.Save(login); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func Test_ConfigSavedLoginReplacesApiKey(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	testCmd := build()
+	if err := testCmd.Execute(); err != nil {
+		t.Fatalf("a saved login should be enough to run: %v", err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "login-org" {
+		t.Errorf("org-id got %s want login-org", org)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-o", "other-org"}
+	testCmd = build()
+	if err := testCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "other-org" {
+		t.Errorf("org-id got %s want other-org", org)
+	}
+}
+
+func Test_ConfigSavedLoginIgnored(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	table := map[string][]string{
+		"login is for another host": {"xxx", "--config", "/nonexistent.yml", "-H", "other-host"},
+		"half an api key is given":  {"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "key-id"},
+	}
+
+	for name, args := range table {
+		os.Args = args
+		if err := build().Execute(); err == nil {
+			t.Errorf("should have failed when %s", name)
+		}
+	}
+}
+
+func Test_ConfigApiKeyWinsOverSavedLogin(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "key-id", "-S", "key"}
+	if err := build().Execute(); err == nil {
+		t.Error("should have failed: the organization of the login must not be used with an api key")
+	}
 }
