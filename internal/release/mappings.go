@@ -11,6 +11,7 @@ package release
 
 import (
 	"encoding/json"
+	"reflect"
 	"sort"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -158,6 +159,7 @@ func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
 
 	tracked := []string{}
 	for _, te := range es.Entities.Tracked {
+		te.Comment = nil
 		entityJson, err := json.Marshal(te)
 		if err != nil {
 			return nil, err
@@ -167,6 +169,7 @@ func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
 
 	enriched := []string{}
 	for _, ee := range es.Entities.Enriched {
+		ee.Comment = nil
 		entityJson, err := json.Marshal(ee)
 		if err != nil {
 			return nil, err
@@ -224,5 +227,123 @@ func dpToDiff(dp console.RemoteDataProduct) RemoteDataProductDiff {
 func saToDiff(sa console.RemoteSourceApplication) console.RemoteSourceApplication {
 	sa.LockStatus = ""
 	sa.ManagedFrom = ""
+	sa.Entities = console.Entities{
+		Tracked:  entitiesWithoutComments(sa.Entities.Tracked),
+		Enriched: entitiesWithoutComments(sa.Entities.Enriched),
+	}
 	return sa
+}
+
+func entitiesWithoutComments(entities []console.Entity) []console.Entity {
+	if entities == nil {
+		return nil
+	}
+	res := []console.Entity{}
+	for _, e := range entities {
+		e.Comment = nil
+		res = append(res, e)
+	}
+	return res
+}
+
+func changedStructuralFields(remote console.RemoteEventSpec, sent console.RemoteEventSpec) ([]string, error) {
+	return structuralDiff(remote, false, sent)
+}
+
+func changedSentStructuralFields(before console.RemoteEventSpec, after console.RemoteEventSpec) ([]string, error) {
+	return structuralDiff(before, true, after)
+}
+
+// Mirrors the structural rule in msc-backend: only a change to the name, the event or the entities raises the version. Change both together.
+func structuralDiff(before console.RemoteEventSpec, beforeIsSent bool, sent console.RemoteEventSpec) ([]string, error) {
+	changed := []string{}
+
+	if before.Name != sent.Name {
+		changed = append(changed, "name")
+	}
+
+	beforeEvent, err := normalizeStructure(structuralEvent(before.Event, beforeIsSent))
+	if err != nil {
+		return nil, err
+	}
+	sentEvent, err := normalizeStructure(structuralEvent(sent.Event, true))
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(beforeEvent, sentEvent) {
+		changed = append(changed, "event")
+	}
+
+	beforeEntities, err := normalizeStructure(structuralEntities(before.Entities, beforeIsSent))
+	if err != nil {
+		return nil, err
+	}
+	sentEntities, err := normalizeStructure(structuralEntities(sent.Entities, true))
+	if err != nil {
+		return nil, err
+	}
+	if !reflect.DeepEqual(beforeEntities, sentEntities) {
+		changed = append(changed, "entities")
+	}
+
+	return changed, nil
+}
+
+func structuralEvent(event *console.EventWrapper, isSent bool) any {
+	if event == nil {
+		return nil
+	}
+	if isSent && event.Source == "" && len(event.Schema) == 0 {
+		return nil
+	}
+	res := map[string]any{"source": event.Source}
+	if (isSent && len(event.Schema) > 0) || (!isSent && event.Schema != nil) {
+		res["schema"] = event.Schema
+	}
+	return res
+}
+
+func structuralEntities(entities console.Entities, isSent bool) any {
+	return map[string]any{
+		"tracked":  structuralEntityList(entities.Tracked, isSent),
+		"enriched": structuralEntityList(entities.Enriched, isSent),
+	}
+}
+
+func structuralEntityList(entities []console.Entity, isSent bool) any {
+	if entities == nil {
+		return nil
+	}
+	res := []any{}
+	for _, e := range entities {
+		minCardinality := 0
+		if e.MinCardinality != nil {
+			minCardinality = *e.MinCardinality
+		}
+		entity := map[string]any{
+			"source":         e.Source,
+			"minCardinality": minCardinality,
+		}
+		if e.MaxCardinality != nil {
+			entity["maxCardinality"] = *e.MaxCardinality
+		}
+		if !isSent && e.Comment != nil {
+			entity["comment"] = *e.Comment
+		}
+		if (isSent && len(e.Schema) > 0) || (!isSent && e.Schema != nil) {
+			entity["schema"] = e.Schema
+		}
+		res = append(res, entity)
+	}
+	return res
+}
+
+func normalizeStructure(structure any) (any, error) {
+	structureJson, err := json.Marshal(structure)
+	if err != nil {
+		return nil, err
+	}
+	var res any
+	err = json.Unmarshal(structureJson, &res)
+	return res, err
 }

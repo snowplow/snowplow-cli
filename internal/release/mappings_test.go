@@ -256,3 +256,28 @@ func Test_saToDiff(t *testing.T) {
 		t.Errorf("failed to setup remote source app for sensible comparison")
 	}
 }
+
+func Test_saToDiff_IgnoresEntityComments(t *testing.T) {
+	comment := "a note"
+	remote := console.RemoteSourceApplication{
+		Id: "id",
+		Entities: console.Entities{
+			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0", Comment: &comment}},
+			Enriched: []console.Entity{},
+		},
+	}
+	local := console.RemoteSourceApplication{
+		Id: "id",
+		Entities: console.Entities{
+			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0"}},
+			Enriched: []console.Entity{},
+		},
+	}
+
+	if !reflect.DeepEqual(saToDiff(remote), saToDiff(local)) {
+		t.Errorf("an entity comment should not make a source app differ")
+	}
+	if remote.Entities.Tracked[0].Comment == nil {
+		t.Errorf("saToDiff should not change its input")
+	}
+}

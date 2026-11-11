@@ -11,17 +11,48 @@ package download
 
 import (
 	"context"
+	"io/fs"
 	"log/slog"
+	"path/filepath"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
-func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool) error {
+func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Context, client *console.ApiClient, isPlain bool, withVersions bool) error {
 	res, err := console.GetDataProductsAndRelatedResources(cnx, client)
 	if err != nil {
 		return err
+	}
+
+	versionedDpIds := map[string]bool{}
+	if withVersions {
+		for _, dp := range res.DataProducts {
+			versionedDpIds[dp.Id] = true
+		}
+	} else if root, err := filepath.EvalSymlinks(files.DataProductsLocation); err == nil {
+		existing := map[string]map[string]any{}
+		_ = filepath.WalkDir(root, func(path string, di fs.DirEntry, err error) error {
+			if err != nil {
+				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
+				return nil
+			}
+			ext := filepath.Ext(path)
+			if di.IsDir() || (ext != ".json" && ext != ".yaml" && ext != ".yml") {
+				return nil
+			}
+			resources, err := util.MaybeResourcesfromPaths([]string{path})
+			if err != nil {
+				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
+				return nil
+			}
+			for f, resource := range resources {
+				existing[f] = resource
+			}
+			return nil
+		})
+		versionedDpIds = dataProductsDeclaringVersions(existing)
 	}
 
 	sas := remoteSasToLocalResources(res.SourceApplication)
@@ -42,7 +73,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	triggerIdToFilePath, err := downloadTriggerImages(res.EventSpecs, cnx, client, files)
 
-	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes, triggerIdToFilePath)
+	dps := remoteDpsToLocalResources(res.DataProducts, saIdToRef, esIdToRes, triggerIdToFilePath, versionedDpIds)
 
 	if err != nil {
 		return err

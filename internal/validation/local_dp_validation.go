@@ -95,7 +95,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				shapeValidations, ok := ValidateDPShape(maybeDp)
 				v.concat(shapeValidations)
 				changed := changedFiles[f]
-				if ok {
+				if ok && cc != nil {
 					if validateAll {
 						v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
 					} else {
@@ -116,7 +116,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 				shapeValidations, ok := ValidateSAShape(maybeDp)
 				v.concat(shapeValidations)
 				v.concat(ValidateSAEntitiesCardinalities(sa))
-				if ok {
+				if ok && sdc != nil {
 					v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
 				}
 			default:
@@ -273,6 +273,34 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 	}
 
 	return nil
+}
+
+func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpecVersionMismatch, fixCommand string) {
+	for _, m := range versionMismatches {
+		path := fmt.Sprintf("/data/eventSpecifications/%d", m.Index)
+
+		summary := fmt.Sprintf("%s: version %d does not match", m.Name, m.Declared)
+		if !m.IsNew && len(m.Changed) > 0 && m.Expected > m.Declared {
+			summary = fmt.Sprintf("%s: version %d needs a bump", m.Name, m.Declared)
+		}
+		messages := []string{summary}
+		if m.IsNew {
+			messages = append(messages, "new event specification")
+		} else if len(m.Changed) > 0 {
+			messages = append(messages, fmt.Sprintf("changed: %s", strings.Join(m.Changed, ", ")))
+		}
+		if m.EntityCommentsRemoved {
+			messages = append(messages, "entities: a comment set in Console will be removed")
+		}
+		messages = append(messages,
+			fmt.Sprintf("expected version: %d", m.Expected),
+			fmt.Sprintf("run `%s` to update it", fixCommand),
+		)
+
+		v := lookup.Validations[m.FileName]
+		v.concat(DPValidations{ErrorsWithPaths: map[string][]string{path: messages}})
+		lookup.Validations[m.FileName] = v
+	}
 }
 
 func (lookup *DPLookup) ValidationErrorCount() int {

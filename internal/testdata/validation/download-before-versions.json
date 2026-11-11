@@ -1,0 +1,40 @@
+{
+  "apiVersion": "v1",
+  "resourceType": "data-product",
+  "resourceName": "dbc68917-3bcb-4640-a165-483de5fc033c",
+  "data": {
+    "name": "checkout",
+    "eventSpecifications": [
+      {
+        "resourceName": "b57f712e-ee43-4e10-8b36-48a0f6f2e628",
+        "name": "Checkout Started",
+        "description": "A checkout started",
+        "event": {
+          "source": "iglu:com.example/checkout/jsonschema/1-0-0",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "a": {
+                "maxLength": 10,
+                "type": "string"
+              }
+            },
+            "required": [
+              "a"
+            ],
+            "type": "object"
+          }
+        },
+        "entities": {
+          "tracked": [
+            {
+              "source": "iglu:com.example/cart/jsonschema/1-0-0",
+              "minCardinality": 0
+            }
+          ],
+          "enriched": []
+        }
+      }
+    ]
+  }
+}

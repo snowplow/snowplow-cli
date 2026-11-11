@@ -18,6 +18,7 @@ type EventSpec struct {
 	ResourceName               string
 	ExcludedSourceApplications []map[string]string `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string
+	Version                    *int
 	Description                string
 	Triggers                   []Trigger
 	Event                      SchemaRef
@@ -104,6 +105,7 @@ type EventSpecCanonical struct {
 	ResourceName               string      `yaml:"resourceName" json:"resourceName"`
 	ExcludedSourceApplications []Ref       `yaml:"excludedSourceApplications,omitempty" json:"excludedSourceApplications,omitempty"`
 	Name                       string      `yaml:"name" json:"name"`
+	Version                    *int        `yaml:"version,omitempty" json:"version,omitempty"`
 	Description                string      `yaml:"description,omitempty" json:"description,omitempty"`
 	Event                      *SchemaRef  `yaml:"event,omitempty" json:"event,omitempty"`
 	Entities                   EntitiesDef `yaml:"entities" json:"entities"`
@@ -149,4 +151,23 @@ type Ref struct {
 type Image struct {
 	Ext  string
 	Data []byte
+}
+
+type EventSpecVersionMismatch struct {
+	FileName              string
+	Index                 int
+	Name                  string
+	Declared              int
+	Expected              int
+	IsNew                 bool
+	Changed               []string
+	EntityCommentsRemoved bool
+}
+
+type EventSpecMissingVersion struct {
+	FileName string
+	Index    int
+	Name     string
+	Expected *int
+	Reason   string
 }

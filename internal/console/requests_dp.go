@@ -63,7 +63,7 @@ type RemoteEventSpec struct {
 	Description          string          `json:"description"`
 	Triggers             []RemoteTrigger `json:"triggers,omitempty"`
 	Status               string          `json:"status"`
-	Version              int             `json:"version"`
+	Version              int             `json:"version,omitempty"`
 	Event                *EventWrapper   `json:"event,omitempty"`
 	Entities             Entities        `json:"entities"`
 	DataProductId        string          `json:"dataProductId"`
@@ -117,16 +117,14 @@ type Entity struct {
 	Source         string         `json:"source"`
 	MinCardinality *int           `json:"minCardinality"`
 	MaxCardinality *int           `json:"maxCardinality"`
+	Comment        *string        `json:"comment,omitempty"`
 	Schema         map[string]any `json:"schema,omitempty"`
 }
 
 type remoteEventSpecPost struct {
-	Spec    RemoteEventSpec `json:"spec"`
-	Message string          `json:"message"`
-}
-
-type esData struct {
-	Data []RemoteEventSpec `json:"data"`
+	Spec            RemoteEventSpec `json:"spec"`
+	Message         string          `json:"message"`
+	ExpectedVersion *int            `json:"expectedVersion,omitempty"`
 }
 
 type saData struct {
@@ -419,9 +417,9 @@ func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	return nil
 }
 
-func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec) error {
+func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec, expectedVersion *int) error {
 
-	esForm := remoteEventSpecPost{Spec: es, Message: ""}
+	esForm := remoteEventSpecPost{Spec: es, Message: "", ExpectedVersion: expectedVersion}
 
 	body, err := json.Marshal(esForm)
 	if err != nil {
@@ -451,42 +449,10 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec)
 	return nil
 }
 
-func getEventSpec(cnx context.Context, client *ApiClient, id string) (*RemoteEventSpec, error) {
-	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/event-specs/v1/%s", client.BaseUrl, id), client, cnx, nil)
-	if err != nil {
-		return nil, err
-	}
-	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var dpResponse esData
-	err = kjson.Unmarshal(rbody, &dpResponse)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
-	}
-
-	return &dpResponse.Data[0], nil
-
-}
-
-func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec) error {
-	existingEs, err := getEventSpec(cnx, client, es.Id)
-	if err != nil {
-		return err
-	}
-	newVersion := existingEs.Version + 1
-
-	es.Version = newVersion
+func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec, expectedVersion *int) error {
 	es.Status = "draft"
 
-	esForm := remoteEventSpecPost{Spec: es, Message: ""}
+	esForm := remoteEventSpecPost{Spec: es, Message: "", ExpectedVersion: expectedVersion}
 
 	body, err := json.Marshal(esForm)
 	if err != nil {
@@ -541,16 +507,22 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 	return nil
 }
 
-type BatchPublishRequest struct {
-	EventSpecIds []string `json:"eventSpecIds"`
+type EventSpecVersionRef struct {
+	Id      string `json:"id"`
+	Version int    `json:"version"`
 }
 
-func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds []string) error {
+type BatchPublishRequest struct {
+	EventSpecIds     []string              `json:"eventSpecIds"`
+	ExpectedVersions []EventSpecVersionRef `json:"expectedVersions,omitempty"`
+}
+
+func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds []string, expectedVersions []EventSpecVersionRef) error {
 	if len(eventSpecIds) == 0 {
 		return nil
 	}
 
-	reqBody := BatchPublishRequest{EventSpecIds: eventSpecIds}
+	reqBody := BatchPublishRequest{EventSpecIds: eventSpecIds, ExpectedVersions: expectedVersions}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return err

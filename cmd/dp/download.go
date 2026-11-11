@@ -36,6 +36,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 		org, _ := cmd.Flags().GetString("org-id")
 		format, _ := cmd.Flags().GetString("output-format")
 		plain, _ := cmd.Flags().GetBool("plain")
+		versions, _ := cmd.Flags().GetBool("versions")
 
 		dataProductsFolder := util.DataProductsFolder
 
@@ -51,7 +52,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = download.DownloadDataProductsAndRelatedResources(files, cnx, c, plain)
+		err = download.DownloadDataProductsAndRelatedResources(files, cnx, c, plain, versions)
 		if err != nil {
 			snplog.LogFatal(err)
 		}
@@ -64,4 +65,5 @@ func init() {
 
 	downloadCommand.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCommand.PersistentFlags().Bool("plain", false, "Don't include any comments in yaml files")
+	downloadCommand.PersistentFlags().Bool("versions", false, "Write the current version of each event specification. Data products whose local file already declares versions keep them without this flag")
 }

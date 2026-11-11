@@ -53,6 +53,16 @@ type DataProductChangeSet struct {
 	imageCreate       []TriggerImageReference
 	IdToFileName      map[string]string
 	localEventSpecIds []string
+	declaredVersions  map[string]int
+	VersionMismatches []model.EventSpecVersionMismatch
+	MissingVersions   []model.EventSpecMissingVersion
+}
+
+func (cs DataProductChangeSet) declaredVersion(id string) *int {
+	if v, ok := cs.declaredVersions[id]; ok {
+		return &v
+	}
+	return nil
 }
 
 func (cs DataProductChangeSet) isEmpty() bool {
@@ -98,7 +108,14 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 		}
 	}
 
-	for dpFile, dp := range filenameToDp {
+	dpFiles := make([]string, 0, len(filenameToDp))
+	for f := range filenameToDp {
+		dpFiles = append(dpFiles, f)
+	}
+	slices.Sort(dpFiles)
+
+	for _, dpFile := range dpFiles {
+		dp := filenameToDp[dpFile]
 		var sourceApps []map[string]string
 		for _, sa := range dp.Data.SourceApplications {
 			ids := map[string]string{}
@@ -217,6 +234,13 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 	var esDelete []console.RemoteEventSpec
 
 	esLocalIds := make(map[string]bool)
+	esLocalFiles := make(map[string]string)
+	esLocalVersioned := make(map[string]bool)
+	declaredVersions := make(map[string]int)
+	var versionMismatches []model.EventSpecVersionMismatch
+	esLocalCount := make(map[string]int)
+	var missingVersions []model.EventSpecMissingVersion
+	var missingVersionIds []string
 
 	var imageCreate []TriggerImageReference
 
@@ -237,9 +261,23 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			dpSaIds = append(dpSaIds, sa["id"])
 		}
 
-		for _, localEs := range localDp.Data.EventSpecifications {
+		for esIdx, localEs := range localDp.Data.EventSpecifications {
+			dpFile := local.IdToFileName[localDp.ResourceName]
+			if previousFile, seen := esLocalFiles[localEs.ResourceName]; seen && (localEs.Version != nil || esLocalVersioned[localEs.ResourceName]) {
+				return nil, duplicateEventSpecError(localEs.ResourceName, previousFile, dpFile)
+			}
+			esLocalFiles[localEs.ResourceName] = dpFile
+			esLocalCount[localEs.ResourceName]++
+			if localEs.Version != nil {
+				esLocalVersioned[localEs.ResourceName] = true
+			}
+
 			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
+			expectedVersion := 0
+			changedFields := []string{}
+			entityCommentsRemoved := false
 			if remoteExists {
+				expectedVersion = remoteEs.Version
 				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
 				updateDiff, err := esToDiff(possibleUpdate)
 				if err != nil {
@@ -254,6 +292,25 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 				// assign remote variant urls to update where image hashes are the same
 				possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
 				if !reflect.DeepEqual(*remoteDiff, *updateDiff) || triggerChangeset.isChanged {
+					changedFields, err = changedStructuralFields(remoteEs, possibleUpdate)
+					if err != nil {
+						return nil, err
+					}
+					if len(changedFields) > 0 {
+						expectedVersion = remoteEs.Version + 1
+					}
+					if slices.Contains(changedFields, "entities") {
+						remoteWithoutComments := remoteEs
+						remoteWithoutComments.Entities = console.Entities{
+							Tracked:  entitiesWithoutComments(remoteEs.Entities.Tracked),
+							Enriched: entitiesWithoutComments(remoteEs.Entities.Enriched),
+						}
+						changedIgnoringComments, err := changedStructuralFields(remoteWithoutComments, possibleUpdate)
+						if err != nil {
+							return nil, err
+						}
+						entityCommentsRemoved = !slices.Contains(changedIgnoringComments, "entities")
+					}
 					esUpdate = append(esUpdate, possibleUpdate)
 					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
 					imageCreate = append(imageCreate, triggerChangeset.imagesToUpload...)
@@ -272,6 +329,31 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 			}
 
 			esLocalIds[localEs.ResourceName] = true
+
+			if localEs.Version != nil {
+				declaredVersions[localEs.ResourceName] = *localEs.Version
+				if *localEs.Version != expectedVersion {
+					versionMismatches = append(versionMismatches, model.EventSpecVersionMismatch{
+						FileName:              local.IdToFileName[localEs.ResourceName],
+						Index:                 esIdx,
+						Name:                  localEs.Name,
+						Declared:              *localEs.Version,
+						Expected:              expectedVersion,
+						IsNew:                 !remoteExists,
+						Changed:               changedFields,
+						EntityCommentsRemoved: entityCommentsRemoved,
+					})
+				}
+			} else {
+				expected := expectedVersion
+				missingVersions = append(missingVersions, model.EventSpecMissingVersion{
+					FileName: dpFile,
+					Index:    esIdx,
+					Name:     localEs.Name,
+					Expected: &expected,
+				})
+				missingVersionIds = append(missingVersionIds, localEs.ResourceName)
+			}
 		}
 
 		for _, remoteEsId := range remoteDp.EventSpecs {
@@ -301,6 +383,9 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		imageCreate:       imageCreate,
 		IdToFileName:      idToFileName,
 		localEventSpecIds: localEsIds,
+		declaredVersions:  declaredVersions,
+		VersionMismatches: versionMismatches,
+		MissingVersions:   withoutDuplicatedEventSpecs(missingVersions, missingVersionIds, esLocalCount),
 	}, nil
 }
 
@@ -411,7 +496,7 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 		}
 	}
 	for _, esC := range changes.esCreate {
-		err := console.CreateEventSpec(cnx, client, esC)
+		err := console.CreateEventSpec(cnx, client, esC, changes.declaredVersion(esC.Id))
 		if err != nil {
 			return err
 		}
@@ -425,7 +510,7 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 		}
 	}
 	for _, esU := range changes.esUpdate {
-		err := console.UpdateEventSpec(cnx, client, esU)
+		err := console.UpdateEventSpec(cnx, client, esU, changes.declaredVersion(esU.Id))
 		if err != nil {
 			return err
 		}
@@ -627,10 +712,14 @@ func Release(cnx context.Context, client *console.ApiClient, changeSet *DataProd
 
 		if !dryRun {
 			ids := make([]string, len(toRelease))
+			var expectedVersions []console.EventSpecVersionRef
 			for i, es := range toRelease {
 				ids[i] = es.Id
+				if v := changeSet.declaredVersion(es.Id); v != nil {
+					expectedVersions = append(expectedVersions, console.EventSpecVersionRef{Id: es.Id, Version: *v})
+				}
 			}
-			err = console.BatchPublishEventSpecs(cnx, client, ids)
+			err = console.BatchPublishEventSpecs(cnx, client, ids, expectedVersions)
 			if err != nil {
 				return err
 			}
@@ -705,4 +794,188 @@ func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
 			changeSet.esUpdate[i].ManagedFrom = managedFrom
 		}
 	}
+}
+
+func withoutDuplicatedEventSpecs(missing []model.EventSpecMissingVersion, ids []string, count map[string]int) []model.EventSpecMissingVersion {
+	var res []model.EventSpecMissingVersion
+	last := make(map[string]int)
+	for i, id := range ids {
+		last[id] = i
+	}
+	for i, m := range missing {
+		if count[ids[i]] > 1 {
+			if last[ids[i]] != i {
+				continue
+			}
+			m.Expected = nil
+			m.Reason = missingVersionDuplicateReason
+		}
+		res = append(res, m)
+	}
+	return res
+}
+
+const missingVersionDuplicateReason = "defined in more than one file"
+
+func duplicateEventSpecError(id string, firstFile string, secondFile string) error {
+	files := []string{firstFile, secondFile}
+	slices.Sort(files)
+	return fmt.Errorf("event specification %s is defined in both %s and %s", id, files[0], files[1])
+}
+
+type localEventSpec struct {
+	fileName string
+	index    int
+	spec     model.EventSpec
+}
+
+func localEventSpecsById(files map[string]map[string]any, rejectDuplicates bool) (map[string]localEventSpec, []string, error) {
+	specs := make(map[string]localEventSpec)
+	versioned := make(map[string]bool)
+	var ids []string
+
+	fileNames := make([]string, 0, len(files))
+	for f := range files {
+		fileNames = append(fileNames, f)
+	}
+	slices.Sort(fileNames)
+
+	for _, f := range fileNames {
+		maybeDp := files[f]
+		if resourceType, ok := maybeDp["resourceType"]; ok && resourceType == "data-product" {
+			var dp model.DataProduct
+			if err := mapstructure.Decode(maybeDp, &dp); err != nil {
+				return nil, nil, err
+			}
+			for idx, es := range dp.Data.EventSpecifications {
+				if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates && (es.Version != nil || versioned[es.ResourceName]) {
+					return nil, nil, duplicateEventSpecError(es.ResourceName, previous.fileName, f)
+				}
+				specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
+				if es.Version != nil {
+					versioned[es.ResourceName] = true
+				}
+				ids = append(ids, es.ResourceName)
+			}
+		}
+	}
+
+	return specs, ids, nil
+}
+
+func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]model.EventSpecVersionMismatch, []string, error) {
+	localSpecs, localIds, err := localEventSpecsById(local, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	baseSpecs, _, err := localEventSpecsById(base, false)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var versionMismatches []model.EventSpecVersionMismatch
+	var skipped []string
+
+	for _, id := range localIds {
+		localEs := localSpecs[id]
+		if localEs.spec.Version == nil {
+			continue
+		}
+
+		expectedVersion := 0
+		changedFields := []string{}
+		baseEs, baseExists := baseSpecs[id]
+		if baseExists {
+			if baseEs.spec.Version == nil {
+				skipped = append(skipped, localEs.spec.Name)
+				continue
+			}
+			expectedVersion, changedFields, err = expectedVersionAgainstBase(baseEs.spec, localEs.spec)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		if *localEs.spec.Version != expectedVersion {
+			versionMismatches = append(versionMismatches, model.EventSpecVersionMismatch{
+				FileName: localEs.fileName,
+				Index:    localEs.index,
+				Name:     localEs.spec.Name,
+				Declared: *localEs.spec.Version,
+				Expected: expectedVersion,
+				IsNew:    !baseExists,
+				Changed:  changedFields,
+			})
+		}
+	}
+
+	return versionMismatches, skipped, nil
+}
+
+func expectedVersionAgainstBase(baseEs model.EventSpec, localEs model.EventSpec) (int, []string, error) {
+	changedFields, err := changedSentStructuralFields(
+		LocalEventSpecToRemote(baseEs, nil, ""),
+		LocalEventSpecToRemote(localEs, nil, ""),
+	)
+	if err != nil {
+		return 0, nil, err
+	}
+	if len(changedFields) > 0 {
+		return *baseEs.Version + 1, changedFields, nil
+	}
+	return *baseEs.Version, changedFields, nil
+}
+
+func FindMissingVersionsAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]model.EventSpecMissingVersion, error) {
+	localSpecs, localIds, err := localEventSpecsById(local, true)
+	if err != nil {
+		return nil, err
+	}
+	baseSpecs, _, err := localEventSpecsById(base, false)
+	if err != nil {
+		return nil, err
+	}
+
+	count := make(map[string]int)
+	for _, id := range localIds {
+		count[id]++
+	}
+
+	var missing []model.EventSpecMissingVersion
+	reported := make(map[string]bool)
+
+	for _, id := range localIds {
+		localEs := localSpecs[id]
+		if localEs.spec.Version != nil || reported[id] {
+			continue
+		}
+		reported[id] = true
+
+		m := model.EventSpecMissingVersion{
+			FileName: localEs.fileName,
+			Index:    localEs.index,
+			Name:     localEs.spec.Name,
+		}
+
+		baseEs, baseExists := baseSpecs[id]
+		switch {
+		case count[id] > 1:
+			m.Reason = missingVersionDuplicateReason
+		case !baseExists:
+			expected := 0
+			m.Expected = &expected
+		case baseEs.spec.Version == nil:
+			m.Reason = "no version declared at the base, run dp validate --fix against Snowplow Console to add it"
+		default:
+			expected, _, err := expectedVersionAgainstBase(baseEs.spec, localEs.spec)
+			if err != nil {
+				return nil, err
+			}
+			m.Expected = &expected
+		}
+
+		missing = append(missing, m)
+	}
+
+	return missing, nil
 }
