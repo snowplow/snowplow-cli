@@ -611,6 +611,19 @@ func Test_AddEventSpecVersionsYamlLastLineWithoutNewline(t *testing.T) {
 	}
 }
 
+func Test_AddEventSpecVersionsYamlHashInNameBeforeClosingBrace(t *testing.T) {
+	original := "data:\n  eventSpecifications:\n    - {resourceName: a, name: \"Checkout #1\"\n      }\n"
+	expected := "data:\n  eventSpecifications:\n    - {resourceName: a, name: \"Checkout #1\", version: 3\n      }\n"
+
+	res, err := AddEventSpecVersions(map[int]int{0: 3}, []byte(original), "test.yaml")
+	if err != nil {
+		t.Fatalf("Can't add event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of adding the versions is not expected, expected:\n%s\nactual:\n%s", expected, string(res))
+	}
+}
+
 func Test_AddEventSpecVersionsYamlRefusesUnsafeEdits(t *testing.T) {
 	for _, tt := range []struct {
 		name     string

@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/goccy/go-yaml/token"
 	"github.com/google/uuid"
@@ -482,6 +484,16 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 		return offset, true
 	}
 
+	var commentOffsets []int
+	for _, tk := range lexer.Tokenize(string(file)) {
+		if tk.Type != token.CommentType {
+			continue
+		}
+		if offset, ok := runeOffset(tk.Position); ok {
+			commentOffsets = append(commentOffsets, offset)
+		}
+	}
+
 	var insertions []insertion
 	for idx, version := range versionsByIndex {
 		path, err := yaml.PathString(fmt.Sprintf("$.data.eventSpecifications[%d]", idx))
@@ -550,7 +562,8 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 			for lineStart > 0 && runes[lineStart-1] != '\n' {
 				lineStart--
 			}
-			if strings.ContainsRune(string(runes[offset:closing]), '\n') && strings.ContainsRune(string(runes[lineStart:offset]), '#') {
+			endsInComment := slices.ContainsFunc(commentOffsets, func(c int) bool { return c >= lineStart && c < offset })
+			if strings.ContainsRune(string(runes[offset:closing]), '\n') && endsInComment {
 				return nil, fmt.Errorf("event specification %d may end in a comment, add its version by hand", idx)
 			}
 			text := fmt.Sprintf(", version: %d", version)
