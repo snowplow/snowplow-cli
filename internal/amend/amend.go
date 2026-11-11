@@ -542,8 +542,16 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 			if !ok || offset >= len(runes) || runes[offset] != '}' {
 				return nil, fmt.Errorf("name of event specification %d could not be located", idx)
 			}
+			closing := offset
 			for offset > 0 && unicode.IsSpace(runes[offset-1]) {
 				offset--
+			}
+			lineStart := offset
+			for lineStart > 0 && runes[lineStart-1] != '\n' {
+				lineStart--
+			}
+			if strings.ContainsRune(string(runes[offset:closing]), '\n') && strings.ContainsRune(string(runes[lineStart:offset]), '#') {
+				return nil, fmt.Errorf("event specification %d may end in a comment, add its version by hand", idx)
 			}
 			text := fmt.Sprintf(", version: %d", version)
 			if offset > 0 && runes[offset-1] == ',' {

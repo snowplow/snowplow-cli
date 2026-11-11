@@ -1022,6 +1022,27 @@ func TestDownload_UnreadableFileKeepsOtherVersions(t *testing.T) {
 	}
 }
 
+func TestDownload_SymbolicLinkDirectoryKeepsVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "data-products")
+	if err := os.MkdirAll(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 1, "1-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(tmpDir, "linked")
+	if err := os.Symlink(target, linked); err != nil {
+		t.Fatal(err)
+	}
+
+	written := downloadInTest(t, linked, "yaml", false)
+
+	if !strings.Contains(written, "version: 3") {
+		t.Errorf("a data products directory reached through a symbolic link should keep its versions, got:\n%s", written)
+	}
+}
+
 func TestDownload_UnreadableFileWithoutVersionsMatchesOutputBeforeVersions(t *testing.T) {
 	before, err := os.ReadFile(filepath.Join("..", "testdata", "validation", "download-before-versions.yaml"))
 	if err != nil {

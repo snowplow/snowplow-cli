@@ -13,7 +13,6 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -32,9 +31,9 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 		for _, dp := range res.DataProducts {
 			versionedDpIds[dp.Id] = true
 		}
-	} else if _, err := os.Stat(files.DataProductsLocation); err == nil {
+	} else if root, err := filepath.EvalSymlinks(files.DataProductsLocation); err == nil {
 		existing := map[string]map[string]any{}
-		_ = filepath.WalkDir(files.DataProductsLocation, func(path string, di fs.DirEntry, err error) error {
+		_ = filepath.WalkDir(root, func(path string, di fs.DirEntry, err error) error {
 			if err != nil {
 				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
 				return nil

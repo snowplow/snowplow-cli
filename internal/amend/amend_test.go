@@ -622,6 +622,7 @@ func Test_AddEventSpecVersionsYamlRefusesUnsafeEdits(t *testing.T) {
 		{name: "literal name", original: "data:\n  eventSpecifications:\n    - name: |\n        test1\n      resourceName: a\n"},
 		{name: "name continued on the next line", original: "data:\n  eventSpecifications:\n    - name: test\n        one\n      resourceName: a\n"},
 		{name: "name on the next line", original: "data:\n  eventSpecifications:\n    - name:\n        test1\n      resourceName: a\n"},
+		{name: "comment before a closing brace on the next line", original: "data:\n  eventSpecifications:\n    - {resourceName: a, name: test1 # note\n      }\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := AddEventSpecVersions(map[int]int{0: 1}, []byte(tt.original), "test.yaml")
