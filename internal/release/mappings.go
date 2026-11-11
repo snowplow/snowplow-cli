@@ -254,6 +254,7 @@ func changedSentStructuralFields(before console.RemoteEventSpec, after console.R
 	return structuralDiff(before, true, after)
 }
 
+// Mirrors the structural rule in msc-backend: only a change to the name, the event or the entities raises the version. Change both together.
 func structuralDiff(before console.RemoteEventSpec, beforeIsSent bool, sent console.RemoteEventSpec) ([]string, error) {
 	changed := []string{}
 
