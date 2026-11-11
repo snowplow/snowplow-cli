@@ -275,3 +275,20 @@ func Test_Save_LeavesNoTemporaryFile(t *testing.T) {
 		t.Errorf("expected only login.json, got %v", entries)
 	}
 }
+
+func Test_UnknownHomeDirectory(t *testing.T) {
+	old := Path
+	Path = func() string { return "" }
+	t.Cleanup(func() { Path = old })
+	t.Chdir(t.TempDir())
+
+	if err := Save(login(time.Hour)); err == nil {
+		t.Error("expected saving to fail without a home directory")
+	}
+	if got, err := Load(host); err != nil || got != nil {
+		t.Errorf("got %v, %v want nil, nil", got, err)
+	}
+	if entries, _ := os.ReadDir("."); len(entries) != 0 {
+		t.Errorf("nothing should be written to the working directory, got %v", entries)
+	}
+}

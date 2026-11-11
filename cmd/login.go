@@ -11,8 +11,6 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package cmd
 
 import (
-	"context"
-
 	"github.com/snowplow/snowplow-cli/internal/config"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/setup"
@@ -52,7 +50,7 @@ configured, and Snowtype shares the same login.`,
 			return err
 		}
 
-		return setup.LoginConfig(clientID, auth0Domain, consoleHost, context.Background())
+		return setup.LoginConfig(clientID, auth0Domain, consoleHost, cmd.Context())
 	},
 }
 

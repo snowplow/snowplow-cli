@@ -43,7 +43,7 @@ var StatusCmd = &cobra.Command{
 			slog.Info("Status check failed: configuration error",
 				"error", err.Error(),
 				"status", "not_configured",
-				"action", "run 'snowplow-cli setup' to configure authentication")
+				"action", "run 'snowplow-cli login' or 'snowplow-cli setup' to configure authentication")
 			os.Exit(1)
 		}
 
@@ -64,7 +64,7 @@ var StatusCmd = &cobra.Command{
 				"host", host,
 				"org_id", orgID,
 				"status", "api_error",
-				"action", "check network connectivity or run 'snowplow-cli setup' to refresh credentials")
+				"action", "check network connectivity or run 'snowplow-cli login' or 'snowplow-cli setup' to refresh credentials")
 			os.Exit(1)
 		}
 
@@ -75,7 +75,7 @@ var StatusCmd = &cobra.Command{
 				"host", host,
 				"org_id", orgID,
 				"status", "api_error",
-				"action", "check network connectivity or run 'snowplow-cli setup' to refresh credentials")
+				"action", "check network connectivity or run 'snowplow-cli login' or 'snowplow-cli setup' to refresh credentials")
 			os.Exit(1)
 		}
 

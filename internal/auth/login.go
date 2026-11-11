@@ -39,8 +39,13 @@ type Login struct {
 const expiryMargin = time.Minute
 
 // Path is a variable holding the function to get the login file path (for testability)
+// It returns "" when the home directory is unknown, so that tokens are never
+// written relative to the working directory.
 var Path = func() string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 	return filepath.Join(home, ".config", "snowplow", "login.json")
 }
 
@@ -55,6 +60,9 @@ var tokenURL = func(auth0Domain string) string {
 // logging in again recovers.
 func Save(login *Login) error {
 	path := Path()
+	if path == "" {
+		return errors.New("failed to write login file: home directory not found")
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
