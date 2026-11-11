@@ -431,3 +431,36 @@ func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
 		}
 	}
 }
+
+func Test_Valid_DoesNotReplaceLoginMadeDuringRefresh(t *testing.T) {
+	useTempPath(t)
+	newer := login(time.Hour)
+	newer.AccessToken = "other-account"
+	newer.RefreshToken = "other-refresh"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := Save(newer); err != nil {
+			t.Error(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access-2", "token_type": "Bearer", "expires_in": 3600})
+	}))
+	old := tokenURL
+	tokenURL = func(string) string { return server.URL }
+	t.Cleanup(func() { tokenURL = old; server.Close() })
+
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Valid(context.Background(), host); err != nil {
+		t.Fatal(err)
+	}
+
+	saved, err := Load(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.AccessToken != "other-account" || saved.RefreshToken != "other-refresh" {
+		t.Errorf("the newer login was replaced, got %+v", saved)
+	}
+}

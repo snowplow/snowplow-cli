@@ -160,6 +160,8 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 		return nil, fmt.Errorf("failed to refresh login: %w", err)
 	}
 
+	// A login made while the refresh was in flight is newer: leave it in place
+	usedRefreshToken := login.RefreshToken
 	login.AccessToken = token.AccessToken
 	login.ExpiresAt = token.Expiry
 	if token.Expiry.IsZero() {
@@ -168,6 +170,9 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	}
 	if token.RefreshToken != "" {
 		login.RefreshToken = token.RefreshToken
+	}
+	if current, err := Load(host); err == nil && current != nil && current.RefreshToken != usedRefreshToken {
+		return login, nil
 	}
 	if err := Save(login); err != nil {
 		return nil, err
