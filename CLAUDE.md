@@ -2,7 +2,7 @@
 `snowplow-cli` is the official command-line interface for Snowplow CDI. It is the eventual home for *all* Snowplow CLI tooling. Its core is a git-based workflow for tracking design: data structures and data products (with their event specs and source apps) live as local YAML/JSON files that the CLI downloads, generates, validates, diffs against what is in Console, and publishes or syncs back. It can also send events to a collector for testing purposes.
 
 # Terminology
-"Data products" and "tracking plans" are the same thing. The product renamed data products to tracking plans, but the CLI still uses the old name everywhere (`data-products` / `dp` commands, `DataProduct` types, file formats).
+"Data products" and "tracking plans" are the same thing. The product renamed data products to tracking plans, but the CLI still uses the old name in everything except prose (`data-products` / `dp` commands, flag names, `DataProduct` types, file formats). User-facing help text says "tracking plan".
 
 # Non-obvious packages
 - `internal/setup/` is the credential setup wizard (`setup`); `internal/wizard/` holds the `signals setup` internals.
@@ -37,6 +37,24 @@ golangci-lint run        # config in .golangci.yml (see CI workflow)
 ```
 
 The release pipeline is GitHub Actions and publishes to GitHub Releases, Homebrew (`snowplow/taps`), and npm (`@snowplow/snowplow-cli` via `npm/`). Release steps and known issues are in `RELEASING.md`.
+
+# Updating the documentation
+
+The CLI docs live in the `snowplow/documentation` repo.
+
+**After every customer-facing change, update the docs.** That means any change to commands, flags, defaults, help text, file formats, config or output that a user can see. Do it in the same piece of work, as a branch in the documentation repo.
+
+The command reference (`reference/index.md`) is generated. Never edit it by hand: fix the help text or `cmd/docs.go` instead, then regenerate.
+
+```bash
+go run . generate-docs /tmp/snowplow-cli-docs     # wipes the output dir, writes index.md
+cp /tmp/snowplow-cli-docs/index.md ../documentation/docs/api-reference/snowplow-cli/reference/index.md
+git -C ../documentation diff                      # should show only your change and the date
+```
+
+If the diff shows anything unrelated, the published page was hand-edited or the generator has drifted. Fix it in this repo so the next run is clean.
+
+The other pages in that folder (`index.md`, `data-structures/`, `tracking-plans/`, `send-events/`) are hand-written how-to guides. Check whether they mention what you changed and update them too. A new command family usually needs a new how-to page.
 
 # Working with this codebase
 
