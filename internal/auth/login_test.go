@@ -396,8 +396,6 @@ func Test_Valid_LoginWithoutExpiryIsUsed(t *testing.T) {
 	}
 }
 
-// Snowtype reads and writes this file, so its keys are a contract between
-// the two tools. Change them in both or not at all.
 func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
 	path := useTempPath(t)
 	want := login(time.Hour)
@@ -524,8 +522,6 @@ func Test_Save_NeverTakesAnotherProcessLock(t *testing.T) {
 	}
 }
 
-// Go's own nanosecond, local-zone expiry is normalized, so that the file
-// holds the same form whichever tool wrote it.
 func Test_Save_WritesExpiryAsUTCMilliseconds(t *testing.T) {
 	path := useTempPath(t)
 	local := login(time.Hour)
@@ -591,7 +587,6 @@ func Test_Valid_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	// A lock left behind by a crash
 	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
 		t.Fatal(err)
 	}

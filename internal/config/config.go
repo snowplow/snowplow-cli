@@ -174,12 +174,12 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 	})
 
 	required := []string{"api-key-id", "api-key", "host", "org-id"}
-	if err == nil {
+	if err == nil && !skipMissingCheck {
 		login, loginErr := savedLogin(cmd)
-		switch {
-		case loginErr != nil && !skipMissingCheck:
+		if loginErr != nil {
 			return fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
-		case login != nil:
+		}
+		if login != nil {
 			required = []string{"host", "org-id"}
 			if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
 				if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
@@ -240,8 +240,6 @@ Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console
 	return nil
 }
 
-// savedLogin returns the login saved by `snowplow-cli login` when the command
-// runs on it because no API key is configured.
 func savedLogin(cmd *cobra.Command) (*auth.Login, error) {
 	apiKeyID, _ := cmd.Flags().GetString("api-key-id")
 	apiKey, _ := cmd.Flags().GetString("api-key")

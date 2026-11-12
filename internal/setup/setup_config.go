@@ -69,8 +69,6 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	return nil
 }
 
-// LoginConfig signs in and saves the login itself, so that commands can run
-// without an API key.
 func LoginConfig(clientID, auth0Domain, consoleHost string, hasAPIKey bool, ctx context.Context) error {
 	session, err := Login(ctx, clientID, auth0Domain, consoleHost, false)
 	if err != nil {

@@ -691,11 +691,9 @@ OTHER_VAR=other_value`
 
 func useLogin(t *testing.T, login *auth.Login) {
 	t.Helper()
-	// godotenv.Load in earlier tests leaves these set for the whole process
 	for _, name := range []string{"API_KEY_ID", "API_KEY", "ORG_ID", "HOST"} {
 		t.Setenv(envNamePrefix+name, "")
 	}
-	// No snowplow.yml or .env of the person running the tests is picked up
 	home := t.TempDir()
 	t.Chdir(home)
 	t.Setenv("HOME", home)
@@ -779,5 +777,25 @@ func Test_ConfigUnreadableSavedLogin(t *testing.T) {
 	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "id", "-S", "key", "-o", "org"}
 	if err := build().Execute(); err != nil {
 		t.Errorf("an api key should make the login file irrelevant: %v", err)
+	}
+}
+
+func Test_ConfigForSetupIgnoresSavedLogin(t *testing.T) {
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	hostOnly := &cobra.Command{Run: func(cmd *cobra.Command, args []string) {}}
+	hostOnly.Flags().String("host", "the-host", "")
+	hostOnly.Flags().String("config", "/nonexistent.yml", "")
+	hostOnly.Flags().String("env-file", "", "")
+
+	if err := InitConsoleConfigForSetup(hostOnly); err != nil {
+		t.Fatalf("a setup command without an org-id flag must not fail on a saved login: %v", err)
+	}
+
+	if err := os.WriteFile(auth.Path(), []byte("{not json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitConsoleConfigForSetup(hostOnly); err != nil {
+		t.Fatalf("a setup command must not fail on an unreadable login file: %v", err)
 	}
 }

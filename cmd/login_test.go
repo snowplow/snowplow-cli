@@ -19,8 +19,6 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/config"
 )
 
-// login reads its configuration before signing in, which needs every console
-// flag to be registered on the command.
 func Test_LoginCmd_ConfigInit(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -37,7 +35,6 @@ func Test_LoginCmd_ConfigInit(t *testing.T) {
 		t.Fatalf("not logged in: %v", err)
 	}
 
-	// Logging in again must work whatever state the saved login is in
 	if err := os.WriteFile(auth.Path(), []byte("{not json"), 0600); err != nil {
 		t.Fatal(err)
 	}
