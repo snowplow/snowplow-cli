@@ -20,6 +20,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/joho/godotenv"
+	"github.com/snowplow/snowplow-cli/internal/auth"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -172,9 +173,25 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		}
 	})
 
+	required := []string{"api-key-id", "api-key", "host", "org-id"}
+	if err == nil && !skipMissingCheck {
+		login, loginErr := savedLogin(cmd)
+		if loginErr != nil {
+			return fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
+		}
+		if login != nil {
+			required = []string{"host", "org-id"}
+			if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
+				if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	var missingVars []string
 	if !skipMissingCheck {
-		for _, f := range []string{"api-key-id", "api-key", "host", "org-id"} {
+		for _, f := range required {
 			value, err := cmd.Flags().GetString(f)
 			if err != nil {
 				return err
@@ -195,7 +212,7 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 
 		errorMsg.WriteString(`
 
-Configuration can be provided via:
+Run 'snowplow-cli login' to sign in with your browser, or provide configuration via:
   1. Command-line flags: --<name> <value>
   2. Environment variables: SNOWPLOW_CONSOLE_<NAME>=<value>
   3. Environment file (.env): SNOWPLOW_CONSOLE_<NAME>=<value>
@@ -221,6 +238,21 @@ Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console
 	}
 
 	return nil
+}
+
+func savedLogin(cmd *cobra.Command) (*auth.Login, error) {
+	apiKeyID, _ := cmd.Flags().GetString("api-key-id")
+	apiKey, _ := cmd.Flags().GetString("api-key")
+	host, _ := cmd.Flags().GetString("host")
+	if apiKeyID != "" || apiKey != "" {
+		return nil, nil
+	}
+
+	login, err := auth.Load(host)
+	if err == nil && login != nil {
+		slog.Debug("no api key configured, using saved login", "file", auth.Path())
+	}
+	return login, err
 }
 
 func PersistConfig(orgID, apiKeyID, apiKeySecret, consoleHost string, isDotEnv bool) error {

@@ -13,9 +13,11 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/joho/godotenv"
+	"github.com/snowplow/snowplow-cli/internal/auth"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -685,4 +687,115 @@ OTHER_VAR=other_value`
 			t.Error("SNOWPLOW_CONSOLE_HOST should not be saved when it's the default value")
 		}
 	})
+}
+
+func useLogin(t *testing.T, login *auth.Login) {
+	t.Helper()
+	for _, name := range []string{"API_KEY_ID", "API_KEY", "ORG_ID", "HOST"} {
+		t.Setenv(envNamePrefix+name, "")
+	}
+	home := t.TempDir()
+	t.Chdir(home)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
+	path := filepath.Join(t.TempDir(), "login.json")
+	old := auth.Path
+	auth.Path = func() string { return path }
+	t.Cleanup(func() { auth.Path = old })
+	if login != nil {
+		if err := auth.Save(login); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func Test_ConfigSavedLoginReplacesApiKey(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	testCmd := build()
+	if err := testCmd.Execute(); err != nil {
+		t.Fatalf("a saved login should be enough to run: %v", err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "login-org" {
+		t.Errorf("org-id got %s want login-org", org)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-o", "other-org"}
+	testCmd = build()
+	if err := testCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "other-org" {
+		t.Errorf("org-id got %s want other-org", org)
+	}
+}
+
+func Test_ConfigSavedLoginIgnored(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	table := map[string][]string{
+		"login is for another host": {"xxx", "--config", "/nonexistent.yml", "-H", "other-host"},
+		"half an api key is given":  {"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "key-id"},
+	}
+
+	for name, args := range table {
+		os.Args = args
+		if err := build().Execute(); err == nil {
+			t.Errorf("should have failed when %s", name)
+		}
+	}
+}
+
+func Test_ConfigApiKeyWinsOverSavedLogin(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "key-id", "-S", "key"}
+	if err := build().Execute(); err == nil {
+		t.Error("should have failed: the organization of the login must not be used with an api key")
+	}
+}
+
+func Test_ConfigUnreadableSavedLogin(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	if err := os.WriteFile(auth.Path(), []byte("{not json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	err := build().Execute()
+	if err == nil || !strings.Contains(err.Error(), "failed to parse login file") {
+		t.Errorf("expected the unreadable login file to be reported, got: %v", err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host", "-a", "id", "-S", "key", "-o", "org"}
+	if err := build().Execute(); err != nil {
+		t.Errorf("an api key should make the login file irrelevant: %v", err)
+	}
+}
+
+func Test_ConfigForSetupIgnoresSavedLogin(t *testing.T) {
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+
+	hostOnly := &cobra.Command{Run: func(cmd *cobra.Command, args []string) {}}
+	hostOnly.Flags().String("host", "the-host", "")
+	hostOnly.Flags().String("config", "/nonexistent.yml", "")
+	hostOnly.Flags().String("env-file", "", "")
+
+	if err := InitConsoleConfigForSetup(hostOnly); err != nil {
+		t.Fatalf("a setup command without an org-id flag must not fail on a saved login: %v", err)
+	}
+
+	if err := os.WriteFile(auth.Path(), []byte("{not json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitConsoleConfigForSetup(hostOnly); err != nil {
+		t.Fatalf("a setup command must not fail on an unreadable login file: %v", err)
+	}
 }
