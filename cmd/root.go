@@ -66,6 +66,7 @@ Then on:
 	RootCmd.AddCommand(dp.DataProductsCmd)
 	RootCmd.AddCommand(McpCmd)
 	RootCmd.AddCommand(LoginCmd)
+	RootCmd.AddCommand(LogoutCmd)
 	RootCmd.AddCommand(SetupCmd)
 	RootCmd.AddCommand(StatusCmd)
 	RootCmd.AddCommand(events.EventsCmd)

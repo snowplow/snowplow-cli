@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -597,5 +598,176 @@ func Test_Valid_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
 	}
 	if got == nil || got.AccessToken != "access-2" {
 		t.Errorf("got %+v want access-2", got)
+	}
+}
+
+func useRevokeServer(t *testing.T, status int) *[]url.Values {
+	t.Helper()
+	var calls []url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		calls = append(calls, r.PostForm)
+		w.WriteHeader(status)
+	}))
+	old := revokeURL
+	revokeURL = func(string) string { return server.URL }
+	t.Cleanup(func() { revokeURL = old; server.Close() })
+	return &calls
+}
+
+func Test_Logout_RevokesAndRemovesLogin(t *testing.T) {
+	path := useTempPath(t)
+	calls := useRevokeServer(t, http.StatusOK)
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.LoggedIn || !result.Revoked {
+		t.Errorf("got %+v want logged in and revoked", result)
+	}
+	if len(*calls) != 1 || (*calls)[0].Get("token") != "refresh-1" || (*calls)[0].Get("client_id") != "client-1" {
+		t.Errorf("revoke calls got %v want one for refresh-1 and client-1", *calls)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("the login file was not removed")
+	}
+	if _, err := os.Stat(path + ".lock"); !os.IsNotExist(err) {
+		t.Error("the lock was left behind")
+	}
+	if got, _ := Load(host); got != nil {
+		t.Errorf("still logged in: %+v", got)
+	}
+}
+
+func Test_Logout_NotLoggedIn(t *testing.T) {
+	path := useTempPath(t)
+	calls := useRevokeServer(t, http.StatusOK)
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.LoggedIn || result.Revoked {
+		t.Errorf("got %+v want not logged in", result)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("revoke called %d times, want 0", len(*calls))
+	}
+	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
+		t.Error("logging out with no login must not create the config directory")
+	}
+}
+
+func Test_Logout_RemovesLoginWhenRevokeFails(t *testing.T) {
+	path := useTempPath(t)
+	useRevokeServer(t, http.StatusServiceUnavailable)
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.LoggedIn || result.Revoked {
+		t.Errorf("got %+v want logged in and not revoked", result)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("the login file was not removed")
+	}
+}
+
+func Test_Logout_WithoutRefreshTokenSkipsRevoke(t *testing.T) {
+	useTempPath(t)
+	calls := useRevokeServer(t, http.StatusOK)
+	noRefresh := login(time.Hour)
+	noRefresh.RefreshToken = ""
+	if err := Save(noRefresh); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.LoggedIn || result.Revoked {
+		t.Errorf("got %+v want logged in and not revoked", result)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("revoke called %d times, want 0", len(*calls))
+	}
+}
+
+func Test_Logout_RemovesUnreadableLogin(t *testing.T) {
+	path := useTempPath(t)
+	calls := useRevokeServer(t, http.StatusOK)
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{not json"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.LoggedIn || result.Revoked {
+		t.Errorf("got %+v want logged in and not revoked", result)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("revoke called %d times, want 0", len(*calls))
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("the unreadable login file was not removed")
+	}
+}
+
+func Test_Logout_LogsOutEveryHost(t *testing.T) {
+	path := useTempPath(t)
+	useRevokeServer(t, http.StatusOK)
+	other := login(time.Hour)
+	other.Host = "https://next.console.snowplowanalytics.com"
+	if err := Save(other); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Logout(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.LoggedIn || !result.Revoked {
+		t.Errorf("got %+v want logged in and revoked", result)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("the login file was not removed")
+	}
+}
+
+func Test_Logout_FailsWhenLocked(t *testing.T) {
+	path := useTempPath(t)
+	calls := useRevokeServer(t, http.StatusOK)
+	oldWait := lockWait
+	lockWait = 50 * time.Millisecond
+	t.Cleanup(func() { lockWait = oldWait })
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Logout(context.Background()); err == nil {
+		t.Error("expected an error while another process holds the lock")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Error("the login file must stay when the lock cannot be taken")
+	}
+	if len(*calls) != 0 {
+		t.Errorf("revoke called %d times, want 0", len(*calls))
 	}
 }

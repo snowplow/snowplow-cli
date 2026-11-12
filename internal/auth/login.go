@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,10 @@ var Path = func() string {
 
 var tokenURL = func(auth0Domain string) string {
 	return fmt.Sprintf("https://%s/oauth/token", auth0Domain)
+}
+
+var revokeURL = func(auth0Domain string) string {
+	return fmt.Sprintf("https://%s/oauth/revoke", auth0Domain)
 }
 
 func Save(login *Login) error {
@@ -211,4 +216,62 @@ func rejected(err *oauth2.RetrieveError) bool {
 	}
 	status := err.Response.StatusCode
 	return status >= 400 && status < 500 && status != http.StatusTooManyRequests
+}
+
+type LogoutResult struct {
+	LoggedIn bool
+	Revoked  bool
+}
+
+func Logout(ctx context.Context) (LogoutResult, error) {
+	path := Path()
+	if path == "" {
+		return LogoutResult{}, nil
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return LogoutResult{}, nil
+	}
+
+	var login *Login
+	err := withLock(func(path string) error {
+		login, _ = loadAny()
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to remove login file: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return LogoutResult{}, err
+	}
+
+	result := LogoutResult{LoggedIn: true}
+	if login != nil && login.RefreshToken != "" && login.ClientID != "" && login.Auth0Domain != "" {
+		if err := revoke(ctx, login); err != nil {
+			slog.Debug("refresh token not revoked", "error", err)
+		} else {
+			result.Revoked = true
+		}
+	}
+	return result, nil
+}
+
+func revoke(ctx context.Context, login *Login) error {
+	form := url.Values{"client_id": {login.ClientID}, "token": {login.RefreshToken}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revokeURL(login.Auth0Domain), strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{Timeout: refreshTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("revoke returned %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+	return nil
 }

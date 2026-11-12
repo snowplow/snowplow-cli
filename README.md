@@ -54,6 +54,14 @@ snowplow-cli login
 
 This signs you in to Snowplow Console in your browser and saves the login to `~/.config/snowplow/login.json`. No API key is created. Commands use the saved login when no API key is configured, with the organization you chose at login unless you set `org-id`. The login is refreshed automatically, and [Snowtype](https://docs.snowplow.io/docs/event-studio/implement-tracking/) shares it through `snowtype login`.
 
+To sign out, run:
+
+```bash
+snowplow-cli logout
+```
+
+This revokes the saved login and deletes the file, which also signs Snowtype out. An API key, if you have one configured, keeps working.
+
 For CI and other non-interactive use, configure an API key instead.
 
 ### Configuration Methods
