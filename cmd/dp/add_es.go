@@ -20,11 +20,11 @@ import (
 
 var addEsCmd = &cobra.Command{
 	Use:     "add-event-spec {path}",
-	Short:   "Add new event spec to an existing data product",
+	Short:   "Add new event spec to an existing tracking plan",
 	Aliases: []string{"add-es"},
 	Args:    cobra.RangeArgs(0, 1),
-	Long: `Adds one or more event specifications to an existing data product file, or print them to the stdout.
-The command takes the path to a data product file and adds the specified event specifications to it. When run without the argument - it will print generated event specs to the stdout.
+	Long: `Adds one or more event specifications to an existing tracking plan file, or print them to the stdout.
+The command takes the path to a tracking plan file and adds the specified event specifications to it. When run without the argument - it will print generated event specs to the stdout.
 The command will attempt to keep the formatting and comments of the original file intact, but it's a best effort approach. Some comments might be deleted, some formatting changes might occur.`,
 	Example: `  $ snowplow-cli dp add-event-spec --event-spec user_login --event-spec page_view ./my-data-product.yaml
   $ snowplow-cli dp add-es ./data-products/analytics.yaml -e "checkout_completed" -e "item_purchased"`,

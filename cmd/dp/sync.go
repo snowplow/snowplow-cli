@@ -21,11 +21,11 @@ import (
 var syncCommand = &cobra.Command{
 	Use:     "sync {directory ./data-products}",
 	Aliases: []string{"publish"},
-	Short:   "Sync data products, event specs and source apps to Snowplow Console",
-	Long: `Sync data products, event specs and source apps to Snowplow Console.
+	Short:   "Sync tracking plans, event specs and source apps to Snowplow Console",
+	Long: `Sync tracking plans, event specs and source apps to Snowplow Console.
 
-This command syncs local files with Snowplow Console. Data products, event specs and source apps are created or updated as needed.
-Data products and source apps that exist in Snowplow Console are updated in place. Structural changes to event specs (name, event, entities) will instead create a new draft version of the event spec.
+This command syncs local files with Snowplow Console. Tracking plans, event specs and source apps are created or updated as needed.
+Tracking plans and source apps that exist in Snowplow Console are updated in place. Structural changes to event specs (name, event, entities) will instead create a new draft version of the event spec.
 Use 'release' to also release event specs, which changes the status in Snowplow Console to "published" and enables event spec inference.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,

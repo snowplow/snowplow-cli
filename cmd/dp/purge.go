@@ -41,8 +41,8 @@ func (a purgeApi) FetchDataProduct() (*console.DataProductsAndRelatedResources, 
 
 var purgeCommand = &cobra.Command{
 	Use:   "purge {directory ./data-products}",
-	Short: "Purges (permanently removes) all remote data products and source apps that do not exist locally",
-	Long: `Purges (permanently removes) all remote data products and source apps that do not exist locally.
+	Short: "Purges (permanently removes) all remote tracking plans and source apps that do not exist locally",
+	Long: `Purges (permanently removes) all remote tracking plans and source apps that do not exist locally.
 
 If no directory is provided then defaults to 'data-products' in the current directory. Source apps are stored in the nested 'source-apps' directory`,
 	Example: `  $ snowplow-cli dp purge

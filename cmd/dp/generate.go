@@ -24,17 +24,17 @@ import (
 
 var generateCmd = &cobra.Command{
 	Use:     "generate [paths...]",
-	Short:   "Generate new data products and source applications locally",
+	Short:   "Generate new tracking plans and source applications locally",
 	Aliases: []string{"gen"},
 	Args:    cobra.NoArgs,
-	Long: `Will write new data products and/or source application to file based on the arguments provided.
+	Long: `Will write new tracking plans and/or source application to file based on the arguments provided.
 
 Example:
   $ snowplow-cli dp gen --source-app "Mobile app"
   Will result in a new source application getting written to './data-products/source-applications/mobile-app.yaml'
 
   $ snowplow-cli dp gen --data-product "Ad tracking" --output-format json --data-products-directory dir1
-  Will result in a new data product getting written to './dir1/ad-tracking.json'
+  Will result in a new tracking plan getting written to './dir1/ad-tracking.json'
 `,
 	Example: `  $ snowplow-cli dp generate --source-app "Mobile app" --source-app "Web app" --data-product "Signup flow"`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -112,11 +112,11 @@ func init() {
 	DataProductsCmd.AddCommand(generateCmd)
 
 	generateCmd.Flags().String("output-format", "yaml", "File format (yaml|json)")
-	generateCmd.Flags().String("data-products-directory", util.DataProductsFolder, "Directory to write data products to")
+	generateCmd.Flags().String("data-products-directory", util.DataProductsFolder, "Directory to write tracking plans to")
 	generateCmd.Flags().String("source-apps-directory", filepath.Join(util.DataProductsFolder, util.SourceAppsFolder), "Directory to write source apps to")
 
 	generateCmd.Flags().StringArray("source-app", []string{}, "Name of source app to generate")
-	generateCmd.Flags().StringArray("data-product", []string{}, "Name of data product to generate")
+	generateCmd.Flags().StringArray("data-product", []string{}, "Name of tracking plan to generate")
 	generateCmd.Flags().Bool("plain", false, "Don't include any comments in yaml files")
 
 	generateCmd.MarkFlagsOneRequired("source-app", "data-product")
