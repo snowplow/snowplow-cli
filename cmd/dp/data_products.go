@@ -22,7 +22,7 @@ import (
 var DataProductsCmd = &cobra.Command{
 	Use:     "data-products",
 	Aliases: []string{"dp"},
-	Short:   "Work with Snowplow data products",
+	Short:   "Work with Snowplow tracking plans",
 	Example: `  $ snowplow-cli data-products validate`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := snplog.InitLogging(cmd); err != nil {

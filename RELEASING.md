@@ -14,6 +14,8 @@ A release is started by pushing a `vX.Y.Z` tag. This triggers `cd` workflow that
 
 2. Watch the `cd` run, then check the [GitHub release](https://github.com/snowplow/snowplow-cli/releases), `brew info snowplow/taps/snowplow-cli` and `npm view @snowplow/snowplow-cli version`.
 
+3. If the release has customer-facing changes, update the docs in `snowplow/documentation`: regenerate the command reference from the released tag and update the how-to guides. The steps are in `CLAUDE.md` under "Updating the documentation".
+
 The GitHub release notes are generated from the commits since the previous tag, without the ones starting with `docs:` or `test:`.
 
 ## Potential issues
