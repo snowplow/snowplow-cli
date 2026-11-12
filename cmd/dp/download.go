@@ -65,5 +65,5 @@ func init() {
 
 	downloadCommand.PersistentFlags().StringP("output-format", "f", "yaml", "Format of the files to read/write. json or yaml are supported")
 	downloadCommand.PersistentFlags().Bool("plain", false, "Don't include any comments in yaml files")
-	downloadCommand.PersistentFlags().Bool("versions", false, "Write the current version of each event specification. Data products whose local file already declares versions keep them without this flag")
+	downloadCommand.PersistentFlags().Bool("versions", false, "Write the current version of each event specification. Tracking plans whose local file already declares versions keep them without this flag")
 }
