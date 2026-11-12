@@ -42,19 +42,20 @@ The release pipeline is GitHub Actions and publishes to GitHub Releases, Homebre
 
 The CLI docs live in the `snowplow/documentation` repo.
 
-**After every customer-facing change, update the docs.** That means any change to commands, flags, defaults, help text, file formats, config or output that a user can see. Do it in the same piece of work, as a branch in the documentation repo.
+**Update the docs after each release, not with each change.** The docs describe the released CLI, so they change once a release with customer-facing changes is out: any change to commands, flags, defaults, help text, file formats, config or output that a user can see. In a feature PR, only get the help text right.
 
 The command reference (`reference/index.md`) is generated. Never edit it by hand: fix the help text or `cmd/docs.go` instead, then regenerate.
 
 ```bash
+git checkout vX.Y.Z                               # generate from the released tag
 go run . generate-docs /tmp/snowplow-cli-docs     # wipes the output dir, writes index.md
 cp /tmp/snowplow-cli-docs/index.md ../documentation/docs/api-reference/snowplow-cli/reference/index.md
-git -C ../documentation diff                      # should show only your change and the date
+git -C ../documentation diff                      # should show only what the release changed and the date
 ```
 
 If the diff shows anything unrelated, the published page was hand-edited or the generator has drifted. Fix it in this repo so the next run is clean.
 
-The other pages in that folder (`index.md`, `data-structures/`, `tracking-plans/`, `send-events/`) are hand-written how-to guides. Check whether they mention what you changed and update them too. A new command family usually needs a new how-to page.
+The other pages in that folder (`index.md`, `data-structures/`, `tracking-plans/`, `send-events/`) are hand-written how-to guides. Check whether they mention what the release changed and update them too. A new command family usually needs a new how-to page.
 
 # Working with this codebase
 
