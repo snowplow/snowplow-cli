@@ -31,9 +31,13 @@ const envNamePrefix = "SNOWPLOW_CONSOLE_"
 func InitConsoleFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringP("api-key-id", "a", "", "Snowplow Console api key id")
 	cmd.PersistentFlags().StringP("api-key", "S", "", "Snowplow Console api key")
-	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "Snowplow Console host")
+	InitConsoleHostFlag(cmd)
 	cmd.PersistentFlags().StringP("org-id", "o", "", "Your organization id")
 	cmd.PersistentFlags().StringP("managed-from", "m", "", "Link to a github repo where the data structure is managed")
+}
+
+func InitConsoleHostFlag(cmd *cobra.Command) {
+	cmd.PersistentFlags().StringP("host", "H", "https://console.snowplowanalytics.com", "Snowplow Console host")
 }
 
 type rawAppConfig struct {
@@ -186,17 +190,19 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 	}
 
 	var missingVars []string
-	for _, f := range required {
-		value, err := cmd.Flags().GetString(f)
-		if err != nil {
-			return err
-		}
-		if value == "" {
-			missingVars = append(missingVars, f)
+	if !skipMissingCheck {
+		for _, f := range required {
+			value, err := cmd.Flags().GetString(f)
+			if err != nil {
+				return err
+			}
+			if value == "" {
+				missingVars = append(missingVars, f)
+			}
 		}
 	}
 
-	if len(missingVars) > 0 && !skipMissingCheck {
+	if len(missingVars) > 0 {
 		var errorMsg strings.Builder
 		if len(missingVars) == 1 {
 			errorMsg.WriteString(fmt.Sprintf(`config value "%s" not set`, missingVars[0]))

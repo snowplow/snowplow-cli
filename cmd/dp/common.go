@@ -79,7 +79,7 @@ func runDpWorkflow(cmd *cobra.Command, args []string, action dpAction) {
 
 	release.LockChanged(changes, managedFrom)
 
-	err = validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, concurrentReq)
+	err = validation.Validate(cnx, c, files, searchPaths, basePath, ghOut, false, changes.IdToFileName, changes.VersionMismatches, concurrentReq)
 	if err != nil {
 		snplog.LogFatal(err)
 	}

@@ -16,9 +16,10 @@ import (
 
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/logging"
+	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
-func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, concurrency int) error {
+func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, versionMismatches []model.EventSpecVersionMismatch, concurrency int) error {
 
 	logger := logging.LoggerFromContext(ctx)
 
@@ -40,6 +41,57 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 	if err != nil {
 		return err
 	}
+
+	lookup.AddVersionMismatches(versionMismatches, "snowplow-cli dp validate --fix")
+
+	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
+
+	err = lookup.SlogValidations(ctx, basePath)
+	if err != nil {
+		return err
+	}
+
+	if ghOut {
+		err := lookup.GhAnnotateValidations(basePath)
+		if err != nil {
+			logging.LogFatal(err)
+		}
+	}
+
+	numErrors := lookup.ValidationErrorCount()
+
+	if numErrors > 0 {
+		return fmt.Errorf("validation failed %d errors", numErrors)
+	} else {
+		dpCount := 0
+		for range lookup.DataProducts {
+			dpCount++
+		}
+		saCount := 0
+		for range lookup.SourceApps {
+			saCount++
+		}
+		logger.Info("validation", "msg", "success", "data products found", dpCount, "source applications found", saCount)
+	}
+
+	return nil
+}
+
+func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, baseRef string, versionMismatches []model.EventSpecVersionMismatch) error {
+
+	logger := logging.LoggerFromContext(ctx)
+
+	possibleFiles := []string{}
+	for n := range files {
+		possibleFiles = append(possibleFiles, n)
+	}
+
+	lookup, err := NewDPLookup(nil, nil, files, map[string]string{}, false, 1)
+	if err != nil {
+		return err
+	}
+
+	lookup.AddVersionMismatches(versionMismatches, fmt.Sprintf("snowplow-cli dp validate offline --base-ref %s --fix", baseRef))
 
 	logger.Debug("validation", "msg", "from", "paths", searchPaths, "files", possibleFiles)
 

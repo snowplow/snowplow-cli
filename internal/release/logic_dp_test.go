@@ -11,12 +11,14 @@ package release
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -914,5 +916,816 @@ func Test_Release_DryRunNothingToRelease(t *testing.T) {
 	}
 	if publishCalls.Load() != 0 {
 		t.Errorf("expected no publish calls, got %d", publishCalls.Load())
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func versionRuleLocalAndRemote(localEs model.EventSpec, remoteEs console.RemoteEventSpec) (LocalFilesRefsResolved, console.DataProductsAndRelatedResources) {
+	dp := model.DataProduct{
+		ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Data: model.DataProductData{
+			Name:                "Data Product 1",
+			EventSpecifications: []model.EventSpec{localEs},
+		},
+	}
+	local := LocalFilesRefsResolved{
+		DataProudcts: []model.DataProduct{dp},
+		IdToFileName: map[string]string{localEs.ResourceName: "/base/dp.yaml"},
+	}
+
+	remoteDp := console.RemoteDataProduct{
+		Id:                   "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Name:                 "Data Product 1",
+		SourceApplicationIds: []string{},
+		EventSpecs:           []console.EventSpecReference{{Id: remoteEs.Id}},
+	}
+	remote := console.DataProductsAndRelatedResources{
+		DataProducts: []console.RemoteDataProduct{remoteDp},
+		EventSpecs:   []console.RemoteEventSpec{remoteEs},
+	}
+	return local, remote
+}
+
+func versionRuleRemoteEs() console.RemoteEventSpec {
+	return console.RemoteEventSpec{
+		Id:                   "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		Name:                 "Checkout Started",
+		Description:          "description",
+		SourceApplicationIds: []string{},
+		Version:              3,
+		DataProductId:        "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Event: &console.EventWrapper{Event: console.Event{
+			Source: "iglu:com.example/checkout/jsonschema/1-0-0",
+			Schema: map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": int64(10)}}},
+		}},
+		Entities: console.Entities{
+			Tracked: []console.Entity{{
+				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
+				MinCardinality: intPtr(0),
+				MaxCardinality: intPtr(1),
+			}},
+			Enriched: []console.Entity{},
+		},
+	}
+}
+
+func versionRuleLocalEs() model.EventSpec {
+	return model.EventSpec{
+		ResourceName: "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		Name:         "Checkout Started",
+		Description:  "description",
+		Event: model.SchemaRef{
+			Source: "iglu:com.example/checkout/jsonschema/1-0-0",
+			Schema: map[string]any{"properties": map[string]any{"a": map[string]any{"maxLength": 10}}, "type": "object"},
+		},
+		Entities: model.EntitiesDef{
+			Tracked: []model.SchemaRef{{
+				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
+				MinCardinality: intPtr(0),
+				MaxCardinality: intPtr(1),
+			}},
+		},
+	}
+}
+
+func Test_findChanges_VersionRule(t *testing.T) {
+	tests := []struct {
+		name         string
+		changeLocal  func(es *model.EventSpec)
+		changeRemote func(es *console.RemoteEventSpec)
+		wantUpdate   bool
+		wantExpected int
+		wantChanged  []string
+
+		wantCommentsRemoved bool
+	}{
+		{
+			name:         "unchanged keeps the version",
+			wantUpdate:   false,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "description change keeps the version",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name: "trigger change keeps the version",
+			changeLocal: func(es *model.EventSpec) {
+				es.Triggers = []model.Trigger{{Id: "a29e6ba7-769a-4919-b9a3-e6bb7bd97d67", Description: "new"}}
+			},
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "name change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Name = "Checkout Begun" },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"name"},
+		},
+		{
+			name:         "event source change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Event.Source = "iglu:com.example/checkout/jsonschema/1-0-1" },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name: "event schema change adds one",
+			changeLocal: func(es *model.EventSpec) {
+				es.Event.Schema = map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": 11}}}
+			},
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name:         "entity cardinality change adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name: "name, event and entities change adds one",
+			changeLocal: func(es *model.EventSpec) {
+				es.Name = "Checkout Begun"
+				es.Event.Source = "iglu:com.example/checkout/jsonschema/1-0-1"
+				es.Entities.Enriched = []model.SchemaRef{{Source: "iglu:com.example/geo/jsonschema/1-0-0"}}
+			},
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"name", "event", "entities"},
+		},
+		{
+			name:         "remote entity comment alone sends nothing and keeps the version",
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   false,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "remote entity comment is dropped by an update and adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+
+			wantCommentsRemoved: true,
+		},
+		{
+			name:         "remote entity comment alongside a real entity change is not the only cause",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name:         "missing min cardinality is sent as null and treated as 0",
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MinCardinality = nil },
+			wantUpdate:   true,
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "absent remote entities list differs from the empty list the cli sends",
+			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Enriched = nil },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name:         "remote empty event schema differs from the absent schema the cli sends",
+			changeLocal:  func(es *model.EventSpec) { es.Event.Schema = nil; es.Description = "other" },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Event.Schema = map[string]any{} },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name:         "removing the event adds one",
+			changeLocal:  func(es *model.EventSpec) { es.Event = model.SchemaRef{} },
+			wantUpdate:   true,
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localEs := versionRuleLocalEs()
+			if tt.changeLocal != nil {
+				tt.changeLocal(&localEs)
+			}
+			localEs.Version = intPtr(99)
+			remoteEs := versionRuleRemoteEs()
+			if tt.changeRemote != nil {
+				tt.changeRemote(&remoteEs)
+			}
+			local, remote := versionRuleLocalAndRemote(localEs, remoteEs)
+
+			changes, err := findChanges(local, remote, map[string]string{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if gotUpdate := len(changes.esUpdate) == 1; gotUpdate != tt.wantUpdate {
+				t.Errorf("update sent = %v, want %v", gotUpdate, tt.wantUpdate)
+			}
+			if len(changes.VersionMismatches) != 1 {
+				t.Fatalf("expected 1 version mismatch, got %+v", changes.VersionMismatches)
+			}
+			want := model.EventSpecVersionMismatch{
+				FileName: "/base/dp.yaml",
+				Index:    0,
+				Name:     localEs.Name,
+				Declared: 99,
+				Expected: tt.wantExpected,
+				IsNew:    false,
+				Changed:  tt.wantChanged,
+
+				EntityCommentsRemoved: tt.wantCommentsRemoved,
+			}
+			if diff := cmp.Diff(want, changes.VersionMismatches[0]); diff != "" {
+				t.Errorf("version mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_findChanges_VersionMatchesNoMismatch(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Name = "Checkout Begun"
+	localEs.Version = intPtr(4)
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+	if v := changes.declaredVersion(localEs.ResourceName); v == nil || *v != 4 {
+		t.Errorf("expected declared version 4, got %v", v)
+	}
+}
+
+func Test_findChanges_NewEventSpecExpectsZero(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Version = intPtr(0)
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+	remote.EventSpecs = []console.RemoteEventSpec{}
+	remote.DataProducts[0].EventSpecs = nil
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esCreate) != 1 {
+		t.Fatalf("expected 1 event spec create, got %d", len(changes.esCreate))
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+
+	localEs.Version = intPtr(1)
+	local, _ = versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+	changes, err = findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []model.EventSpecVersionMismatch{{
+		FileName: "/base/dp.yaml",
+		Index:    0,
+		Name:     localEs.Name,
+		Declared: 1,
+		Expected: 0,
+		IsNew:    true,
+		Changed:  []string{},
+	}}
+	if diff := cmp.Diff(want, changes.VersionMismatches); diff != "" {
+		t.Errorf("version mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func Test_findChanges_NoVersionDeclared(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	localEs.Name = "Checkout Begun"
+	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esUpdate) != 1 {
+		t.Errorf("expected 1 event spec update, got %d", len(changes.esUpdate))
+	}
+	if len(changes.VersionMismatches) != 0 {
+		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
+	}
+	if v := changes.declaredVersion(localEs.ResourceName); v != nil {
+		t.Errorf("expected no declared version, got %d", *v)
+	}
+}
+
+func newEventSpecWriteServer(t *testing.T, bodies map[string]map[string]any) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("unexpected body: %v", err)
+		}
+		bodies[r.Method+" "+r.URL.Path] = body
+		switch {
+		case r.URL.Path == "/event-specs/v1" && r.Method == "POST":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{}`)
+		case strings.HasPrefix(r.URL.Path, "/event-specs/v1/") && r.Method == "PUT":
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func Test_ApplyDpChanges_UpdateExpectedVersionOnlyWhenDeclared(t *testing.T) {
+	bodies := map[string]map[string]any{}
+	server := newEventSpecWriteServer(t, bodies)
+	defer server.Close()
+	client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+	changes := DataProductChangeSet{
+		esUpdate:         []console.RemoteEventSpec{{Id: "es-update-declared", Name: "c"}, {Id: "es-update", Name: "d"}},
+		declaredVersions: map[string]int{"es-update-declared": 4},
+	}
+
+	err := ApplyDpChanges(changes, context.Background(), client)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if v, ok := bodies["PUT /event-specs/v1/es-update-declared"]["expectedVersion"]; !ok || v != float64(4) {
+		t.Errorf("update with a declared version should send expectedVersion 4, got %v", bodies["PUT /event-specs/v1/es-update-declared"])
+	}
+	if _, ok := bodies["PUT /event-specs/v1/es-update"]["expectedVersion"]; ok {
+		t.Errorf("update without a declared version should not send expectedVersion, got %v", bodies["PUT /event-specs/v1/es-update"])
+	}
+}
+
+func Test_ApplyDpChanges_CreateExpectedVersionOnlyWhenDeclared(t *testing.T) {
+	for _, tt := range []struct {
+		id       string
+		declared map[string]int
+		want     any
+		wantSent bool
+	}{
+		{id: "es-create-declared", declared: map[string]int{"es-create-declared": 0}, want: float64(0), wantSent: true},
+		{id: "es-create", declared: map[string]int{}, wantSent: false},
+	} {
+		t.Run(tt.id, func(t *testing.T) {
+			bodies := map[string]map[string]any{}
+			server := newEventSpecWriteServer(t, bodies)
+			defer server.Close()
+			client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+			changes := DataProductChangeSet{
+				esCreate:         []console.RemoteEventSpec{{Id: tt.id, Name: "a"}},
+				declaredVersions: tt.declared,
+			}
+			err := ApplyDpChanges(changes, context.Background(), client)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			v, ok := bodies["POST /event-specs/v1"]["expectedVersion"]
+			if ok != tt.wantSent || (tt.wantSent && v != tt.want) {
+				t.Errorf("expectedVersion sent = %v (%v), want %v (%v)", ok, v, tt.wantSent, tt.want)
+			}
+		})
+	}
+}
+
+func Test_Release_ExpectedVersionsOnlyForDeclared(t *testing.T) {
+	eventSpecsJSON := `[
+		{"id": "es-1", "status": "draft", "name": "ES 1", "version": 2, "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []},
+		{"id": "es-2", "status": "draft", "name": "ES 2", "version": 5, "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}
+	]`
+
+	for _, tt := range []struct {
+		name     string
+		declared map[string]int
+		wantBody string
+	}{
+		{
+			name:     "no declared versions",
+			declared: nil,
+			wantBody: `{"eventSpecIds":["es-1","es-2"]}`,
+		},
+		{
+			name:     "one declared version",
+			declared: map[string]int{"es-2": 5, "es-not-released": 1},
+			wantBody: `{"eventSpecIds":["es-1","es-2"],"expectedVersions":[{"id":"es-2","version":5}]}`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var publishBody string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/data-products/v2" && r.Method == "GET":
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, fmt.Sprintf(`{"data": [], "includes": {"eventSpecs": %s}}`, eventSpecsJSON))
+				case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
+					w.WriteHeader(http.StatusOK)
+					_, _ = io.WriteString(w, `{"data": []}`)
+				case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+					b, _ := io.ReadAll(r.Body)
+					publishBody = string(b)
+					w.WriteHeader(http.StatusAccepted)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer server.Close()
+			client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+			changeSet := &DataProductChangeSet{
+				IdToFileName:      map[string]string{},
+				localEventSpecIds: []string{"es-1", "es-2"},
+				declaredVersions:  tt.declared,
+			}
+
+			err := Release(context.Background(), client, changeSet, false)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if publishBody != tt.wantBody {
+				t.Errorf("publish body = %s, want %s", publishBody, tt.wantBody)
+			}
+		})
+	}
+}
+
+func baseRuleFile(spec map[string]any) map[string]map[string]any {
+	return map[string]map[string]any{
+		"/base/dp.yaml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"resourceName": "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+			"data": map[string]any{
+				"name":                "Data Product 1",
+				"eventSpecifications": []any{spec},
+			},
+		},
+	}
+}
+
+func baseRuleSpec(version any) map[string]any {
+	spec := map[string]any{
+		"resourceName": "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+		"name":         "Checkout Started",
+		"description":  "description",
+		"event": map[string]any{
+			"source": "iglu:com.example/checkout/jsonschema/1-0-0",
+			"schema": map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": 10}}},
+		},
+		"entities": map[string]any{
+			"tracked": []any{map[string]any{"source": "iglu:com.example/cart/jsonschema/1-0-0", "minCardinality": 0}},
+		},
+	}
+	if version != nil {
+		spec["version"] = version
+	}
+	return spec
+}
+
+func Test_FindVersionMismatchesAgainstBase(t *testing.T) {
+	tests := []struct {
+		name         string
+		changeLocal  func(spec map[string]any)
+		wantExpected int
+		wantChanged  []string
+	}{
+		{
+			name:         "unchanged keeps the base version",
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "description change keeps the base version",
+			changeLocal:  func(spec map[string]any) { spec["description"] = "other" },
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+		{
+			name:         "name change adds one",
+			changeLocal:  func(spec map[string]any) { spec["name"] = "Checkout Begun" },
+			wantExpected: 4,
+			wantChanged:  []string{"name"},
+		},
+		{
+			name: "event change adds one",
+			changeLocal: func(spec map[string]any) {
+				spec["event"] = map[string]any{"source": "iglu:com.example/checkout/jsonschema/1-0-1"}
+			},
+			wantExpected: 4,
+			wantChanged:  []string{"event"},
+		},
+		{
+			name: "entities change adds one",
+			changeLocal: func(spec map[string]any) {
+				spec["entities"] = map[string]any{"tracked": []any{map[string]any{"source": "iglu:com.example/cart/jsonschema/1-0-0", "minCardinality": 1}}}
+			},
+			wantExpected: 4,
+			wantChanged:  []string{"entities"},
+		},
+		{
+			name: "missing min cardinality equals 0",
+			changeLocal: func(spec map[string]any) {
+				spec["entities"] = map[string]any{"tracked": []any{map[string]any{"source": "iglu:com.example/cart/jsonschema/1-0-0"}}}
+			},
+			wantExpected: 3,
+			wantChanged:  []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			localSpec := baseRuleSpec(99)
+			if tt.changeLocal != nil {
+				tt.changeLocal(localSpec)
+			}
+
+			mismatches, skipped, err := FindVersionMismatchesAgainstBase(baseRuleFile(localSpec), baseRuleFile(baseRuleSpec(3)))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(skipped) != 0 {
+				t.Errorf("expected nothing skipped, got %v", skipped)
+			}
+			want := []model.EventSpecVersionMismatch{{
+				FileName: "/base/dp.yaml",
+				Index:    0,
+				Name:     localSpec["name"].(string),
+				Declared: 99,
+				Expected: tt.wantExpected,
+				Changed:  tt.wantChanged,
+			}}
+			if diff := cmp.Diff(want, mismatches); diff != "" {
+				t.Errorf("version mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_MatchingVersion(t *testing.T) {
+	localSpec := baseRuleSpec(4)
+	localSpec["name"] = "Checkout Begun"
+
+	mismatches, _, err := FindVersionMismatchesAgainstBase(baseRuleFile(localSpec), baseRuleFile(baseRuleSpec(float64(3))))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mismatches) != 0 {
+		t.Errorf("expected no mismatch, got %+v", mismatches)
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_NewSpec(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		base map[string]map[string]any
+	}{
+		{name: "spec absent at base", base: baseRuleFile(map[string]any{"resourceName": "aaa70141-c223-4172-ab39-86a0194e44e8", "name": "other", "version": 5})},
+		{name: "file absent at base", base: map[string]map[string]any{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mismatches, _, err := FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(0)), tt.base)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(mismatches) != 0 {
+				t.Errorf("expected version 0 to match a new spec, got %+v", mismatches)
+			}
+
+			mismatches, _, err = FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(2)), tt.base)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			want := []model.EventSpecVersionMismatch{{FileName: "/base/dp.yaml", Index: 0, Name: "Checkout Started", Declared: 2, Expected: 0, IsNew: true, Changed: []string{}}}
+			if diff := cmp.Diff(want, mismatches); diff != "" {
+				t.Errorf("version mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_SkipsUndeclared(t *testing.T) {
+	localSpec := baseRuleSpec(7)
+	localSpec["name"] = "Checkout Begun"
+
+	mismatches, skipped, err := FindVersionMismatchesAgainstBase(baseRuleFile(localSpec), baseRuleFile(baseRuleSpec(nil)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mismatches) != 0 {
+		t.Errorf("expected no mismatch when the base declares no version, got %+v", mismatches)
+	}
+	if diff := cmp.Diff([]string{"Checkout Begun"}, skipped); diff != "" {
+		t.Errorf("skipped (-want +got):\n%s", diff)
+	}
+
+	mismatches, skipped, err = FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(nil)), baseRuleFile(baseRuleSpec(3)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mismatches) != 0 || len(skipped) != 0 {
+		t.Errorf("a local spec without a version is not checked, got %+v %v", mismatches, skipped)
+	}
+}
+
+func duplicateSpecLocal(firstVersion *int, secondVersion *int) LocalFilesRefsResolved {
+	first := versionRuleLocalEs()
+	first.Version = firstVersion
+	second := versionRuleLocalEs()
+	second.Version = secondVersion
+	return LocalFilesRefsResolved{
+		DataProudcts: []model.DataProduct{
+			{ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed", Data: model.DataProductData{Name: "one", EventSpecifications: []model.EventSpec{first}}},
+			{ResourceName: "e0067fb4-6233-49c1-94d2-6cc417abd7ee", Data: model.DataProductData{Name: "two", EventSpecifications: []model.EventSpec{second}}},
+		},
+		IdToFileName: map[string]string{
+			"d9967fb4-6233-49c1-94d2-6cc417abd7ed": "/base/one.yaml",
+			"e0067fb4-6233-49c1-94d2-6cc417abd7ee": "/base/two.yaml",
+		},
+	}
+}
+
+func Test_findChanges_DuplicateEventSpecId(t *testing.T) {
+	remote := console.DataProductsAndRelatedResources{}
+
+	for _, tt := range []struct {
+		name    string
+		local   LocalFilesRefsResolved
+		wantErr bool
+	}{
+		{name: "no version declared keeps the old behaviour", local: duplicateSpecLocal(nil, nil), wantErr: false},
+		{name: "first declares a version", local: duplicateSpecLocal(intPtr(1), nil), wantErr: true},
+		{name: "second declares a version", local: duplicateSpecLocal(nil, intPtr(1)), wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := findChanges(tt.local, remote, map[string]string{})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, want error %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/one.yaml and /base/two.yaml"
+				if err.Error() != want {
+					t.Errorf("error = %q, want %q", err.Error(), want)
+				}
+			}
+		})
+	}
+}
+
+func Test_findChanges_DuplicateEventSpecIdNamesFilesInOrder(t *testing.T) {
+	local := duplicateSpecLocal(intPtr(1), intPtr(1))
+	slices.Reverse(local.DataProudcts)
+
+	_, err := findChanges(local, console.DataProductsAndRelatedResources{}, map[string]string{})
+	want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/one.yaml and /base/two.yaml"
+	if err == nil || err.Error() != want {
+		t.Errorf("error = %v, want %q", err, want)
+	}
+}
+
+func Test_ReadLocalDataProducts_SortsDataProductsByFileName(t *testing.T) {
+	input := map[string]map[string]any{}
+	var want []string
+	for _, name := range []string{"e", "c", "a", "d", "b"} {
+		resourceName := fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name)
+		input[fmt.Sprintf("/base/%s.yaml", name)] = map[string]any{
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"resourceName": resourceName,
+			"data":         map[string]any{"name": name},
+		}
+	}
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		want = append(want, fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name))
+	}
+
+	result, err := ReadLocalDataProducts(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var got []string
+	for _, dp := range result.DataProudcts {
+		got = append(got, dp.ResourceName)
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("data products not in file name order (-want +got):\n%s", diff)
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_DuplicateEventSpecId(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		dpVersion    any
+		otherVersion any
+		wantErr      bool
+	}{
+		{name: "no version declared keeps the old behaviour", dpVersion: nil, otherVersion: nil, wantErr: false},
+		{name: "first declares a version", dpVersion: 3, otherVersion: nil, wantErr: true},
+		{name: "second declares a version", dpVersion: nil, otherVersion: 3, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			local := baseRuleFile(baseRuleSpec(tt.dpVersion))
+			local["/base/other.yaml"] = baseRuleFile(baseRuleSpec(tt.otherVersion))["/base/dp.yaml"]
+
+			_, _, err := FindVersionMismatchesAgainstBase(local, baseRuleFile(baseRuleSpec(3)))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, want error %v", err, tt.wantErr)
+			}
+			want := "event specification 6557ceee-a1c7-4ea9-910a-2a97194fb3f6 is defined in both /base/dp.yaml and /base/other.yaml"
+			if tt.wantErr && err.Error() != want {
+				t.Errorf("error = %q, want %q", err.Error(), want)
+			}
+		})
+	}
+
+	base := baseRuleFile(baseRuleSpec(3))
+	base["/base/other.yaml"] = baseRuleFile(baseRuleSpec(3))["/base/dp.yaml"]
+	_, _, err := FindVersionMismatchesAgainstBase(baseRuleFile(baseRuleSpec(3)), base)
+	if err != nil {
+		t.Errorf("a duplicate at base should not fail the check, got: %v", err)
+	}
+}
+
+func Test_findChanges_EntityCommentOnlyDifferenceWithoutVersion(t *testing.T) {
+	localEs := versionRuleLocalEs()
+	remoteEs := versionRuleRemoteEs()
+	remoteEs.Entities.Tracked[0].Comment = strPtr("a note")
+	local, remote := versionRuleLocalAndRemote(localEs, remoteEs)
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esUpdate) != 0 {
+		t.Errorf("a comment-only difference sent no update before versions existed, got %d updates", len(changes.esUpdate))
+	}
+}
+
+func Test_findChanges_SourceAppEntityCommentOnlyDifference(t *testing.T) {
+	sa := model.SourceApp{
+		ResourceName: "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Data: model.SourceAppData{
+			Name:     "Source App 1",
+			Entities: &model.EntitiesDef{Tracked: []model.SchemaRef{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0)}}},
+		},
+	}
+	remoteSa := console.RemoteSourceApplication{
+		Id:   "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
+		Name: "Source App 1",
+		Entities: console.Entities{
+			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0), Comment: strPtr("a note")}},
+			Enriched: []console.Entity{},
+		},
+	}
+	local := LocalFilesRefsResolved{SourceApps: []model.SourceApp{sa}}
+	remote := console.DataProductsAndRelatedResources{SourceApplication: []console.RemoteSourceApplication{remoteSa}}
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.saUpdate) != 0 {
+		t.Errorf("a comment-only difference sent no update before versions existed, got %d updates", len(changes.saUpdate))
+	}
+}
+
+func Test_findChanges_MissingVersionOfDuplicateIsNotAdded(t *testing.T) {
+	changes, err := findChanges(duplicateSpecLocal(nil, nil), console.DataProductsAndRelatedResources{}, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.MissingVersions) != 1 {
+		t.Fatalf("expected the duplicated spec to be reported once, got %+v", changes.MissingVersions)
+	}
+	if m := changes.MissingVersions[0]; m.Expected != nil || m.Reason != "defined in more than one file" || m.FileName != "/base/two.yaml" {
+		t.Errorf("expected no version for a duplicated spec, reported in the last file, got %+v", m)
 	}
 }

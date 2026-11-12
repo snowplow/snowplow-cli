@@ -103,6 +103,7 @@ var sampleRemoteEs = console.RemoteEventSpec{
 	Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
 	SourceApplicationIds: []string{sampleSa1.Id},
 	Name:                 "test ES",
+	Version:              7,
 	Event: &console.EventWrapper{Event: console.Event{
 		Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
 		Schema: map[string]any{},
@@ -183,7 +184,7 @@ func Test_localSasToRefs_AbsolutePath(t *testing.T) {
 }
 
 func Test_remoteDpsToLocalResources_OK(t *testing.T) {
-	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"})
+	res := remoteDpsToLocalResources(sampleRemoteDps, sampleSaRefs2, sampleEsIdToEs, map[string]string{sampleRemoteTrigger.Id: "./images/test"}, map[string]bool{sampleRemoteDp.Id: true})
 	expected := []model.CliResource[model.DataProductCanonicalData]{{
 		ApiVersion:   "v1",
 		ResourceType: "data-product",
@@ -199,6 +200,7 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 				ResourceName:               sampleRemoteEs.Id,
 				ExcludedSourceApplications: nil,
 				Name:                       sampleRemoteEs.Name,
+				Version:                    intPtr(7),
 				Event: &model.SchemaRef{
 					Source:         sampleRemoteEs.Event.Source,
 					MinCardinality: nil,
@@ -410,5 +412,26 @@ func Test_remoteEsToLocal_NoExclusions(t *testing.T) {
 
 	if len(result.ExcludedSourceApplications) != 0 {
 		t.Errorf("Expected no exclusions when ES includes all DP source apps, got %v", result.ExcludedSourceApplications)
+	}
+}
+
+func Test_remoteDpsToLocalResources_NoVersionWithoutRemoteSpec(t *testing.T) {
+	dp := console.RemoteDataProduct{
+		Id:         "46d47289-f3d5-4ef8-a82c-b19597e6e503",
+		Name:       "test DP",
+		EventSpecs: []console.EventSpecReference{{Id: sampleRemoteEs.Id}, {Id: "0e6e4e4c-c34a-483c-a5e7-f728d66a53b4"}},
+	}
+
+	res := remoteDpsToLocalResources([]console.RemoteDataProduct{dp}, sampleSaRefs, sampleEsIdToEs, map[string]string{}, map[string]bool{dp.Id: true})
+
+	specs := res[0].Data.EventSpecifications
+	if len(specs) != 2 {
+		t.Fatalf("expected 2 event specs, got %d", len(specs))
+	}
+	if specs[0].Version == nil || *specs[0].Version != 7 {
+		t.Errorf("expected the known spec to carry version 7, got %v", specs[0].Version)
+	}
+	if specs[1].Version != nil {
+		t.Errorf("expected no version for a spec missing from the lookup, got %d", *specs[1].Version)
 	}
 }

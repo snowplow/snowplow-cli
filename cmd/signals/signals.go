@@ -29,7 +29,7 @@ var SignalsCmd = &cobra.Command{
 }
 
 func init() {
-	config.InitConsoleFlags(SignalsCmd)
+	config.InitConsoleHostFlag(SignalsCmd)
 	SignalsCmd.AddCommand(setupCmd)
 	SignalsCmd.AddCommand(statusCmd)
 }

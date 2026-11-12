@@ -112,10 +112,10 @@ var docsCommand = &cobra.Command{
 		combinedContent.WriteString("title: \"Snowplow CLI command reference\"\n")
 		combinedContent.WriteString("sidebar_label: \"Command reference\"\n")
 		combinedContent.WriteString(fmt.Sprintf("date: %s\n", time.Now().Format("2006-01-02")))
-		combinedContent.WriteString("sidebar_position: 1\n")
+		combinedContent.WriteString("sidebar_position: 0\n")
 		combinedContent.WriteString("description: \"Complete reference for Snowplow CLI commands including data-products and data-structures subcommands with options and usage examples.\"\n")
 		combinedContent.WriteString("keywords: [\"Snowplow CLI reference\", \"CLI commands\", \"command options\", \"CLI documentation\"]\n")
-		
+		combinedContent.WriteString("content_type: reference\n")
 		combinedContent.WriteString("---\n\n")
 
 		combinedContent.WriteString("import TrackingPlansNomenclature from '@site/docs/reusable/tracking-plans-nomenclature/_index.md';\n\n")
