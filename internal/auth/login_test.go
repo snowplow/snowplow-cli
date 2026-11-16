@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func Test_SaveThenLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil || *got != *want {
+	if got == nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v want %+v", got, want)
 	}
 
@@ -769,5 +770,144 @@ func Test_Logout_FailsWhenLocked(t *testing.T) {
 	}
 	if len(*calls) != 0 {
 		t.Errorf("revoke called %d times, want 0", len(*calls))
+	}
+}
+
+type contractCase struct {
+	Name        string                     `json:"name"`
+	ExpiresAtMs int64                      `json:"expires_at_ms"`
+	File        map[string]json.RawMessage `json:"file"`
+}
+
+func contractCases(t *testing.T) []contractCase {
+	t.Helper()
+	data, err := os.ReadFile("testdata/login-contract.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Cases []contractCase `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.Cases) == 0 {
+		t.Fatal("the contract fixture has no cases")
+	}
+	return fixture.Cases
+}
+
+func writeContractFile(t *testing.T, path string, file map[string]json.RawMessage) {
+	t.Helper()
+	data, err := json.Marshal(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertContractFile(t *testing.T, path string, c contractCase, changed map[string]string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var written map[string]json.RawMessage
+	if err := json.Unmarshal(data, &written); err != nil {
+		t.Fatal(err)
+	}
+	if len(written) != len(c.File) {
+		t.Errorf("keys got %d want %d: %s", len(written), len(c.File), data)
+	}
+	for key, want := range c.File {
+		got, ok := written[key]
+		if !ok {
+			t.Errorf("%s was dropped", key)
+			continue
+		}
+		if key == "expires_at" {
+			continue
+		}
+		if value, ok := changed[key]; ok {
+			var gotValue string
+			_ = json.Unmarshal(got, &gotValue)
+			if gotValue != value {
+				t.Errorf("%s got %s want %s", key, gotValue, value)
+			}
+			continue
+		}
+		var gotValue, wantValue any
+		_ = json.Unmarshal(got, &gotValue)
+		_ = json.Unmarshal(want, &wantValue)
+		if !reflect.DeepEqual(gotValue, wantValue) {
+			t.Errorf("%s got %s want %s", key, got, want)
+		}
+	}
+}
+
+func Test_Contract_ReadsAndRewritesEveryCase(t *testing.T) {
+	for _, c := range contractCases(t) {
+		t.Run(c.Name, func(t *testing.T) {
+			path := useTempPath(t)
+			writeContractFile(t, path, c.File)
+
+			loaded, err := Load(host)
+			if err != nil || loaded == nil {
+				t.Fatalf("got %v, %v want a login", loaded, err)
+			}
+			if loaded.AccessToken != "access-1" || loaded.OrgID != "org-1" {
+				t.Errorf("got %+v", loaded)
+			}
+			if got := loaded.ExpiresAt.UnixMilli(); got != c.ExpiresAtMs {
+				t.Errorf("expiry got %d want %d", got, c.ExpiresAtMs)
+			}
+
+			if err := Save(loaded); err != nil {
+				t.Fatal(err)
+			}
+			assertContractFile(t, path, c, nil)
+
+			again, err := Load(host)
+			if err != nil || again == nil {
+				t.Fatalf("got %v, %v want a login", again, err)
+			}
+			if got := again.ExpiresAt.UnixMilli(); got != c.ExpiresAtMs {
+				t.Errorf("expiry after rewrite got %d want %d", got, c.ExpiresAtMs)
+			}
+		})
+	}
+}
+
+func Test_Contract_RefreshKeepsUnknownFields(t *testing.T) {
+	for _, c := range contractCases(t) {
+		if _, ok := c.File["refresh_token"]; !ok {
+			continue
+		}
+		t.Run(c.Name, func(t *testing.T) {
+			path := useTempPath(t)
+			useTokenServer(t, http.StatusOK, map[string]any{
+				"access_token":  "access-2",
+				"refresh_token": "refresh-2",
+				"token_type":    "Bearer",
+				"expires_in":    3600,
+			})
+			expired := map[string]json.RawMessage{}
+			for key, value := range c.File {
+				expired[key] = value
+			}
+			expired["expires_at"] = json.RawMessage(`"2020-01-01T00:00:00.000Z"`)
+			writeContractFile(t, path, expired)
+
+			got, err := Valid(context.Background(), host)
+			if err != nil || got == nil || got.AccessToken != "access-2" {
+				t.Fatalf("got %v, %v want access-2", got, err)
+			}
+			assertContractFile(t, path, c, map[string]string{"access_token": "access-2", "refresh_token": "refresh-2"})
+		})
 	}
 }

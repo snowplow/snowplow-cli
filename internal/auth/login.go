@@ -35,6 +35,48 @@ type Login struct {
 	Host         string    `json:"host"`
 	ClientID     string    `json:"client_id"`
 	Auth0Domain  string    `json:"auth0_domain"`
+
+	unknown map[string]json.RawMessage
+}
+
+var knownKeys = []string{"access_token", "refresh_token", "expires_at", "org_id", "host", "client_id", "auth0_domain"}
+
+func (l *Login) UnmarshalJSON(data []byte) error {
+	type known Login
+	var k known
+	if err := json.Unmarshal(data, &k); err != nil {
+		return err
+	}
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(data, &all); err != nil {
+		return err
+	}
+	for _, key := range knownKeys {
+		delete(all, key)
+	}
+	*l = Login(k)
+	if len(all) > 0 {
+		l.unknown = all
+	}
+	return nil
+}
+
+func (l Login) MarshalJSON() ([]byte, error) {
+	type known Login
+	data, err := json.Marshal(known(l))
+	if err != nil || len(l.unknown) == 0 {
+		return data, err
+	}
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(data, &all); err != nil {
+		return nil, err
+	}
+	for key, value := range l.unknown {
+		if _, ok := all[key]; !ok {
+			all[key] = value
+		}
+	}
+	return json.Marshal(all)
 }
 
 const expiryMargin = time.Minute
