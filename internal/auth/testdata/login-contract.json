@@ -1,0 +1,91 @@
+{
+  "_readme": "The login file contract between snowplow-cli and snowtype. This fixture is identical in both repositories: snowplow-cli/internal/auth/testdata/login-contract.json and snowtype/packages/cli/src/auth/__fixtures__/login-contract.json. Change both together.",
+  "cases": [
+    {
+      "name": "written by snowtype",
+      "expires_at_ms": 1893553445123,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "refresh_token": "refresh-1",
+        "expires_at": "2030-01-02T03:04:05.123Z",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com"
+      }
+    },
+    {
+      "name": "written by snowplow-cli on a whole second",
+      "expires_at_ms": 1893553445000,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "refresh_token": "refresh-1",
+        "expires_at": "2030-01-02T03:04:05Z",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com"
+      }
+    },
+    {
+      "name": "written by snowplow-cli with trailing zeros trimmed",
+      "expires_at_ms": 1893553445100,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "refresh_token": "refresh-1",
+        "expires_at": "2030-01-02T03:04:05.1Z",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com"
+      }
+    },
+    {
+      "name": "nanoseconds and a time zone offset",
+      "expires_at_ms": 1893553445123,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "refresh_token": "refresh-1",
+        "expires_at": "2030-01-02T04:04:05.123456789+01:00",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com"
+      }
+    },
+    {
+      "name": "no refresh token",
+      "expires_at_ms": 1893553445123,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "expires_at": "2030-01-02T03:04:05.123Z",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com"
+      }
+    },
+    {
+      "name": "fields the reader does not know",
+      "expires_at_ms": 1893553445123,
+      "file": {
+        "version": 1,
+        "access_token": "access-1",
+        "refresh_token": "refresh-1",
+        "expires_at": "2030-01-02T03:04:05.123Z",
+        "org_id": "org-1",
+        "host": "https://console.snowplowanalytics.com",
+        "client_id": "client-1",
+        "auth0_domain": "id.example.com",
+        "logged_in_as": "dev@example.com",
+        "logged_in_at": "2029-12-31T23:59:59.000Z",
+        "added_later": { "nested": [1, 2, 3], "flag": true }
+      }
+    }
+  ]
+}

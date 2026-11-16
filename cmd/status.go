@@ -43,7 +43,7 @@ var StatusCmd = &cobra.Command{
 			slog.Info("Status check failed: configuration error",
 				"error", err.Error(),
 				"status", "not_configured",
-				"action", "run 'snowplow-cli setup' to configure authentication")
+				"action", "run 'snowplow-cli login' or 'snowplow-cli setup' to configure authentication")
 			os.Exit(1)
 		}
 
@@ -52,7 +52,13 @@ var StatusCmd = &cobra.Command{
 		orgID, _ := cmd.Flags().GetString("org-id")
 		host, _ := cmd.Flags().GetString("host")
 
+		authMethod := "api-key"
+		if apiKeyID == "" && apiKey == "" {
+			authMethod = "login"
+		}
+
 		slog.Info("API credentials configured",
+			"auth", authMethod,
 			"api_key_id", apiKeyID,
 			"org_id", orgID,
 			"host", host)
@@ -64,7 +70,7 @@ var StatusCmd = &cobra.Command{
 				"host", host,
 				"org_id", orgID,
 				"status", "api_error",
-				"action", "check network connectivity or run 'snowplow-cli setup' to refresh credentials")
+				"action", "check network connectivity or run 'snowplow-cli login' or 'snowplow-cli setup' to refresh credentials")
 			os.Exit(1)
 		}
 
@@ -75,7 +81,7 @@ var StatusCmd = &cobra.Command{
 				"host", host,
 				"org_id", orgID,
 				"status", "api_error",
-				"action", "check network connectivity or run 'snowplow-cli setup' to refresh credentials")
+				"action", "check network connectivity or run 'snowplow-cli login' or 'snowplow-cli setup' to refresh credentials")
 			os.Exit(1)
 		}
 

@@ -22,6 +22,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/pkg/browser"
+	"github.com/snowplow/snowplow-cli/internal/auth"
 	"github.com/snowplow/snowplow-cli/internal/config"
 	"github.com/snowplow/snowplow-cli/internal/console"
 	"golang.org/x/oauth2"
@@ -68,11 +69,44 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	return nil
 }
 
+func LoginConfig(clientID, auth0Domain, consoleHost string, hasAPIKey bool, ctx context.Context) error {
+	session, err := Login(ctx, clientID, auth0Domain, consoleHost, false)
+	if err != nil {
+		return err
+	}
+
+	err = auth.Save(&auth.Login{
+		AccessToken:  session.AccessToken,
+		RefreshToken: session.RefreshToken,
+		ExpiresAt:    session.Expiry,
+		OrgID:        session.Org.ID,
+		Host:         consoleHost,
+		ClientID:     clientID,
+		Auth0Domain:  auth0Domain,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to save login: %w", err)
+	}
+
+	if session.RefreshToken == "" {
+		slog.Warn("No refresh token was issued, so this login ends when its token expires", "expires-at", session.Expiry)
+	}
+	slog.Info("Logged in to Snowplow Console", "email", session.Email, "org-id", session.Org.ID)
+	slog.Info("Login saved", "file", auth.Path())
+	if hasAPIKey {
+		slog.Warn("An API key is configured and takes precedence over this login. Remove it to use the login")
+	}
+
+	return nil
+}
+
 type Session struct {
-	AccessToken string
-	Email       string
-	Org         console.Organization
-	HomeOrgID   string
+	AccessToken  string
+	RefreshToken string
+	Expiry       time.Time
+	Email        string
+	Org          console.Organization
+	HomeOrgID    string
 }
 
 func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeOrgOnly bool) (*Session, error) {
@@ -183,7 +217,7 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeO
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
-	return &Session{AccessToken: token.AccessToken, Email: userInfo.Email, Org: *selectedOrg, HomeOrgID: jwtOrgID}, nil
+	return &Session{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, Expiry: token.Expiry, Email: userInfo.Email, Org: *selectedOrg, HomeOrgID: jwtOrgID}, nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {

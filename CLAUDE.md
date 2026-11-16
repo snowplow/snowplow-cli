@@ -7,13 +7,14 @@
 # Non-obvious packages
 - `internal/setup/` is the credential setup wizard (`setup`); `internal/wizard/` holds the `signals setup` internals.
 - `internal/changes/` is change tracking for `ds publish`; `internal/amend/` edits files in place.
+- `internal/auth/` holds the Console login saved by `login` (`~/.config/snowplow/login.json`), its lock file and the token refresh. Snowtype reads and writes the same file, so its format is a contract between the two repos.
 
 # Conventions
 **CLI framework:** Cobra + Viper for config. New top-level command families live under their own subpackage in `cmd/`. Each family exposes one exported `*cobra.Command` and is registered in `cmd/root.go`. Leaf commands sit in sibling files in the same package.
 
 **License header:** Every Go source file starts with the Snowplow Limited Use License Agreement v1.0 header. Match the exact wording used in existing files when creating new ones.
 
-**Config precedence (highest → lowest):** CLI flags → env vars (`SNOWPLOW_CONSOLE_*`) → `.env` file → YAML at `~/.config/snowplow/snowplow.yml` (or platform equivalent). Console credentials (`org-id`, `api-key-id`, `api-key`) are required for any command that hits Console — initialize them in a command's `PersistentPreRunE` via `config.InitConsoleConfig(cmd)` and register flags with `config.InitConsoleFlags(cmd)` (see `cmd/dp/data_products.go`).
+**Config precedence (highest → lowest):** CLI flags → env vars (`SNOWPLOW_CONSOLE_*`) → `.env` file → YAML at `~/.config/snowplow/snowplow.yml` (or platform equivalent). Console credentials (`org-id`, `api-key-id`, `api-key`) are required for any command that hits Console, unless a login saved by `snowplow-cli login` stands in for the API key — initialize them in a command's `PersistentPreRunE` via `config.InitConsoleConfig(cmd)` and register flags with `config.InitConsoleFlags(cmd)` (see `cmd/dp/data_products.go`).
 
 **Signals config is separate:** `signals setup` / `signals status` use `SNOWPLOW_SIGNALS_*` values in the project's `.env` (`internal/wizard/verify.go`), not `internal/config`. The names deliberately don't overlap with `SNOWPLOW_CONSOLE_*`, so neither picks up the other's key.
 
