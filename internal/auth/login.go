@@ -85,9 +85,11 @@ const defaultLifetime = time.Hour
 
 var refreshMu sync.Mutex
 
-const refreshTimeout = 30 * time.Second
+const refreshTimeout = 10 * time.Second
 
-var lockWait = 5 * time.Second
+var lockWait = 15 * time.Second
+
+var errLock = errors.New("failed to lock login file")
 
 var Path = func() string {
 	home, err := os.UserHomeDir()
@@ -127,10 +129,10 @@ func withLock(fn func(path string) error) error {
 			break
 		}
 		if !errors.Is(err, os.ErrExist) {
-			return fmt.Errorf("failed to lock login file: %w", err)
+			return fmt.Errorf("%w: %w", errLock, err)
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("failed to lock login file: %s exists. If no other snowplow-cli or snowtype command is running, delete it and try again", lock)
+			return fmt.Errorf("%w: %s exists. If no other snowplow-cli or snowtype command is running, delete it and try again", errLock, lock)
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
@@ -207,13 +209,52 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 	if err != nil || login == nil {
 		return nil, err
 	}
-	if login.ExpiresAt.IsZero() || time.Until(login.ExpiresAt) > expiryMargin {
+	if login.fresh() {
 		return login, nil
 	}
-	if login.RefreshToken == "" || login.ClientID == "" || login.Auth0Domain == "" {
+	if !login.refreshable() {
 		return nil, nil
 	}
 
+	var result *Login
+	err = withLock(func(path string) error {
+		current, err := Load(host)
+		if err != nil || current == nil {
+			return err
+		}
+		if current.fresh() {
+			result = current
+			return nil
+		}
+		if !current.refreshable() {
+			return nil
+		}
+		refreshed, err := refresh(ctx, current)
+		if err != nil || refreshed == nil {
+			return err
+		}
+		result = refreshed
+		if err := write(refreshed, path); err != nil {
+			slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
+		}
+		return nil
+	})
+	if errors.Is(err, errLock) {
+		slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
+		return refresh(ctx, login)
+	}
+	return result, err
+}
+
+func (l *Login) fresh() bool {
+	return l.ExpiresAt.IsZero() || time.Until(l.ExpiresAt) > expiryMargin
+}
+
+func (l *Login) refreshable() bool {
+	return l.RefreshToken != "" && l.ClientID != "" && l.Auth0Domain != ""
+}
+
+func refresh(ctx context.Context, login *Login) (*Login, error) {
 	conf := &oauth2.Config{
 		ClientID: login.ClientID,
 		Endpoint: oauth2.Endpoint{TokenURL: tokenURL(login.Auth0Domain), AuthStyle: oauth2.AuthStyleInParams},
@@ -230,26 +271,16 @@ func Valid(ctx context.Context, host string) (*Login, error) {
 		return nil, fmt.Errorf("failed to refresh login: %w", err)
 	}
 
-	usedRefreshToken := login.RefreshToken
-	login.AccessToken = token.AccessToken
-	login.ExpiresAt = token.Expiry
+	refreshed := *login
+	refreshed.AccessToken = token.AccessToken
+	refreshed.ExpiresAt = token.Expiry
 	if token.Expiry.IsZero() {
-		login.ExpiresAt = time.Now().Add(defaultLifetime)
+		refreshed.ExpiresAt = time.Now().Add(defaultLifetime)
 	}
 	if token.RefreshToken != "" {
-		login.RefreshToken = token.RefreshToken
+		refreshed.RefreshToken = token.RefreshToken
 	}
-	err = withLock(func(path string) error {
-		current, err := loadAny()
-		if err != nil || current == nil || current.RefreshToken != usedRefreshToken {
-			return nil
-		}
-		return write(login, path)
-	})
-	if err != nil {
-		slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
-	}
-	return login, nil
+	return &refreshed, nil
 }
 
 func rejected(err *oauth2.RetrieveError) bool {

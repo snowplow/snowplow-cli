@@ -433,16 +433,15 @@ func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
 	}
 }
 
-func Test_Valid_DoesNotReplaceLoginMadeDuringRefresh(t *testing.T) {
+func Test_Valid_LoginMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
 	useTempPath(t)
 	newer := login(time.Hour)
 	newer.AccessToken = "other-account"
 	newer.RefreshToken = "other-refresh"
+	saved := make(chan error, 1)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := Save(newer); err != nil {
-			t.Error(err)
-		}
+		go func() { saved <- Save(newer) }()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access-2", "token_type": "Bearer", "expires_in": 3600})
 	}))
@@ -456,13 +455,16 @@ func Test_Valid_DoesNotReplaceLoginMadeDuringRefresh(t *testing.T) {
 	if _, err := Valid(context.Background(), host); err != nil {
 		t.Fatal(err)
 	}
+	if err := <-saved; err != nil {
+		t.Fatal(err)
+	}
 
-	saved, err := Load(host)
+	kept, err := Load(host)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.AccessToken != "other-account" || saved.RefreshToken != "other-refresh" {
-		t.Errorf("the newer login was replaced, got %+v", saved)
+	if kept.AccessToken != "other-account" || kept.RefreshToken != "other-refresh" {
+		t.Errorf("the newer login was replaced, got %+v", kept)
 	}
 }
 
@@ -541,17 +543,16 @@ func Test_Save_WritesExpiryAsUTCMilliseconds(t *testing.T) {
 	}
 }
 
-func Test_Valid_DoesNotReplaceLoginForAnotherHostMadeDuringRefresh(t *testing.T) {
+func Test_Valid_LoginForAnotherHostMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
 	useTempPath(t)
 	other := login(time.Hour)
 	other.AccessToken = "other-host-token"
 	other.RefreshToken = "other-host-refresh"
 	other.Host = "https://next.console.snowplowanalytics.com"
+	saved := make(chan error, 1)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := Save(other); err != nil {
-			t.Error(err)
-		}
+		go func() { saved <- Save(other) }()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access-2", "token_type": "Bearer", "expires_in": 3600})
 	}))
@@ -566,13 +567,16 @@ func Test_Valid_DoesNotReplaceLoginForAnotherHostMadeDuringRefresh(t *testing.T)
 	if err != nil || got == nil || got.AccessToken != "access-2" {
 		t.Fatalf("the command in hand should still get the refreshed token, got %v, %v", got, err)
 	}
+	if err := <-saved; err != nil {
+		t.Fatal(err)
+	}
 
-	saved, err := Load(other.Host)
+	kept, err := Load(other.Host)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved == nil || saved.AccessToken != "other-host-token" {
-		t.Errorf("the login for the other host was replaced, got %+v", saved)
+	if kept == nil || kept.AccessToken != "other-host-token" {
+		t.Errorf("the login for the other host was replaced, got %+v", kept)
 	}
 }
 
@@ -909,5 +913,99 @@ func Test_Contract_RefreshKeepsUnknownFields(t *testing.T) {
 			}
 			assertContractFile(t, path, c, map[string]string{"access_token": "access-2", "refresh_token": "refresh-2"})
 		})
+	}
+}
+
+func Test_Valid_WaitsForARefreshInProgressAndReusesItsTokens(t *testing.T) {
+	path := useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "must-not-be-used",
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	refreshed := login(time.Hour)
+	refreshed.AccessToken = "access-from-other-process"
+	refreshed.RefreshToken = "rotated-by-other-process"
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		if err := write(refreshed, path); err != nil {
+			t.Error(err)
+		}
+		_ = os.Remove(path + ".lock")
+	}()
+
+	got, err := Valid(context.Background(), host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.AccessToken != "access-from-other-process" {
+		t.Errorf("got %+v want the tokens the other process saved", got)
+	}
+	if *calls != 0 {
+		t.Errorf("the used refresh token was sent again, %d refresh calls", *calls)
+	}
+}
+
+func Test_Valid_ConcurrentCommandsRefreshOnce(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token":  "access-2",
+		"refresh_token": "refresh-2",
+		"token_type":    "Bearer",
+		"expires_in":    3600,
+	})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	results := make(chan string, 4)
+	for range 4 {
+		go func() {
+			got, err := Valid(context.Background(), host)
+			if err != nil || got == nil {
+				results <- "failed"
+				return
+			}
+			results <- got.AccessToken
+		}()
+	}
+	for range 4 {
+		if got := <-results; got != "access-2" {
+			t.Errorf("got %s want access-2", got)
+		}
+	}
+	if *calls != 1 {
+		t.Errorf("got %d refresh calls want 1", *calls)
+	}
+}
+
+func Test_Valid_LoggedOutWhileWaitingForLock(t *testing.T) {
+	path := useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{"access_token": "access-2", "token_type": "Bearer"})
+	if err := Save(login(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".lock", nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = os.Remove(path)
+		_ = os.Remove(path + ".lock")
+	}()
+
+	got, err := Valid(context.Background(), host)
+	if err != nil || got != nil {
+		t.Errorf("got %+v, %v want no login", got, err)
+	}
+	if *calls != 0 {
+		t.Errorf("got %d refresh calls want 0", *calls)
 	}
 }
