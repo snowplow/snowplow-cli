@@ -27,7 +27,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const fileVersion = 1
+
 type Login struct {
+	Version      int       `json:"version"`
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token,omitempty"`
 	ExpiresAt    time.Time `json:"expires_at"`
@@ -39,7 +42,7 @@ type Login struct {
 	unknown map[string]json.RawMessage
 }
 
-var knownKeys = []string{"access_token", "refresh_token", "expires_at", "org_id", "host", "client_id", "auth0_domain"}
+var knownKeys = []string{"version", "access_token", "refresh_token", "expires_at", "org_id", "host", "client_id", "auth0_domain"}
 
 func (l *Login) UnmarshalJSON(data []byte) error {
 	type known Login
@@ -143,6 +146,7 @@ func withLock(fn func(path string) error) error {
 
 func write(login *Login, path string) error {
 	saved := *login
+	saved.Version = fileVersion
 	if !saved.ExpiresAt.IsZero() {
 		saved.ExpiresAt = saved.ExpiresAt.UTC().Truncate(time.Millisecond)
 	}
@@ -197,6 +201,9 @@ func loadAny() (*Login, error) {
 	var login Login
 	if err := json.Unmarshal(data, &login); err != nil {
 		return nil, fmt.Errorf("failed to parse login file %s: %w", Path(), err)
+	}
+	if login.Version > fileVersion {
+		return nil, fmt.Errorf("login file %s has version %d, which this snowplow-cli does not support. Upgrade snowplow-cli, or run 'snowplow-cli login' to replace the login", Path(), login.Version)
 	}
 	return &login, nil
 }

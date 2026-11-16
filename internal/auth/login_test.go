@@ -13,6 +13,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -92,6 +93,7 @@ func Test_SaveThenLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	want.Version = fileVersion
 	if got == nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v want %+v", got, want)
 	}
@@ -415,6 +417,7 @@ func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
 	}
 
 	expected := map[string]any{
+		"version":       float64(1),
 		"access_token":  "access-1",
 		"refresh_token": "refresh-1",
 		"expires_at":    want.ExpiresAt.Format(time.RFC3339),
@@ -1007,5 +1010,87 @@ func Test_Valid_LoggedOutWhileWaitingForLock(t *testing.T) {
 	}
 	if *calls != 0 {
 		t.Errorf("got %d refresh calls want 0", *calls)
+	}
+}
+
+func writeRawLogin(t *testing.T, path string, version string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	data := fmt.Sprintf(`{%s"access_token":"access-1","refresh_token":"refresh-1","expires_at":"2099-01-02T03:04:05Z","org_id":"org-1","host":%q,"client_id":"client-1","auth0_domain":"id.example.com"}`, version, host)
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_Version_MissingIsReadAndWrittenBackAsCurrent(t *testing.T) {
+	path := useTempPath(t)
+	writeRawLogin(t, path, "")
+
+	got, err := Load(host)
+	if err != nil || got == nil || got.AccessToken != "access-1" {
+		t.Fatalf("a file without a version must be read, got %+v, %v", got, err)
+	}
+	if err := Save(got); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"version": 1`) {
+		t.Errorf("want version 1 in %s", data)
+	}
+}
+
+func Test_Version_NewerIsRefusedWithAClearMessage(t *testing.T) {
+	path := useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{"access_token": "access-2", "token_type": "Bearer"})
+	writeRawLogin(t, path, `"version":2,`)
+	before, _ := os.ReadFile(path)
+
+	for name, load := range map[string]func() (*Login, error){
+		"Load":  func() (*Login, error) { return Load(host) },
+		"Valid": func() (*Login, error) { return Valid(context.Background(), host) },
+	} {
+		got, err := load()
+		if got != nil || err == nil {
+			t.Fatalf("%s: got %+v, %v want an error", name, got, err)
+		}
+		for _, want := range []string{"version 2", "Upgrade snowplow-cli", path} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: want %q in %q", name, want, err.Error())
+			}
+		}
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Error("a file with a newer version must be left as it is")
+	}
+	if *calls != 0 {
+		t.Errorf("got %d refresh calls want 0", *calls)
+	}
+}
+
+func Test_Version_NewerIsReplacedByLoginAndRemovedByLogout(t *testing.T) {
+	path := useTempPath(t)
+	useRevokeServer(t, http.StatusOK)
+	writeRawLogin(t, path, `"version":2,`)
+
+	if err := Save(login(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Load(host); err != nil || got == nil || got.Version != fileVersion {
+		t.Fatalf("a new login must replace a newer file, got %+v, %v", got, err)
+	}
+
+	writeRawLogin(t, path, `"version":2,`)
+	result, err := Logout(context.Background())
+	if err != nil || !result.LoggedIn {
+		t.Fatalf("got %+v, %v", result, err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("logout must remove a file with a newer version")
 	}
 }
