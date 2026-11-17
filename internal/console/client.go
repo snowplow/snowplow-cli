@@ -79,7 +79,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	baseUrl := fmt.Sprintf("%s/api/msc/v1/organizations/%s", host, orgid)
 
 	if apiKeyId == "" && apiKeySecret == "" {
-		login, err := auth.Valid(ctx, host)
+		login, err := auth.LoadAndRefresh(ctx, host)
 		if err != nil {
 			return nil, err
 		}

@@ -219,7 +219,7 @@ func check(host string) (login *Login, expired bool, err error) {
 	return login, true, nil
 }
 
-func Valid(ctx context.Context, host string) (*Login, error) {
+func LoadAndRefresh(ctx context.Context, host string) (*Login, error) {
 	login, expired, err := check(host)
 	if err != nil || login == nil || !expired {
 		return login, err
