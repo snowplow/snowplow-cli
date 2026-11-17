@@ -205,29 +205,34 @@ func loadAny() (*Login, error) {
 	return &login, nil
 }
 
-func Valid(ctx context.Context, host string) (*Login, error) {
-	login, err := Load(host)
+func check(host string) (login *Login, expired bool, err error) {
+	login, err = Load(host)
 	if err != nil || login == nil {
-		return nil, err
+		return nil, false, err
 	}
 	if login.fresh() {
-		return login, nil
+		return login, false, nil
 	}
 	if !login.refreshable() {
-		return nil, nil
+		return nil, false, nil
+	}
+	return login, true, nil
+}
+
+func Valid(ctx context.Context, host string) (*Login, error) {
+	login, expired, err := check(host)
+	if err != nil || login == nil || !expired {
+		return login, err
 	}
 
 	var result *Login
 	err = withLock(func(path string) error {
-		current, err := Load(host)
+		current, currentExpired, err := check(host)
 		if err != nil || current == nil {
 			return err
 		}
-		if current.fresh() {
+		if !currentExpired {
 			result = current
-			return nil
-		}
-		if !current.refreshable() {
 			return nil
 		}
 		refreshed, err := refresh(ctx, current)
