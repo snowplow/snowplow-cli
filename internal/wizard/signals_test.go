@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/console"
-	"github.com/snowplow/snowplow-cli/internal/setup"
 )
 
 func Test_ensureAppKey_ReusesWorkingKey(t *testing.T) {
@@ -28,7 +28,7 @@ func Test_ensureAppKey_ReusesWorkingKey(t *testing.T) {
 	envPath := writeEnv(t, signalsURL, "secret")
 	before, _ := os.ReadFile(envPath)
 
-	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	if err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath); err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func Test_ensureAppKey_ReplacesRejectedKey(t *testing.T) {
 	envPath := writeEnv(t, signalsURL, "revoked")
 
 	// The fake Console has no key creation endpoint, so reaching it fails.
-	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath)
 	if err == nil || !strings.Contains(err.Error(), "failed to create the Signals app key") {
@@ -56,7 +56,7 @@ func Test_ensureAppKey_ReplacesKeySignalsRejects(t *testing.T) {
 	envPath := writeEnv(t, signalsURL, "secret")
 
 	// The fake Console has no key creation endpoint, so reaching it fails.
-	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath)
 	if err == nil || !strings.Contains(err.Error(), "failed to create the Signals app key") {
@@ -69,7 +69,7 @@ func Test_ensureAppKey_KeepsKeyWhenSignalsFails(t *testing.T) {
 	envPath := writeEnv(t, signalsURL, "secret")
 	before, _ := os.ReadFile(envPath)
 
-	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath)
 	if err == nil || !strings.Contains(err.Error(), "the Signals API returned 503") {
@@ -84,7 +84,7 @@ func Test_ensureAppKey_KeepsKeyForAnotherEnvironment(t *testing.T) {
 	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusOK, ``)
 	envPath := writeEnv(t, "https://old.signals.example", "secret")
 
-	s := &setup.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
 	opts := SignalsOptions{ConsoleHost: consoleURL, ProjectDir: filepath.Dir(envPath)}
 	if err := ensureAppKey(context.Background(), opts, s, signalsURL, envPath); err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func Test_pickSignalsEnvironment(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			s := &setup.Session{AccessToken: "token", Org: console.Organization{ID: "org", Name: "Acme"}}
+			s := &device.Session{AccessToken: "token", Org: console.Organization{ID: "org", Name: "Acme"}}
 			env, err := pickSignalsEnvironment(context.Background(), SignalsOptions{ConsoleHost: srv.URL, Pipeline: tt.pipeline}, s)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {

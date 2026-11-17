@@ -13,9 +13,10 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/config"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
-	"github.com/snowplow/snowplow-cli/internal/setup"
+	"github.com/snowplow/snowplow-cli/internal/login"
 	"github.com/spf13/cobra"
 )
 
@@ -60,13 +61,13 @@ configured, and Snowtype shares the same login.`,
 		apiKeyID, _ := cmd.Flags().GetString("api-key-id")
 		apiKey, _ := cmd.Flags().GetString("api-key")
 
-		return setup.LoginConfig(clientID, auth0Domain, consoleHost, apiKeyID != "" || apiKey != "", cmd.Context())
+		return login.LoginConfig(clientID, auth0Domain, consoleHost, apiKeyID != "" || apiKey != "", cmd.Context())
 	},
 }
 
 func init() {
 	config.InitConsoleFlags(LoginCmd)
 
-	LoginCmd.Flags().String("client-id", setup.DefaultClientID, "Auth0 Client ID for device auth")
-	LoginCmd.Flags().String("auth0-domain", setup.DefaultAuth0Domain, "Auth0 domain")
+	LoginCmd.Flags().String("client-id", device.DefaultClientID, "Auth0 Client ID for device auth")
+	LoginCmd.Flags().String("auth0-domain", device.DefaultAuth0Domain, "Auth0 domain")
 }
