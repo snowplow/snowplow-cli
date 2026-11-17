@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -85,8 +84,6 @@ func (l Login) MarshalJSON() ([]byte, error) {
 const expiryMargin = 5 * time.Minute
 
 const defaultLifetime = time.Hour
-
-var refreshMu sync.Mutex
 
 const refreshTimeout = 10 * time.Second
 
@@ -209,9 +206,6 @@ func loadAny() (*Login, error) {
 }
 
 func Valid(ctx context.Context, host string) (*Login, error) {
-	refreshMu.Lock()
-	defer refreshMu.Unlock()
-
 	login, err := Load(host)
 	if err != nil || login == nil {
 		return nil, err
