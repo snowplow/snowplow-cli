@@ -318,6 +318,42 @@ func Test_Valid_RefreshesTokenAboutToExpire(t *testing.T) {
 	}
 }
 
+func Test_Valid_RefreshesTokenExpiringWithinTheMargin(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "access-2",
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+	if err := Save(login(3 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessToken != "access-2" || *calls != 1 {
+		t.Errorf("got %s after %d refreshes, want access-2 after 1", got.AccessToken, *calls)
+	}
+}
+
+func Test_Valid_KeepsTokenLivingLongerThanTheMargin(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{"access_token": "access-2", "token_type": "Bearer"})
+	if err := Save(login(10 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Valid(context.Background(), host)
+	if err != nil || got == nil || got.AccessToken != "access-1" {
+		t.Fatalf("got %+v, %v want access-1", got, err)
+	}
+	if *calls != 0 {
+		t.Errorf("token endpoint called %d times, want 0", *calls)
+	}
+}
+
 func Test_Valid_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{

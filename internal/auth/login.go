@@ -82,7 +82,7 @@ func (l Login) MarshalJSON() ([]byte, error) {
 	return json.Marshal(all)
 }
 
-const expiryMargin = time.Minute
+const expiryMargin = 5 * time.Minute
 
 const defaultLifetime = time.Hour
 
