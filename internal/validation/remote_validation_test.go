@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -91,13 +90,8 @@ func Test_ValidateChanges_CollectsIgluAndMigrationFailures(t *testing.T) {
 		{"noisy.yml", []string{"an info"}, igluValidationInfo},
 		{"noisy.yml", []string{"an error"}, igluValidationError},
 	}
-	if len(vr.Iglu) != len(wantIglu) {
-		t.Fatalf("iglu = %+v, want %+v", vr.Iglu, wantIglu)
-	}
-	for _, want := range wantIglu {
-		if !slices.ContainsFunc(vr.Iglu, func(got igluValidation) bool { return reflect.DeepEqual(got, want) }) {
-			t.Errorf("iglu = %+v, missing %+v", vr.Iglu, want)
-		}
+	if !reflect.DeepEqual(vr.Iglu, wantIglu) {
+		t.Errorf("iglu = %+v, want %+v in this order", vr.Iglu, wantIglu)
 	}
 	wantMigration := []migrationValidation{{"bumped.yml", "2-0-0", "snowflake", []string{"field removed"}}}
 	if !reflect.DeepEqual(vr.Migration, wantMigration) {
