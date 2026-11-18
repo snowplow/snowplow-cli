@@ -107,7 +107,7 @@ func gitListAndShowResourcesAtMergeBase(ctx context.Context, topLevel string, me
 			continue
 		}
 		ext := filepath.Ext(gitPath)
-		if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+		if !isResourceExtension(ext) {
 			continue
 		}
 
@@ -137,6 +137,10 @@ func gitListAndShowResourcesAtMergeBase(ctx context.Context, topLevel string, me
 	}
 
 	return files, nil
+}
+
+func isResourceExtension(ext string) bool {
+	return ext == ".json" || ext == ".yaml" || ext == ".yml"
 }
 
 func unmarshalResource(ext string, body string) (map[string]any, error) {

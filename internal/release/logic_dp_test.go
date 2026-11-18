@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -2189,5 +2190,102 @@ level=INFO msg=release msg="might release event spec if the changes are structur
 	wantEmpty := "level=INFO msg=sync msg=\"no changes detected, nothing to apply\"\n"
 	if diff := cmp.Diff(wantEmpty, capturePrintChangeset(t, DataProductChangeSet{}, true)); diff != "" {
 		t.Errorf("unexpected empty output (-want +got):\n%s", diff)
+	}
+}
+
+type recordingPurgeApi struct {
+	remoteResources *console.DataProductsAndRelatedResources
+	sourceAppErr    error
+	dataProductErr  error
+	calls           []string
+}
+
+func (a *recordingPurgeApi) DeleteSourceApp(_ context.Context, sa console.RemoteSourceApplication) error {
+	a.calls = append(a.calls, "source app "+sa.Id)
+	return a.sourceAppErr
+}
+
+func (a *recordingPurgeApi) DeleteDataProduct(_ context.Context, _ console.RemoteDataProduct) error {
+	a.calls = append(a.calls, "data product")
+	return a.dataProductErr
+}
+
+func (a *recordingPurgeApi) FetchDataProduct(_ context.Context) (*console.DataProductsAndRelatedResources, error) {
+	return a.remoteResources, nil
+}
+
+func purgeRemoteInTest() *console.DataProductsAndRelatedResources {
+	return &console.DataProductsAndRelatedResources{
+		SourceApplication: []console.RemoteSourceApplication{{Id: "sa"}},
+		DataProducts:      []console.RemoteDataProduct{{Id: "dp1"}, {Id: "dp2"}},
+	}
+}
+
+func Test_Purge_StopsWhenSourceAppDeleteFails(t *testing.T) {
+	failure := errors.New("console is down")
+	api := &recordingPurgeApi{remoteResources: purgeRemoteInTest(), sourceAppErr: failure}
+
+	err := Purge(context.Background(), api, map[string]map[string]any{}, true)
+	if !errors.Is(err, failure) {
+		t.Fatalf("error = %v, want it to wrap %v", err, failure)
+	}
+
+	want := []string{"source app sa"}
+	if !slices.Equal(api.calls, want) {
+		t.Errorf("calls = %v, want %v", api.calls, want)
+	}
+}
+
+func Test_Purge_StopsAtFirstFailedDataProductDelete(t *testing.T) {
+	failure := errors.New("console is down")
+	api := &recordingPurgeApi{remoteResources: purgeRemoteInTest(), dataProductErr: failure}
+
+	err := Purge(context.Background(), api, map[string]map[string]any{}, true)
+	if !errors.Is(err, failure) {
+		t.Fatalf("error = %v, want it to wrap %v", err, failure)
+	}
+
+	want := []string{"source app sa", "data product"}
+	if !slices.Equal(api.calls, want) {
+		t.Errorf("calls = %v, want %v", api.calls, want)
+	}
+}
+
+func Test_FindMissingVersionsAgainstBase_DuplicateNewSpecGetsNoVersion(t *testing.T) {
+	local := baseRuleFile(baseRuleSpec(nil))
+	local["/base/other.yaml"] = baseRuleFile(baseRuleSpec(nil))["/base/dp.yaml"]
+
+	missing, err := FindMissingVersionsAgainstBase(local, map[string]map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(missing) != 1 {
+		t.Fatalf("got %d missing versions, want 1: %+v", len(missing), missing)
+	}
+	if missing[0].Expected != nil || missing[0].Reason != missingVersionDuplicateReason {
+		t.Errorf("got expected %v and reason %q, want no version and the duplicate reason", missing[0].Expected, missing[0].Reason)
+	}
+}
+
+func Test_FindMissingVersionsAgainstBase_IgnoresEventSpecsOutsideDataProducts(t *testing.T) {
+	local := baseRuleFile(baseRuleSpec(nil))
+	local["/base/dp.yaml"]["resourceType"] = "source-application"
+
+	missing, err := FindMissingVersionsAgainstBase(local, map[string]map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(missing) != 0 {
+		t.Errorf("got %+v, want nothing", missing)
+	}
+}
+
+func Test_FindMissingVersionsAgainstBase_UnreadableDataProduct(t *testing.T) {
+	local := baseRuleFile(baseRuleSpec(nil))
+	local["/base/dp.yaml"]["data"] = "not a data product"
+
+	_, err := FindMissingVersionsAgainstBase(local, map[string]map[string]any{})
+	if err == nil {
+		t.Fatal("expected an error for a data product that can't be read")
 	}
 }

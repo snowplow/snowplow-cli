@@ -255,6 +255,35 @@ func Test_MaybeResourcesAtMergeBase_SeveralPathsAndOtherFiles(t *testing.T) {
 	}
 }
 
+func Test_MaybeResourcesAtMergeBase_ReadsEveryResourceExtension(t *testing.T) {
+	isolateGitInTest(t)
+	repo := t.TempDir()
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	writeInTest(t, filepath.Join(repo, "a.json"), `{"resourceType": "source-application"}`)
+	writeInTest(t, filepath.Join(repo, "b.yaml"), "resourceType: data-product\n")
+	writeInTest(t, filepath.Join(repo, "c.yml"), "resourceType: data-product\n")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	res, err := MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{repo})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	realRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]map[string]any{
+		filepath.Join(realRepo, "a.json"): {"resourceType": "source-application"},
+		filepath.Join(realRepo, "b.yaml"): {"resourceType": "data-product"},
+		filepath.Join(realRepo, "c.yml"):  {"resourceType": "data-product"},
+	}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("got %v, want %v", res, want)
+	}
+}
+
 func Test_MaybeResourcesAtMergeBase_UnreadableFile(t *testing.T) {
 	isolateGitInTest(t)
 	repo := t.TempDir()

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	. "github.com/snowplow/snowplow-cli/internal/model"
+	"github.com/snowplow/snowplow-cli/internal/util"
 	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -46,6 +47,39 @@ func Test_NewClient_Ok(t *testing.T) {
 
 	if client.Jwt != "token" {
 		t.Errorf("jwt not ok, got: %s", client.Jwt)
+	}
+}
+
+func Test_NewClient_SendsApiKeyHeaders(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		fromMCP    bool
+		wantSource string
+	}{
+		{name: "from the command line", fromMCP: false, wantSource: ""},
+		{name: "from the MCP server", fromMCP: true, wantSource: "mcp"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var got http.Header
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = r.Header
+				_, _ = w.Write([]byte(`{"accessToken":"token"}`))
+			}))
+			defer server.Close()
+
+			ctx := context.WithValue(context.Background(), util.MCPSourceContextKey{}, tt.fromMCP)
+			_, err := NewApiClient(ctx, server.URL, "apiKeyId", "apiKeySecret", "orgid")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if got.Get("X-Api-Key-Id") != "apiKeyId" || got.Get("X-Api-Key") != "apiKeySecret" {
+				t.Errorf("got key id %q and key %q", got.Get("X-Api-Key-Id"), got.Get("X-Api-Key"))
+			}
+			if got.Get("X-Snowplow-Cli-Source") != tt.wantSource {
+				t.Errorf("source header = %q, want %q", got.Get("X-Snowplow-Cli-Source"), tt.wantSource)
+			}
+		})
 	}
 }
 

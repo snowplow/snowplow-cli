@@ -324,7 +324,7 @@ func Logout(ctx context.Context) (LogoutResult, error) {
 	}
 
 	result := LogoutResult{LoggedIn: true}
-	if login != nil && login.RefreshToken != "" && login.ClientID != "" && login.Auth0Domain != "" {
+	if login != nil && login.refreshable() {
 		if err := revoke(ctx, login); err != nil {
 			slog.Debug("refresh token not revoked", "error", err)
 		} else {

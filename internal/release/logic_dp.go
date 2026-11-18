@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -705,29 +706,8 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 		return err
 	}
 
-	purgeApps := map[string]console.RemoteSourceApplication{}
-	for _, r := range remote.SourceApplication {
-		purgeApps[r.Id] = r
-	}
-	for _, r := range localResolved.SourceApps {
-		delete(purgeApps, r.ResourceName)
-	}
-	saNames := []string{}
-	for _, r := range purgeApps {
-		saNames = append(saNames, r.Name)
-	}
-
-	purgeProds := map[string]console.RemoteDataProduct{}
-	for _, r := range remote.DataProducts {
-		purgeProds[r.Id] = r
-	}
-	for _, r := range localResolved.DataProudcts {
-		delete(purgeProds, r.ResourceName)
-	}
-	dpNames := []string{}
-	for _, r := range purgeProds {
-		dpNames = append(dpNames, r.Name)
-	}
+	purgeApps, saNames := remoteSourceAppsMissingLocally(remote.SourceApplication, localResolved.SourceApps)
+	purgeProds, dpNames := remoteDataProductsMissingLocally(remote.DataProducts, localResolved.DataProudcts)
 
 	slog.Info("purge",
 		"msg", fmt.Sprintf("%d source apps and %d data products", len(saNames), len(dpNames)),
@@ -740,7 +720,50 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 		return nil
 	}
 
-	for n, r := range purgeApps {
+	if err := deleteSourceAppsAndLog(ctx, api, purgeApps); err != nil {
+		return err
+	}
+	if err := deleteDataProductsAndLog(ctx, api, purgeProds); err != nil {
+		return err
+	}
+
+	slog.Info("purge", "msg", "complete")
+
+	return nil
+}
+
+func remoteSourceAppsMissingLocally(remote []console.RemoteSourceApplication, local []model.SourceApp) (map[string]console.RemoteSourceApplication, []string) {
+	missing := map[string]console.RemoteSourceApplication{}
+	for _, r := range remote {
+		missing[r.Id] = r
+	}
+	for _, r := range local {
+		delete(missing, r.ResourceName)
+	}
+	names := []string{}
+	for _, r := range missing {
+		names = append(names, r.Name)
+	}
+	return missing, names
+}
+
+func remoteDataProductsMissingLocally(remote []console.RemoteDataProduct, local []model.DataProduct) (map[string]console.RemoteDataProduct, []string) {
+	missing := map[string]console.RemoteDataProduct{}
+	for _, r := range remote {
+		missing[r.Id] = r
+	}
+	for _, r := range local {
+		delete(missing, r.ResourceName)
+	}
+	names := []string{}
+	for _, r := range missing {
+		names = append(names, r.Name)
+	}
+	return missing, names
+}
+
+func deleteSourceAppsAndLog(ctx context.Context, api DataProductPurger, apps map[string]console.RemoteSourceApplication) error {
+	for n, r := range apps {
 		slog.Debug("purge", "msg", "deleting remote", "source app", n)
 		if err := api.DeleteSourceApp(ctx, r); err != nil {
 			slog.Error("purge", "msg", "failed", "source app", n)
@@ -749,8 +772,11 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 
 		slog.Debug("purge", "msg", "deleted", "source app", n)
 	}
+	return nil
+}
 
-	for n, r := range purgeProds {
+func deleteDataProductsAndLog(ctx context.Context, api DataProductPurger, products map[string]console.RemoteDataProduct) error {
+	for n, r := range products {
 		slog.Debug("purge", "msg", "deleting remote", "data product", n)
 		if err := api.DeleteDataProduct(ctx, r); err != nil {
 			slog.Error("purge", "msg", "failed", "data product", n)
@@ -759,9 +785,6 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 
 		slog.Debug("purge", "msg", "deleted", "data product", n)
 	}
-
-	slog.Info("purge", "msg", "complete")
-
 	return nil
 }
 
@@ -866,40 +889,37 @@ func GetEventSpecIdsToRelease(cnx context.Context, client *console.ApiClient, lo
 }
 
 func LockChanged(changeSet *DataProductChangeSet, managedFrom string) {
-	for i := range changeSet.dpCreate {
-		changeSet.dpCreate[i].LockStatus = "locked"
+	lockDataProducts(changeSet.dpCreate, managedFrom)
+	lockDataProducts(changeSet.dpUpdate, managedFrom)
+	lockSourceApps(changeSet.saCreate, managedFrom)
+	lockSourceApps(changeSet.saUpdate, managedFrom)
+	lockEventSpecs(changeSet.esCreate, managedFrom)
+	lockEventSpecs(changeSet.esUpdate, managedFrom)
+}
+
+func lockDataProducts(dps []console.RemoteDataProduct, managedFrom string) {
+	for i := range dps {
+		dps[i].LockStatus = "locked"
 		if managedFrom != "" {
-			changeSet.dpCreate[i].ManagedFrom = managedFrom
+			dps[i].ManagedFrom = managedFrom
 		}
 	}
-	for i := range changeSet.dpUpdate {
-		changeSet.dpUpdate[i].LockStatus = "locked"
+}
+
+func lockSourceApps(sas []console.RemoteSourceApplication, managedFrom string) {
+	for i := range sas {
+		sas[i].LockStatus = "locked"
 		if managedFrom != "" {
-			changeSet.dpUpdate[i].ManagedFrom = managedFrom
+			sas[i].ManagedFrom = managedFrom
 		}
 	}
-	for i := range changeSet.saCreate {
-		changeSet.saCreate[i].LockStatus = "locked"
+}
+
+func lockEventSpecs(ess []console.RemoteEventSpec, managedFrom string) {
+	for i := range ess {
+		ess[i].LockStatus = "locked"
 		if managedFrom != "" {
-			changeSet.saCreate[i].ManagedFrom = managedFrom
-		}
-	}
-	for i := range changeSet.saUpdate {
-		changeSet.saUpdate[i].LockStatus = "locked"
-		if managedFrom != "" {
-			changeSet.saUpdate[i].ManagedFrom = managedFrom
-		}
-	}
-	for i := range changeSet.esCreate {
-		changeSet.esCreate[i].LockStatus = "locked"
-		if managedFrom != "" {
-			changeSet.esCreate[i].ManagedFrom = managedFrom
-		}
-	}
-	for i := range changeSet.esUpdate {
-		changeSet.esUpdate[i].LockStatus = "locked"
-		if managedFrom != "" {
-			changeSet.esUpdate[i].ManagedFrom = managedFrom
+			ess[i].ManagedFrom = managedFrom
 		}
 	}
 }
@@ -942,33 +962,35 @@ func localEventSpecsById(files map[string]map[string]any, rejectDuplicates bool)
 	versioned := make(map[string]bool)
 	var ids []string
 
-	fileNames := make([]string, 0, len(files))
-	for f := range files {
-		fileNames = append(fileNames, f)
-	}
-	slices.Sort(fileNames)
-
-	for _, f := range fileNames {
-		maybeDp := files[f]
-		if resourceType, ok := maybeDp["resourceType"]; ok && resourceType == "data-product" {
-			var dp model.DataProduct
-			if err := mapstructure.Decode(maybeDp, &dp); err != nil {
-				return nil, nil, err
+	for _, f := range slices.Sorted(maps.Keys(files)) {
+		eventSpecs, err := eventSpecsOfDataProductFile(files[f])
+		if err != nil {
+			return nil, nil, err
+		}
+		for idx, es := range eventSpecs {
+			if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates && (es.Version != nil || versioned[es.ResourceName]) {
+				return nil, nil, duplicateEventSpecError(es.ResourceName, previous.fileName, f)
 			}
-			for idx, es := range dp.Data.EventSpecifications {
-				if previous, seen := specs[es.ResourceName]; seen && rejectDuplicates && (es.Version != nil || versioned[es.ResourceName]) {
-					return nil, nil, duplicateEventSpecError(es.ResourceName, previous.fileName, f)
-				}
-				specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
-				if es.Version != nil {
-					versioned[es.ResourceName] = true
-				}
-				ids = append(ids, es.ResourceName)
+			specs[es.ResourceName] = localEventSpec{fileName: f, index: idx, spec: es}
+			if es.Version != nil {
+				versioned[es.ResourceName] = true
 			}
+			ids = append(ids, es.ResourceName)
 		}
 	}
 
 	return specs, ids, nil
+}
+
+func eventSpecsOfDataProductFile(file map[string]any) ([]model.EventSpec, error) {
+	if resourceType, ok := file["resourceType"]; !ok || resourceType != "data-product" {
+		return nil, nil
+	}
+	var dp model.DataProduct
+	if err := mapstructure.Decode(file, &dp); err != nil {
+		return nil, err
+	}
+	return dp.Data.EventSpecifications, nil
 }
 
 func FindVersionMismatchesAgainstBase(local map[string]map[string]any, base map[string]map[string]any) ([]model.EventSpecVersionMismatch, []string, error) {
@@ -1059,31 +1081,40 @@ func FindMissingVersionsAgainstBase(local map[string]map[string]any, base map[st
 		}
 		reported[id] = true
 
-		m := model.EventSpecMissingVersion{
-			FileName: localEs.fileName,
-			Index:    localEs.index,
-			Name:     localEs.spec.Name,
-		}
-
 		baseEs, baseExists := baseSpecs[id]
-		switch {
-		case count[id] > 1:
-			m.Reason = missingVersionDuplicateReason
-		case !baseExists:
-			expected := 0
-			m.Expected = &expected
-		case baseEs.spec.Version == nil:
-			m.Reason = "no version declared at the base, run dp validate --fix against Snowplow Console to add it"
-		default:
-			expected, _, err := expectedVersionAgainstBase(baseEs.spec, localEs.spec)
-			if err != nil {
-				return nil, err
-			}
-			m.Expected = &expected
+		m, err := missingVersionAgainstBase(localEs, baseEs, baseExists, count[id] > 1)
+		if err != nil {
+			return nil, err
 		}
 
 		missing = append(missing, m)
 	}
 
 	return missing, nil
+}
+
+func missingVersionAgainstBase(localEs localEventSpec, baseEs localEventSpec, baseExists bool, duplicated bool) (model.EventSpecMissingVersion, error) {
+	m := model.EventSpecMissingVersion{
+		FileName: localEs.fileName,
+		Index:    localEs.index,
+		Name:     localEs.spec.Name,
+	}
+
+	switch {
+	case duplicated:
+		m.Reason = missingVersionDuplicateReason
+	case !baseExists:
+		expected := 0
+		m.Expected = &expected
+	case baseEs.spec.Version == nil:
+		m.Reason = "no version declared at the base, run dp validate --fix against Snowplow Console to add it"
+	default:
+		expected, _, err := expectedVersionAgainstBase(baseEs.spec, localEs.spec)
+		if err != nil {
+			return model.EventSpecMissingVersion{}, err
+		}
+		m.Expected = &expected
+	}
+
+	return m, nil
 }
