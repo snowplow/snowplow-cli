@@ -134,9 +134,12 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 
 	required := []string{"api-key-id", "api-key", "host", "org-id"}
 	if setErr == nil {
-		required, err = requiredWithSavedLogin(cmd, required)
+		loggedIn, err := applySavedLogin(cmd)
 		if err != nil {
 			return err
+		}
+		if loggedIn {
+			required = []string{"host", "org-id"}
 		}
 	}
 
@@ -216,20 +219,20 @@ func setFlagsFromEnv(cmd *cobra.Command) error {
 	return err
 }
 
-func requiredWithSavedLogin(cmd *cobra.Command, required []string) ([]string, error) {
+func applySavedLogin(cmd *cobra.Command) (bool, error) {
 	login, loginErr := savedLogin(cmd)
 	if loginErr != nil {
-		return nil, fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
+		return false, fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
 	}
 	if login == nil {
-		return required, nil
+		return false, nil
 	}
 	if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
 		if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
-			return nil, err
+			return false, err
 		}
 	}
-	return []string{"host", "org-id"}, nil
+	return true, nil
 }
 
 func missingFlags(cmd *cobra.Command, required []string) ([]string, error) {
