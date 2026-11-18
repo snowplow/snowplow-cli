@@ -202,6 +202,7 @@ func TestValidateDataProductsWithClient_NoLoggerInContext(t *testing.T) {
 }
 
 func writeValidDataProduct(t *testing.T, dir string) {
+	t.Helper()
 	validDP := `apiVersion: v1
 resourceType: data-product
 resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
@@ -240,6 +241,7 @@ data:
 }
 
 func writeValidSourceApp(t *testing.T, dir string) {
+	t.Helper()
 	validSA := `apiVersion: v1
 resourceType: source-application
 resourceName: c85f1787-6a42-48c5-afeb-455b6380cb62
@@ -261,6 +263,7 @@ data:
 }
 
 func writeInvalidDataProduct(t *testing.T, dir, filename string) {
+	t.Helper()
 	invalidDP := `apiVersion: v1
 resourceType: data-product
 data:
@@ -919,6 +922,7 @@ data:
 		{
 			name: "renamed file keeps its versions",
 			arrange: func(t *testing.T, tracking string, dpFile string) {
+				t.Helper()
 				if err := os.Rename(dpFile, filepath.Join(tracking, "renamed.yaml")); err != nil {
 					t.Fatal(err)
 				}
@@ -927,6 +931,7 @@ data:
 		{
 			name: "file moved to another directory keeps its versions",
 			arrange: func(t *testing.T, tracking string, dpFile string) {
+				t.Helper()
 				if err := os.MkdirAll(filepath.Join(tracking, "nested"), 0755); err != nil {
 					t.Fatal(err)
 				}
@@ -938,6 +943,7 @@ data:
 		{
 			name: "spec moved to another data product file keeps its version",
 			arrange: func(t *testing.T, tracking string, dpFile string) {
+				t.Helper()
 				moved := strings.Replace(fmt.Sprintf(baseDataProduct, 3, "1-0-0"), "dbc68917-3bcb-4640-a165-483de5fc033c", "fd68917a-3bcb-4640-a165-483de5fc033e", 1)
 				if err := os.WriteFile(filepath.Join(tracking, "moved.yaml"), []byte(moved), 0644); err != nil {
 					t.Fatal(err)
@@ -950,6 +956,7 @@ data:
 		{
 			name: "truly new spec at 0 passes",
 			arrange: func(t *testing.T, tracking string, dpFile string) {
+				t.Helper()
 				if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")+fmt.Sprintf(newSpec, 0)), 0644); err != nil {
 					t.Fatal(err)
 				}
@@ -958,6 +965,7 @@ data:
 		{
 			name: "truly new spec not at 0 fails",
 			arrange: func(t *testing.T, tracking string, dpFile string) {
+				t.Helper()
 				if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-0")+fmt.Sprintf(newSpec, 1)), 0644); err != nil {
 					t.Fatal(err)
 				}

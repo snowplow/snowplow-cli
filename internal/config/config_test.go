@@ -41,8 +41,19 @@ func build() *cobra.Command {
 	return testCmd
 }
 
+func unsetConsoleEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"API_KEY_ID", "API_KEY", "ORG_ID", "HOST"} {
+		t.Setenv(envNamePrefix+name, "")
+		if err := os.Unsetenv(envNamePrefix + name); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func Test_ConfigFromFile(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
+	unsetConsoleEnv(t)
 
 	os.Args = []string{"xxx", "--config", "../testdata/config/config.yml"}
 
@@ -73,6 +84,7 @@ func Test_ConfigFromFile(t *testing.T) {
 
 func Test_ConfigEnvOveride(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
+	unsetConsoleEnv(t)
 
 	os.Args = []string{"xxx", "--config", "../testdata/config/config.yml"}
 
@@ -106,6 +118,7 @@ func Test_ConfigEnvOveride(t *testing.T) {
 
 func Test_ConfigValidate(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
+	unsetConsoleEnv(t)
 
 	table := [][]string{
 		{"xxx", "-a", "something", "-H", "something", "-S", "something", "-o", ""},
@@ -126,6 +139,7 @@ func Test_ConfigValidate(t *testing.T) {
 
 func Test_ConfigFromEnvFile(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
+	unsetConsoleEnv(t)
 
 	envFile := "../testdata/config/test.env"
 	os.Args = []string{"xxx", "--env-file", envFile}
@@ -157,6 +171,7 @@ func Test_ConfigFromEnvFile(t *testing.T) {
 
 func Test_ConfigEnvFilePrecedence(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
+	unsetConsoleEnv(t)
 
 	envFile := "../testdata/config/test.env"
 	configFile := "../testdata/config/config.yml"
@@ -209,9 +224,7 @@ func Test_ConfigEnvFileDiscovery(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
 
 	// Clean up any existing environment variables that might interfere
-	for _, env := range []string{"SNOWPLOW_CONSOLE_HOST", "SNOWPLOW_CONSOLE_API_KEY_ID", "SNOWPLOW_CONSOLE_API_KEY", "SNOWPLOW_CONSOLE_ORG_ID"} {
-		_ = os.Unsetenv(env)
-	}
+	unsetConsoleEnv(t)
 
 	// Create a temporary .env file in current directory
 	tempDir := t.TempDir()
@@ -223,20 +236,7 @@ func Test_ConfigEnvFileDiscovery(t *testing.T) {
 	}
 
 	// Change to temp directory to test discovery
-	oldWd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(oldWd); err != nil {
-			t.Errorf("failed to restore working directory: %v", err)
-		}
-	}()
-
-	err = os.Chdir(tempDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(tempDir)
 
 	os.Args = []string{"xxx"}
 
@@ -513,20 +513,7 @@ OTHER_VAR=other_value`
 			t.Fatal(err)
 		}
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("failed to restore working directory: %v", err)
-			}
-		}()
-
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Chdir(tempDir)
 
 		err = SaveDotenvFile("test-org-id", "test-api-key-id", "test-api-key", "https://test.example.com")
 		if err != nil {
@@ -565,22 +552,9 @@ func Test_SaveDotenvFileCreatesNewFile(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("failed to restore working directory: %v", err)
-			}
-		}()
+		t.Chdir(tempDir)
 
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = SaveDotenvFile("new-org-id", "new-api-key-id", "new-api-key", "https://new.example.com")
+		err := SaveDotenvFile("new-org-id", "new-api-key-id", "new-api-key", "https://new.example.com")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -614,22 +588,9 @@ func Test_SaveDotenvFileDefaultHost(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("failed to restore working directory: %v", err)
-			}
-		}()
+		t.Chdir(tempDir)
 
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = SaveDotenvFile("org-id", "api-key-id", "api-key", "https://console.snowplowanalytics.com")
+		err := SaveDotenvFile("org-id", "api-key-id", "api-key", "https://console.snowplowanalytics.com")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -660,22 +621,9 @@ func Test_SaveDotenvFileEmptyValues(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("failed to restore working directory: %v", err)
-			}
-		}()
+		t.Chdir(tempDir)
 
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = SaveDotenvFile("", "", "", "https://console.snowplowanalytics.com")
+		err := SaveDotenvFile("", "", "", "https://console.snowplowanalytics.com")
 		if err != nil {
 			t.Fatal(err)
 		}

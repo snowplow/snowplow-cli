@@ -33,12 +33,7 @@ linters:
     - tagliatelle
     - testpackage
     - thelper
-    - usetesting
     - wrapcheck
-  settings:
-    misspell:
-      ignore-rules:
-        - avaliable
   exclusions:
     presets:
       - std-error-handling

@@ -68,7 +68,7 @@ func validateDs(validate *validator.Validate, ds model.DataStructure) error {
 			case "required":
 				result = append(result, fmt.Errorf("required field %s is missing", err.path))
 			case "oneof":
-				firstSentence := fmt.Sprintf("Invalid value %s at %s. Avaliable values are: ", err.value, err.path)
+				firstSentence := fmt.Sprintf("Invalid value %s at %s. Available values are: ", err.value, err.path)
 				var secondSentence string
 				switch err.field {
 				case "schemaType":

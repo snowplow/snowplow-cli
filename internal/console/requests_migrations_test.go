@@ -89,7 +89,8 @@ func Test_ValidateMigrations_Fail(t *testing.T) {
 	}
 }
 
-func migrationServer(changeType string, t *testing.T) *httptest.Server {
+func migrationServer(t *testing.T, changeType string) *httptest.Server {
+	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/destinations/v3" {
 			w.WriteHeader(http.StatusOK)
@@ -110,7 +111,7 @@ func migrationServer(changeType string, t *testing.T) *httptest.Server {
 }
 
 func Test_ValidateMigrationsMajor_Ok(t *testing.T) {
-	server := migrationServer("major", t)
+	server := migrationServer(t, "major")
 	defer server.Close()
 
 	cnx := context.Background()
@@ -148,7 +149,7 @@ func Test_ValidateMigrationsMajor_Ok(t *testing.T) {
 }
 
 func Test_ValidateMigrationsMinor_Ok(t *testing.T) {
-	server := migrationServer("minor", t)
+	server := migrationServer(t, "minor")
 	defer server.Close()
 
 	cnx := context.Background()
