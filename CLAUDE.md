@@ -5,9 +5,9 @@
 "Data products" and "tracking plans" are the same thing. The product renamed data products to tracking plans, but the CLI still uses the old name in everything except prose (`data-products` / `dp` commands, flag names, `DataProduct` types, file formats). User-facing help text says "tracking plan".
 
 # Non-obvious packages
-- `internal/setup/` is the credential setup wizard (`setup`); `internal/wizard/` holds the `signals setup` internals.
+- `internal/auth/device/` holds the browser sign-in itself: the OAuth device flow, the organization picker and the `Session` it returns. `internal/setup/` (`setup`) and `internal/login/` (`login`) are each one top-level function over it, one saving an API key and the other a login. `internal/wizard/` holds the `signals setup` internals.
 - `internal/changes/` is change tracking for `ds publish`; `internal/amend/` edits files in place.
-- `internal/auth/` holds the Console login saved by `login` (`~/.config/snowplow/login.json`), its lock file and the token refresh. Snowtype reads and writes the same file, so its format is a contract between the two repos.
+- `internal/auth/` holds the Console login saved by `login` (`~/.config/snowplow/login.json`), its lock file and the token refresh. Snowtype reads and writes the same file, so its format is a contract between the two repos. It must not import `internal/console`, which imports it: that is why the device flow sits in the `device` subpackage.
 
 # Conventions
 **CLI framework:** Cobra + Viper for config. New top-level command families live under their own subpackage in `cmd/`. Each family exposes one exported `*cobra.Command` and is registered in `cmd/root.go`. Leaf commands sit in sibling files in the same package.

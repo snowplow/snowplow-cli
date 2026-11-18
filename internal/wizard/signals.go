@@ -21,8 +21,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
+	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/console"
-	"github.com/snowplow/snowplow-cli/internal/setup"
 )
 
 type SignalsOptions struct {
@@ -52,7 +52,7 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 		_, _ = yellow.Println("! This project has uncommitted changes. Your agent will edit files, so consider committing first.")
 	}
 
-	session, err := setup.Login(ctx, setup.DefaultClientID, setup.DefaultAuth0Domain, opts.ConsoleHost, true)
+	session, err := device.Login(ctx, device.DefaultClientID, device.DefaultAuth0Domain, opts.ConsoleHost, true)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 	return startAgent(agents)
 }
 
-func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *setup.Session) (console.SignalsEnvironment, error) {
+func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *device.Session) (console.SignalsEnvironment, error) {
 	all, err := console.GetSignalsEnvironments(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID)
 	if err != nil {
 		return console.SignalsEnvironment{}, err
@@ -161,7 +161,7 @@ func envLabel(e console.SignalsEnvironment) string {
 	return fmt.Sprintf("%s (%s)", name, e.APIURL())
 }
 
-func ensureAppKey(ctx context.Context, opts SignalsOptions, s *setup.Session, apiURL, envPath string) error {
+func ensureAppKey(ctx context.Context, opts SignalsOptions, s *device.Session, apiURL, envPath string) error {
 	existing, err := readSignalsCredentials(envPath)
 	hasOrgKey := err == nil && existing.OrgID == s.Org.ID
 
@@ -276,5 +276,5 @@ func choose(question string, options []string) (int, error) {
 	fmt.Printf("Select [1-%d] (default: 1): ", len(options))
 	var input string
 	_, _ = fmt.Scanln(&input)
-	return setup.SelectIndex(input, len(options), 0)
+	return device.SelectIndex(input, len(options), 0)
 }

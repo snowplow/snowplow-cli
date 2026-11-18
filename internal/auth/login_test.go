@@ -152,14 +152,14 @@ func Test_Load_InvalidFile(t *testing.T) {
 	}
 }
 
-func Test_Valid_UsesUnexpiredToken(t *testing.T) {
+func Test_LoadAndRefresh_UsesUnexpiredToken(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, nil)
 	if err := Save(login(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func Test_Valid_UsesUnexpiredToken(t *testing.T) {
 	}
 }
 
-func Test_Valid_RefreshesExpiredTokenAndSavesIt(t *testing.T) {
+func Test_LoadAndRefresh_RefreshesExpiredTokenAndSavesIt(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token":  "access-2",
@@ -183,7 +183,7 @@ func Test_Valid_RefreshesExpiredTokenAndSavesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func Test_Valid_RefreshesExpiredTokenAndSavesIt(t *testing.T) {
 	}
 }
 
-func Test_Valid_KeepsRefreshTokenWhenNotRotated(t *testing.T) {
+func Test_LoadAndRefresh_KeepsRefreshTokenWhenNotRotated(t *testing.T) {
 	useTempPath(t)
 	useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token": "access-2",
@@ -217,7 +217,7 @@ func Test_Valid_KeepsRefreshTokenWhenNotRotated(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func Test_Valid_KeepsRefreshTokenWhenNotRotated(t *testing.T) {
 	}
 }
 
-func Test_Valid_ExpiredWithoutRefreshToken(t *testing.T) {
+func Test_LoadAndRefresh_ExpiredWithoutRefreshToken(t *testing.T) {
 	useTempPath(t)
 	expired := login(-time.Hour)
 	expired.RefreshToken = ""
@@ -234,33 +234,33 @@ func Test_Valid_ExpiredWithoutRefreshToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got != nil {
 		t.Fatalf("got %v, %v want nil, nil", got, err)
 	}
 }
 
-func Test_Valid_RefreshRejected(t *testing.T) {
+func Test_LoadAndRefresh_RefreshRejected(t *testing.T) {
 	useTempPath(t)
 	useTokenServer(t, http.StatusForbidden, map[string]any{"error": "invalid_grant"})
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got != nil {
 		t.Fatalf("got %v, %v want nil, nil", got, err)
 	}
 }
 
-func Test_Valid_RefreshServerError(t *testing.T) {
+func Test_LoadAndRefresh_RefreshServerError(t *testing.T) {
 	useTempPath(t)
 	useTokenServer(t, http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err == nil {
 		t.Fatalf("an outage must not read as logged out, got %v, nil", got)
 	}
@@ -298,7 +298,7 @@ func Test_UnknownHomeDirectory(t *testing.T) {
 	}
 }
 
-func Test_Valid_RefreshesTokenAboutToExpire(t *testing.T) {
+func Test_LoadAndRefresh_RefreshesTokenAboutToExpire(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token": "access-2",
@@ -309,7 +309,7 @@ func Test_Valid_RefreshesTokenAboutToExpire(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,43 @@ func Test_Valid_RefreshesTokenAboutToExpire(t *testing.T) {
 	}
 }
 
-func Test_Valid_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
+func Test_LoadAndRefresh_RefreshesTokenExpiringWithinTheMargin(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{
+		"access_token": "access-2",
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+	if err := Save(login(3 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadAndRefresh(context.Background(), host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessToken != "access-2" || *calls != 1 {
+		t.Errorf("got %s after %d refreshes, want access-2 after 1", got.AccessToken, *calls)
+	}
+}
+
+func Test_LoadAndRefresh_KeepsTokenLivingLongerThanTheMargin(t *testing.T) {
+	useTempPath(t)
+	calls := useTokenServer(t, http.StatusOK, map[string]any{"access_token": "access-2", "token_type": "Bearer"})
+	if err := Save(login(10 * time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := LoadAndRefresh(context.Background(), host)
+	if err != nil || got == nil || got.AccessToken != "access-1" {
+		t.Fatalf("got %+v, %v want access-1", got, err)
+	}
+	if *calls != 0 {
+		t.Errorf("token endpoint called %d times, want 0", *calls)
+	}
+}
+
+func Test_LoadAndRefresh_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token": "access-2",
@@ -329,7 +365,7 @@ func Test_Valid_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
 	}
 
 	for range 2 {
-		if _, err := Valid(context.Background(), host); err != nil {
+		if _, err := LoadAndRefresh(context.Background(), host); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -338,7 +374,7 @@ func Test_Valid_RefreshWithoutExpiryIsNotRepeated(t *testing.T) {
 	}
 }
 
-func Test_Valid_ExpiredWithoutClient(t *testing.T) {
+func Test_LoadAndRefresh_ExpiredWithoutClient(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, nil)
 	expired := login(-time.Hour)
@@ -347,7 +383,7 @@ func Test_Valid_ExpiredWithoutClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got != nil {
 		t.Fatalf("got %v, %v want nil, nil", got, err)
 	}
@@ -356,32 +392,32 @@ func Test_Valid_ExpiredWithoutClient(t *testing.T) {
 	}
 }
 
-func Test_Valid_RefreshRateLimited(t *testing.T) {
+func Test_LoadAndRefresh_RefreshRateLimited(t *testing.T) {
 	useTempPath(t)
 	useTokenServer(t, http.StatusTooManyRequests, map[string]any{"error": "too_many_requests"})
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, err := Valid(context.Background(), host); err == nil {
+	if got, err := LoadAndRefresh(context.Background(), host); err == nil {
 		t.Fatalf("a rate limit must not read as logged out, got %v, nil", got)
 	}
 }
 
-func Test_Valid_RefreshGrantNotEnabled(t *testing.T) {
+func Test_LoadAndRefresh_RefreshGrantNotEnabled(t *testing.T) {
 	useTempPath(t)
 	useTokenServer(t, http.StatusForbidden, map[string]any{"error": "unauthorized_client"})
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got != nil {
 		t.Fatalf("got %v, %v want nil, nil", got, err)
 	}
 }
 
-func Test_Valid_LoginWithoutExpiryIsUsed(t *testing.T) {
+func Test_LoadAndRefresh_LoginWithoutExpiryIsUsed(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, nil)
 	noExpiry := login(time.Hour)
@@ -391,7 +427,7 @@ func Test_Valid_LoginWithoutExpiryIsUsed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got == nil || got.AccessToken != "access-1" {
 		t.Fatalf("got %v, %v want access-1", got, err)
 	}
@@ -436,7 +472,7 @@ func Test_Save_FileFormatSharedWithSnowtype(t *testing.T) {
 	}
 }
 
-func Test_Valid_LoginMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
+func Test_LoadAndRefresh_LoginMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
 	useTempPath(t)
 	newer := login(time.Hour)
 	newer.AccessToken = "other-account"
@@ -455,7 +491,7 @@ func Test_Valid_LoginMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Valid(context.Background(), host); err != nil {
+	if _, err := LoadAndRefresh(context.Background(), host); err != nil {
 		t.Fatal(err)
 	}
 	if err := <-saved; err != nil {
@@ -546,7 +582,7 @@ func Test_Save_WritesExpiryAsUTCMilliseconds(t *testing.T) {
 	}
 }
 
-func Test_Valid_LoginForAnotherHostMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
+func Test_LoadAndRefresh_LoginForAnotherHostMadeDuringRefreshWaitsAndIsKept(t *testing.T) {
 	useTempPath(t)
 	other := login(time.Hour)
 	other.AccessToken = "other-host-token"
@@ -566,7 +602,7 @@ func Test_Valid_LoginForAnotherHostMadeDuringRefreshWaitsAndIsKept(t *testing.T)
 	if err := Save(login(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got == nil || got.AccessToken != "access-2" {
 		t.Fatalf("the command in hand should still get the refreshed token, got %v, %v", got, err)
 	}
@@ -583,7 +619,7 @@ func Test_Valid_LoginForAnotherHostMadeDuringRefreshWaitsAndIsKept(t *testing.T)
 	}
 }
 
-func Test_Valid_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
+func Test_LoadAndRefresh_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
 	path := useTempPath(t)
 	oldWait := lockWait
 	lockWait = 50 * time.Millisecond
@@ -600,7 +636,7 @@ func Test_Valid_ReturnsRefreshedTokenWhenItCannotBeSaved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatalf("a refresh that worked must not fail the command: %v", err)
 	}
@@ -910,7 +946,7 @@ func Test_Contract_RefreshKeepsUnknownFields(t *testing.T) {
 			expired["expires_at"] = json.RawMessage(`"2020-01-01T00:00:00.000Z"`)
 			writeContractFile(t, path, expired)
 
-			got, err := Valid(context.Background(), host)
+			got, err := LoadAndRefresh(context.Background(), host)
 			if err != nil || got == nil || got.AccessToken != "access-2" {
 				t.Fatalf("got %v, %v want access-2", got, err)
 			}
@@ -919,7 +955,7 @@ func Test_Contract_RefreshKeepsUnknownFields(t *testing.T) {
 	}
 }
 
-func Test_Valid_WaitsForARefreshInProgressAndReusesItsTokens(t *testing.T) {
+func Test_LoadAndRefresh_WaitsForARefreshInProgressAndReusesItsTokens(t *testing.T) {
 	path := useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token": "must-not-be-used",
@@ -944,7 +980,7 @@ func Test_Valid_WaitsForARefreshInProgressAndReusesItsTokens(t *testing.T) {
 		_ = os.Remove(path + ".lock")
 	}()
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -956,7 +992,7 @@ func Test_Valid_WaitsForARefreshInProgressAndReusesItsTokens(t *testing.T) {
 	}
 }
 
-func Test_Valid_ConcurrentCommandsRefreshOnce(t *testing.T) {
+func Test_LoadAndRefresh_ConcurrentCommandsRefreshOnce(t *testing.T) {
 	useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{
 		"access_token":  "access-2",
@@ -971,7 +1007,7 @@ func Test_Valid_ConcurrentCommandsRefreshOnce(t *testing.T) {
 	results := make(chan string, 4)
 	for range 4 {
 		go func() {
-			got, err := Valid(context.Background(), host)
+			got, err := LoadAndRefresh(context.Background(), host)
 			if err != nil || got == nil {
 				results <- "failed"
 				return
@@ -989,7 +1025,7 @@ func Test_Valid_ConcurrentCommandsRefreshOnce(t *testing.T) {
 	}
 }
 
-func Test_Valid_LoggedOutWhileWaitingForLock(t *testing.T) {
+func Test_LoadAndRefresh_LoggedOutWhileWaitingForLock(t *testing.T) {
 	path := useTempPath(t)
 	calls := useTokenServer(t, http.StatusOK, map[string]any{"access_token": "access-2", "token_type": "Bearer"})
 	if err := Save(login(-time.Hour)); err != nil {
@@ -1004,7 +1040,7 @@ func Test_Valid_LoggedOutWhileWaitingForLock(t *testing.T) {
 		_ = os.Remove(path + ".lock")
 	}()
 
-	got, err := Valid(context.Background(), host)
+	got, err := LoadAndRefresh(context.Background(), host)
 	if err != nil || got != nil {
 		t.Errorf("got %+v, %v want no login", got, err)
 	}
@@ -1051,8 +1087,8 @@ func Test_Version_NewerIsRefusedWithAClearMessage(t *testing.T) {
 	before, _ := os.ReadFile(path)
 
 	for name, load := range map[string]func() (*Login, error){
-		"Load":  func() (*Login, error) { return Load(host) },
-		"Valid": func() (*Login, error) { return Valid(context.Background(), host) },
+		"Load":           func() (*Login, error) { return Load(host) },
+		"LoadAndRefresh": func() (*Login, error) { return LoadAndRefresh(context.Background(), host) },
 	} {
 		got, err := load()
 		if got != nil || err == nil {

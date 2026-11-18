@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -82,11 +81,9 @@ func (l Login) MarshalJSON() ([]byte, error) {
 	return json.Marshal(all)
 }
 
-const expiryMargin = time.Minute
+const expiryMargin = 5 * time.Minute
 
 const defaultLifetime = time.Hour
-
-var refreshMu sync.Mutex
 
 const refreshTimeout = 10 * time.Second
 
@@ -208,32 +205,34 @@ func loadAny() (*Login, error) {
 	return &login, nil
 }
 
-func Valid(ctx context.Context, host string) (*Login, error) {
-	refreshMu.Lock()
-	defer refreshMu.Unlock()
-
-	login, err := Load(host)
+func check(host string) (login *Login, expired bool, err error) {
+	login, err = Load(host)
 	if err != nil || login == nil {
-		return nil, err
+		return nil, false, err
 	}
 	if login.fresh() {
-		return login, nil
+		return login, false, nil
 	}
 	if !login.refreshable() {
-		return nil, nil
+		return nil, false, nil
+	}
+	return login, true, nil
+}
+
+func LoadAndRefresh(ctx context.Context, host string) (*Login, error) {
+	login, expired, err := check(host)
+	if err != nil || login == nil || !expired {
+		return login, err
 	}
 
 	var result *Login
 	err = withLock(func(path string) error {
-		current, err := Load(host)
+		current, currentExpired, err := check(host)
 		if err != nil || current == nil {
 			return err
 		}
-		if current.fresh() {
+		if !currentExpired {
 			result = current
-			return nil
-		}
-		if !current.refreshable() {
 			return nil
 		}
 		refreshed, err := refresh(ctx, current)

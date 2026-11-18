@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/config"
 	snplog "github.com/snowplow/snowplow-cli/internal/logging"
 	"github.com/snowplow/snowplow-cli/internal/setup"
@@ -77,8 +78,8 @@ var SetupCmd = &cobra.Command{
 func init() {
 	config.InitConsoleFlags(SetupCmd)
 
-	SetupCmd.Flags().String("client-id", setup.DefaultClientID, "Auth0 Client ID for device auth")
-	SetupCmd.Flags().String("auth0-domain", setup.DefaultAuth0Domain, "Auth0 domain")
+	SetupCmd.Flags().String("client-id", device.DefaultClientID, "Auth0 Client ID for device auth")
+	SetupCmd.Flags().String("auth0-domain", device.DefaultAuth0Domain, "Auth0 domain")
 	SetupCmd.Flags().Bool("read-only", false, "Create a read-only API key")
 	SetupCmd.Flags().Bool("dotenv", false, "Store as .env file in current working directory")
 }
