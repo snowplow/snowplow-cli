@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package wizard
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -96,6 +97,19 @@ func TestLaunch(t *testing.T) {
 	}
 	if err := launch(t.Context(), filepath.Join(t.TempDir(), "missing"), nil); err == nil {
 		t.Fatal("expected an error when the agent can't start")
+	}
+}
+
+func TestLaunchKeepsAgentAliveWhenContextIsCancelled(t *testing.T) {
+	bin := fakeBin(t, "claude")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	if err := launch(ctx, bin, []string{"the prompt"}); err != nil {
+		t.Fatalf("a cancelled command context should not stop the agent: %v", err)
+	}
+	if args, _ := os.ReadFile(bin + ".args"); string(args) != "the prompt\n--\n" {
+		t.Fatalf("the agent did not run to the end, recorded args %q", args)
 	}
 }
 

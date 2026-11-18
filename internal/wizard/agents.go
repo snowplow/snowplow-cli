@@ -67,7 +67,7 @@ func claudeArgs(prompt string) []string {
 const claudeSessionSettings = `{"permissions":{"deny":["Read(./.env)","Read(./.env.*)"]}}`
 
 func launch(ctx context.Context, bin string, args []string) error {
-	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 
 	// Ctrl-C and closing the terminal reach us too: ignore them while the agent has the terminal.
