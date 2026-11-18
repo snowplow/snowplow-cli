@@ -74,49 +74,49 @@ func GetChanges(locals map[string]model.DataStructure, remoteListing []console.L
 	}
 
 	for f, ds := range locals {
-		data, err := ds.ParseData()
+		err := res.addLocal(f, ds, remotesSet, env)
 		if err != nil {
 			return Changes{}, err
 		}
-		remotePair, exists := remotesSet[idFromSelf(data.Self)]
-		// DS does not exists, we should create it
-		if !exists {
-			res.ToCreate = append(res.ToCreate, NewDSChangeContext(ds, f))
-		} else {
-			// Remote DS exists,
-			if !reflect.DeepEqual(ds.Meta, remotePair.Meta) {
-				// Meta is different, needs updating
-				res.ToUpdateMeta = append(res.ToUpdateMeta, NewDSChangeContext(ds, f))
-			}
-			contentHash, err := ds.GetContentHash()
-			if err != nil {
-				return Changes{}, err
-			}
-			var foundDeployment bool
-			// find the correct deployment to compare to
-			for _, deployment := range remotePair.Deployments {
-				if deployment.Env == env {
-					foundDeployment = true
-					if deployment.ContentHash != contentHash {
-						// data structure has changed
-						if data.Self.Version != deployment.Version {
-							// Different version, create new version
-							res.ToUpdateNewVersion = append(res.ToUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, deployment.Version))
-						} else {
-							// Same version, but different hash, patch
-							res.ToUpdatePatch = append(res.ToUpdatePatch, NewDSChangeContextWithVersionAndHashes(ds, f, deployment.Version, contentHash, deployment.ContentHash))
-						}
-					}
-				}
-			}
-			if !foundDeployment {
-				// DS exists, but we didn't find a version of it
-				// We should deploy from dev to prod
-				res.ToUpdateNewVersion = append(res.ToUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, ""))
-			}
-		}
 	}
 	return res, nil
+}
+
+func (c *Changes) addLocal(f string, ds model.DataStructure, remotesSet map[DataStructureId]console.ListResponse, env console.DataStructureEnv) error {
+	data, err := ds.ParseData()
+	if err != nil {
+		return err
+	}
+	remotePair, exists := remotesSet[idFromSelf(data.Self)]
+	if !exists {
+		c.ToCreate = append(c.ToCreate, NewDSChangeContext(ds, f))
+		return nil
+	}
+	if !reflect.DeepEqual(ds.Meta, remotePair.Meta) {
+		c.ToUpdateMeta = append(c.ToUpdateMeta, NewDSChangeContext(ds, f))
+	}
+	contentHash, err := ds.GetContentHash()
+	if err != nil {
+		return err
+	}
+	var foundDeployment bool
+	for _, deployment := range remotePair.Deployments {
+		if deployment.Env != env {
+			continue
+		}
+		foundDeployment = true
+		switch {
+		case deployment.ContentHash == contentHash:
+		case data.Self.Version != deployment.Version:
+			c.ToUpdateNewVersion = append(c.ToUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, deployment.Version))
+		default:
+			c.ToUpdatePatch = append(c.ToUpdatePatch, NewDSChangeContextWithVersionAndHashes(ds, f, deployment.Version, contentHash, deployment.ContentHash))
+		}
+	}
+	if !foundDeployment {
+		c.ToUpdateNewVersion = append(c.ToUpdateNewVersion, NewDSChangeContextWithVersion(ds, f, ""))
+	}
+	return nil
 }
 
 func PerformChangesDev(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {

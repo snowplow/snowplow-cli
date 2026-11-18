@@ -310,10 +310,49 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 		return nil, err
 	}
 
+	dsDataMap, err := getLatestSchemaVersions(cnx, client)
+	if err != nil {
+		return nil, err
+	}
+
 	var res []model.DataStructure
-	var dsData []map[string]any
 	var skippedCount int
 	var includedLegacyCount int
+
+	for _, dsResp := range listResp {
+		if !matchesAnyPrefix(dsResp, match) {
+			continue
+		}
+
+		devVersions := devDeploymentVersions(dsResp.Deployments)
+		meta := dsResp.Meta
+		if meta.SchemaType == "" {
+			if !includeLegacy {
+				skippedCount += len(devVersions)
+				continue
+			}
+			includedLegacyCount += len(devVersions)
+			meta.SchemaType = "entity"
+		}
+
+		for _, version := range devVersions {
+			dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, version)]}
+			res = append(res, dataStructure)
+		}
+	}
+
+	if skippedCount > 0 {
+		slog.Info("skipped legacy data structures with empty schemaType", "count", skippedCount, "note", "use --include-legacy to include them")
+	}
+	if includedLegacyCount > 0 {
+		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
+	}
+
+	return res, nil
+}
+
+func getLatestSchemaVersions(cnx context.Context, client *ApiClient) (map[string]map[string]any, error) {
+	var dsData []map[string]any
 
 	req, err := http.NewRequestWithContext(cnx, http.MethodGet, client.BaseUrl+"/data-structures/v1/schemas/versions?latest=true", nil)
 	if err != nil {
@@ -338,57 +377,38 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 
 	dsDataMap := map[string]map[string]any{}
 	for _, ds := range dsData {
-		if self, ok := ds["self"].(map[string]any); ok {
-			dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
-		} else {
+		self, ok := ds["self"].(map[string]any)
+		if !ok {
 			return nil, fmt.Errorf("wrong data structure self section %s", ds["self"])
 		}
+		dsDataMap[fmt.Sprintf("%s-%s-%s-%s", self["vendor"], self["name"], self["format"], self["version"])] = ds
 	}
 
-	for _, dsResp := range listResp {
-		matched := false
-		for _, m := range match {
-			dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
-			if strings.HasPrefix(dsUri, m) {
-				matched = true
-			}
+	return dsDataMap, nil
+}
 
-			slog.Debug("fetching data structure", "match", m, "dsUri", dsUri, "result", matched)
+func matchesAnyPrefix(dsResp ListResponse, match []string) bool {
+	matched := false
+	for _, m := range match {
+		dsUri := fmt.Sprintf("%s/%s/%s", dsResp.Vendor, dsResp.Name, dsResp.Format)
+		if strings.HasPrefix(dsUri, m) {
+			matched = true
 		}
 
-		if !matched && len(match) > 0 {
-			continue
-		}
+		slog.Debug("fetching data structure", "match", m, "dsUri", dsUri, "result", matched)
+	}
 
-		for _, deployment := range dsResp.Deployments {
-			if deployment.Env == DEV {
-				if dsResp.Meta.SchemaType == "" {
-					if !includeLegacy {
-						skippedCount++
-						continue
-					} else {
-						includedLegacyCount++
-						meta := dsResp.Meta
-						meta.SchemaType = "entity"
-						dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
-						res = append(res, dataStructure)
-					}
-				} else {
-					dataStructure := model.DataStructure{ApiVersion: "v1", ResourceType: "data-structure", Meta: dsResp.Meta, Data: dsDataMap[fmt.Sprintf("%s-%s-%s-%s", dsResp.Vendor, dsResp.Name, dsResp.Format, deployment.Version)]}
-					res = append(res, dataStructure)
-				}
-			}
+	return matched || len(match) == 0
+}
+
+func devDeploymentVersions(deployments []Deployment) []string {
+	var versions []string
+	for _, deployment := range deployments {
+		if deployment.Env == DEV {
+			versions = append(versions, deployment.Version)
 		}
 	}
-
-	if skippedCount > 0 {
-		slog.Info("skipped legacy data structures with empty schemaType", "count", skippedCount, "note", "use --include-legacy to include them")
-	}
-	if includedLegacyCount > 0 {
-		slog.Warn("included legacy data structures with empty schemaType, converted to 'entity'", "count", includedLegacyCount)
-	}
-
-	return res, nil
+	return versions
 }
 
 func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []string) ([]model.DataStructure, error) {
@@ -416,9 +436,11 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 		return nil, err
 	}
 
-	noFilter := len(match) == 0
 	for _, ds := range dsData {
-		dataStructure := model.DataStructure{
+		if !draftMatchesAnyPrefix(ds, match) {
+			continue
+		}
+		res = append(res, model.DataStructure{
 			ApiVersion:   "v1",
 			ResourceType: "data-structure",
 			Meta: model.DataStructureMeta{
@@ -427,26 +449,27 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 				CustomData: map[string]string{},
 			},
 			Data: ds,
-		}
-		if noFilter {
-			res = append(res, dataStructure)
-		} else {
-			if self, ok := ds["self"].(map[string]any); ok {
-				dsUri := fmt.Sprintf("%s/%s/%s", self["vendor"], self["name"], self["format"])
-				matched := false
-				for _, m := range match {
-					if strings.HasPrefix(dsUri, m) {
-						matched = true
-					}
-				}
-				if matched {
-					res = append(res, dataStructure)
-				}
-			}
-		}
+		})
 	}
 
 	return res, nil
+}
+
+func draftMatchesAnyPrefix(ds map[string]any, match []string) bool {
+	if len(match) == 0 {
+		return true
+	}
+	self, ok := ds["self"].(map[string]any)
+	if !ok {
+		return false
+	}
+	dsUri := fmt.Sprintf("%s/%s/%s", self["vendor"], self["name"], self["format"])
+	for _, m := range match {
+		if strings.HasPrefix(dsUri, m) {
+			return true
+		}
+	}
+	return false
 }
 
 func MetadateUpdate(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {

@@ -45,56 +45,61 @@ type rawAppConfig struct {
 }
 
 func loadEnvFiles(cmd *cobra.Command, baseDir string) error {
-	var envFilePaths []string
-	var isExplicitFile bool
-
-	if envFile, _ := cmd.Flags().GetString("env-file"); envFile != "" {
-		envFilePaths = append(envFilePaths, envFile)
-		isExplicitFile = true
-	} else {
-		workingDir := baseDir
-		if workingDir == "" {
-			cwd, err := os.Getwd()
-			if err == nil {
-				workingDir = cwd
-			}
-		}
-
-		if workingDir != "" {
-			envFilePaths = append(envFilePaths, filepath.Join(workingDir, ".env"))
-		}
-
-		home, err := os.UserHomeDir()
-		if err == nil {
-			envFilePaths = append(envFilePaths, filepath.Join(home, ".config", "snowplow", ".env"))
-		}
-
-		userConfigDir, err := os.UserConfigDir()
-		if err == nil {
-			envFilePaths = append(envFilePaths, filepath.Join(userConfigDir, "snowplow", ".env"))
-		}
+	envFile, _ := cmd.Flags().GetString("env-file")
+	isExplicitFile := envFile != ""
+	envFilePaths := []string{envFile}
+	if !isExplicitFile {
+		envFilePaths = defaultEnvFilePaths(baseDir)
 	}
 
 	slog.Debug("looking for .env files at", "paths", strings.Join(envFilePaths, "\n"))
 
 	for _, path := range envFilePaths {
-		if _, err := os.Stat(path); err == nil {
+		_, err := os.Stat(path)
+		if err == nil {
 			slog.Debug(".env file found at", "file", path)
 			if err := godotenv.Load(path); err != nil {
 				return fmt.Errorf("failed to load .env file %s: %w", path, err)
 			}
 			slog.Debug(".env file loaded successfully", "file", path)
 			return nil
-		} else {
-			slog.Debug(".env file not found at", "file", path, "err", err)
-			if isExplicitFile {
-				return fmt.Errorf("specified .env file not found: %s", path)
-			}
+		}
+		slog.Debug(".env file not found at", "file", path, "err", err)
+		if isExplicitFile {
+			return fmt.Errorf("specified .env file not found: %s", path)
 		}
 	}
 
 	slog.Debug("no .env file found")
 	return nil
+}
+
+func defaultEnvFilePaths(baseDir string) []string {
+	var envFilePaths []string
+
+	workingDir := baseDir
+	if workingDir == "" {
+		cwd, err := os.Getwd()
+		if err == nil {
+			workingDir = cwd
+		}
+	}
+
+	if workingDir != "" {
+		envFilePaths = append(envFilePaths, filepath.Join(workingDir, ".env"))
+	}
+
+	home, err := os.UserHomeDir()
+	if err == nil {
+		envFilePaths = append(envFilePaths, filepath.Join(home, ".config", "snowplow", ".env"))
+	}
+
+	userConfigDir, err := os.UserConfigDir()
+	if err == nil {
+		envFilePaths = append(envFilePaths, filepath.Join(userConfigDir, "snowplow", ".env"))
+	}
+
+	return envFilePaths
 }
 
 func InitConsoleConfig(cmd *cobra.Command) error {
@@ -114,8 +119,41 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		return fmt.Errorf("failed to load .env file: %w", err)
 	}
 
+	config, err := readConfigFile(cmd)
+	if err != nil {
+		return err
+	}
+
+	setErr := setFlagsFromConfigFile(cmd, config)
+	if setErr == nil {
+		setErr = setFlagsFromEnv(cmd)
+	}
+	if skipMissingCheck {
+		return setErr
+	}
+
+	required := []string{"api-key-id", "api-key", "host", "org-id"}
+	if setErr == nil {
+		required, err = requiredWithSavedLogin(cmd, required)
+		if err != nil {
+			return err
+		}
+	}
+
+	missingVars, err := missingFlags(cmd, required)
+	if err != nil {
+		return err
+	}
+	if len(missingVars) > 0 {
+		return missingConfigError(missingVars)
+	}
+
+	return setErr
+}
+
+func readConfigFile(cmd *cobra.Command) (rawAppConfig, error) {
+	var config rawAppConfig
 	var configBytes []byte
-	var err error
 	var potentialConfigs []string
 
 	if configFileName, _ := cmd.Flags().GetString("config"); configFileName != "" {
@@ -124,12 +162,12 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return config, err
 	}
 
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
-		return err
+		return config, err
 	}
 
 	configDir := filepath.Join(userConfigDir, "snowplow", "snowplow.yml")
@@ -151,19 +189,23 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		}
 	}
 
-	var config rawAppConfig
 	err = yaml.Unmarshal(configBytes, &config)
-	if err != nil {
-		return err
-	}
+	return config, err
+}
 
+func setFlagsFromConfigFile(cmd *cobra.Command, config rawAppConfig) error {
+	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if value, ok := config.Console[f.Name]; ok && !f.Changed && err == nil {
 			err = cmd.Flags().Set(f.Name, value)
 			slog.Debug("config value found in file", "flag", f.Name)
 		}
 	})
+	return err
+}
 
+func setFlagsFromEnv(cmd *cobra.Command) error {
+	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		envName := toEnvName(f.Name)
 		if value, ok := os.LookupEnv(envName); err == nil && ok && value != "" {
@@ -171,45 +213,48 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 			slog.Debug("config value found in env", "flag", f.Name, "env", envName)
 		}
 	})
+	return err
+}
 
-	required := []string{"api-key-id", "api-key", "host", "org-id"}
-	if err == nil && !skipMissingCheck {
-		login, loginErr := savedLogin(cmd)
-		if loginErr != nil {
-			return fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
-		}
-		if login != nil {
-			required = []string{"host", "org-id"}
-			if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
-				if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
-					return err
-				}
-			}
+func requiredWithSavedLogin(cmd *cobra.Command, required []string) ([]string, error) {
+	login, loginErr := savedLogin(cmd)
+	if loginErr != nil {
+		return nil, fmt.Errorf("%w\n\nRun 'snowplow-cli login' to replace it, or configure an API key", loginErr)
+	}
+	if login == nil {
+		return required, nil
+	}
+	if orgID, _ := cmd.Flags().GetString("org-id"); orgID == "" {
+		if err := cmd.Flags().Set("org-id", login.OrgID); err != nil {
+			return nil, err
 		}
 	}
+	return []string{"host", "org-id"}, nil
+}
 
+func missingFlags(cmd *cobra.Command, required []string) ([]string, error) {
 	var missingVars []string
-	if !skipMissingCheck {
-		for _, f := range required {
-			value, err := cmd.Flags().GetString(f)
-			if err != nil {
-				return err
-			}
-			if value == "" {
-				missingVars = append(missingVars, f)
-			}
+	for _, f := range required {
+		value, err := cmd.Flags().GetString(f)
+		if err != nil {
+			return nil, err
+		}
+		if value == "" {
+			missingVars = append(missingVars, f)
 		}
 	}
+	return missingVars, nil
+}
 
-	if len(missingVars) > 0 {
-		var errorMsg strings.Builder
-		if len(missingVars) == 1 {
-			fmt.Fprintf(&errorMsg, `config value "%s" not set`, missingVars[0])
-		} else {
-			fmt.Fprintf(&errorMsg, `config values not set: %s`, strings.Join(missingVars, ", "))
-		}
+func missingConfigError(missingVars []string) error {
+	var errorMsg strings.Builder
+	if len(missingVars) == 1 {
+		fmt.Fprintf(&errorMsg, `config value "%s" not set`, missingVars[0])
+	} else {
+		fmt.Fprintf(&errorMsg, `config values not set: %s`, strings.Join(missingVars, ", "))
+	}
 
-		errorMsg.WriteString(`
+	errorMsg.WriteString(`
 
 Run 'snowplow-cli login' to sign in with your browser, or provide configuration via:
   1. Command-line flags: --<name> <value>
@@ -219,24 +264,17 @@ Run 'snowplow-cli login' to sign in with your browser, or provide configuration 
 
 Required variables:`)
 
-		for _, v := range missingVars {
-			fmt.Fprintf(&errorMsg, `
+	for _, v := range missingVars {
+		fmt.Fprintf(&errorMsg, `
   %s: --%s or %s`, v, v, toEnvName(v))
-		}
+	}
 
-		errorMsg.WriteString(`
+	errorMsg.WriteString(`
 
 See 'snowplow-cli --help' for config file and .env file locations.
 Get API credentials at: https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/`)
 
-		return errors.New(errorMsg.String())
-	}
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return errors.New(errorMsg.String())
 }
 
 func savedLogin(cmd *cobra.Command) (*auth.Login, error) {

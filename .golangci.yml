@@ -20,13 +20,9 @@ linters:
     - funlen
     - gochecknoglobals
     - gochecknoinits
-    - gocognit
     - goconst
-    - gocyclo
     - gosec
     - lll
-    - maintidx
-    - nestif
     - nilnil
     - noctx
     - noinlineerr
@@ -40,9 +36,17 @@ linters:
     - usetesting
     - wrapcheck
   settings:
+    gocognit:
+      min-complexity: 90
+    gocyclo:
+      min-complexity: 42
+    maintidx:
+      under: 16
     misspell:
       ignore-rules:
         - avaliable
+    nestif:
+      min-complexity: 16
   exclusions:
     presets:
       - std-error-handling
