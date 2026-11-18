@@ -15,6 +15,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -35,12 +38,23 @@ func (b *closeCountingBody) Close() error {
 
 type closeCountingTransport struct {
 	status   int
+	body     string
 	failRead bool
+	err      error
+	requests int
 	bodies   []*closeCountingBody
 }
 
 func (tr *closeCountingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	body := &closeCountingBody{Reader: strings.NewReader(`{}`)}
+	tr.requests++
+	if tr.err != nil {
+		return nil, tr.err
+	}
+	content := tr.body
+	if content == "" {
+		content = `{}`
+	}
+	body := &closeCountingBody{Reader: strings.NewReader(content)}
 	if tr.failRead {
 		body.Reader = iotest.ErrReader(errors.New("read failed"))
 	}
@@ -57,85 +71,138 @@ func closeCountingClient(tr *closeCountingTransport) *ApiClient {
 	return &ApiClient{Http: &http.Client{Transport: tr}, Jwt: "token", BaseUrl: "http://console.test", OrgId: "orgid"}
 }
 
-func Test_RequestFunctionsCloseEveryResponseBodyOnce(t *testing.T) {
-	calls := []struct {
-		name string
-		call func(ctx context.Context, c *ApiClient) error
-	}{
-		{"GetDataProductsAndRelatedResources", func(ctx context.Context, c *ApiClient) error {
+type requestCall struct {
+	name string
+	body string
+	call func(ctx context.Context, c *ApiClient) error
+}
+
+func dataProductRequestCalls() []requestCall {
+	return []requestCall{
+		{"GetDataProductsAndRelatedResources", "", func(ctx context.Context, c *ApiClient) error {
 			_, err := GetDataProductsAndRelatedResources(ctx, c)
 			return err
 		}},
-		{"CompatCheck", func(ctx context.Context, c *ApiClient) error {
+		{"CompatCheck", "", func(ctx context.Context, c *ApiClient) error {
 			_, err := CompatCheck(ctx, c, CompatCheckable{}, nil)
 			return err
 		}},
-		{"CreateSourceApp", func(ctx context.Context, c *ApiClient) error {
+		{"CreateSourceApp", "", func(ctx context.Context, c *ApiClient) error {
 			return CreateSourceApp(ctx, c, RemoteSourceApplication{})
 		}},
-		{"UpdateSourceApp", func(ctx context.Context, c *ApiClient) error {
+		{"UpdateSourceApp", "", func(ctx context.Context, c *ApiClient) error {
 			return UpdateSourceApp(ctx, c, RemoteSourceApplication{})
 		}},
-		{"DeleteSourceApp", func(ctx context.Context, c *ApiClient) error {
+		{"DeleteSourceApp", "", func(ctx context.Context, c *ApiClient) error {
 			return DeleteSourceApp(ctx, c, RemoteSourceApplication{})
 		}},
-		{"CreateDataProduct", func(ctx context.Context, c *ApiClient) error {
+		{"CreateDataProduct", "", func(ctx context.Context, c *ApiClient) error {
 			return CreateDataProduct(ctx, c, RemoteDataProduct{})
 		}},
-		{"UpdateDataProduct", func(ctx context.Context, c *ApiClient) error {
+		{"UpdateDataProduct", "", func(ctx context.Context, c *ApiClient) error {
 			return UpdateDataProduct(ctx, c, RemoteDataProduct{})
 		}},
-		{"DeleteDataProduct", func(ctx context.Context, c *ApiClient) error {
+		{"DeleteDataProduct", "", func(ctx context.Context, c *ApiClient) error {
 			return DeleteDataProduct(ctx, c, RemoteDataProduct{})
 		}},
-		{"CreateEventSpec", func(ctx context.Context, c *ApiClient) error {
+		{"CreateEventSpec", "", func(ctx context.Context, c *ApiClient) error {
 			return CreateEventSpec(ctx, c, RemoteEventSpec{}, nil)
 		}},
-		{"UpdateEventSpec", func(ctx context.Context, c *ApiClient) error {
+		{"UpdateEventSpec", "", func(ctx context.Context, c *ApiClient) error {
 			return UpdateEventSpec(ctx, c, RemoteEventSpec{}, nil)
 		}},
-		{"DeleteEventSpec", func(ctx context.Context, c *ApiClient) error {
+		{"DeleteEventSpec", "", func(ctx context.Context, c *ApiClient) error {
 			return DeleteEventSpec(ctx, c, "id")
 		}},
-		{"BatchPublishEventSpecs", func(ctx context.Context, c *ApiClient) error {
+		{"BatchPublishEventSpecs", "", func(ctx context.Context, c *ApiClient) error {
 			return BatchPublishEventSpecs(ctx, c, []string{"id"}, nil)
 		}},
-		{"GetDataStructureListing", func(ctx context.Context, c *ApiClient) error {
+	}
+}
+
+func dataStructureRequestCalls() []requestCall {
+	return []requestCall{
+		{"Validate", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := Validate(ctx, c, model.DataStructure{})
+			return err
+		}},
+		{"publish", `{"success":true}`, func(ctx context.Context, c *ApiClient) error {
+			_, err := publish(ctx, c, VALIDATED, DEV, model.DataStructure{}, false)
+			return err
+		}},
+		{"GetIgluCentralListing", `[]`, func(ctx context.Context, c *ApiClient) error {
+			_, err := GetIgluCentralListing(ctx, c)
+			return err
+		}},
+		{"GetDataStructureListing", `[]`, func(ctx context.Context, c *ApiClient) error {
 			_, err := GetDataStructureListing(ctx, c)
 			return err
 		}},
-		{"GetDataStructureDeployments", func(ctx context.Context, c *ApiClient) error {
+		{"GetDataStructureDeployments", `[]`, func(ctx context.Context, c *ApiClient) error {
 			_, err := GetDataStructureDeployments(ctx, c, "hash")
 			return err
 		}},
-		{"GetAllDataStructuresDrafts", func(ctx context.Context, c *ApiClient) error {
+		{"getLatestSchemaVersions", `[]`, func(ctx context.Context, c *ApiClient) error {
+			_, err := getLatestSchemaVersions(ctx, c)
+			return err
+		}},
+		{"GetAllDataStructuresDrafts", `[]`, func(ctx context.Context, c *ApiClient) error {
 			_, err := GetAllDataStructuresDrafts(ctx, c, nil)
 			return err
 		}},
-		{"patchMeta", func(ctx context.Context, c *ApiClient) error {
+		{"patchMeta", "", func(ctx context.Context, c *ApiClient) error {
 			return patchMeta(ctx, c, &model.DataStructureSelf{}, fullMeta{})
 		}},
-		{"GetImage", func(ctx context.Context, c *ApiClient) error {
-			_, _, err := GetImage(ctx, c, c.BaseUrl+"/image")
+		{"fetchMigration", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := fetchMigration(ctx, c, "snowflake", model.DataStructureSelf{}, nil)
 			return err
 		}},
-		{"GetImageHashLookup", func(ctx context.Context, c *ApiClient) error {
-			_, err := GetImageHashLookup(ctx, c)
-			return err
-		}},
-		{"createImageUploadLink", func(ctx context.Context, c *ApiClient) error {
-			_, err := createImageUploadLink(ctx, c)
-			return err
-		}},
-		{"confirmImage", func(ctx context.Context, c *ApiClient) error {
-			_, err := confirmImage(ctx, c, "id", "hash")
-			return err
-		}},
-		{"fetchDestinations", func(ctx context.Context, c *ApiClient) error {
+		{"fetchDestinations", `[]`, func(ctx context.Context, c *ApiClient) error {
 			_, err := fetchDestinations(ctx, c)
 			return err
 		}},
 	}
+}
+
+func imageAndAPIKeyRequestCalls(t *testing.T) []requestCall {
+	t.Helper()
+	image := filepath.Join(t.TempDir(), "image.png")
+	if err := os.WriteFile(image, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return []requestCall{
+		{"GetImage", "", func(ctx context.Context, c *ApiClient) error {
+			_, _, err := GetImage(ctx, c, c.BaseUrl+"/image")
+			return err
+		}},
+		{"GetImageHashLookup", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := GetImageHashLookup(ctx, c)
+			return err
+		}},
+		{"createImageUploadLink", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := createImageUploadLink(ctx, c)
+			return err
+		}},
+		{"uploadImage", `{"success":true}`, func(ctx context.Context, c *ApiClient) error {
+			return uploadImage(ctx, c, image, &imageUploadLinkResponse{UploadURL: "http://upload.test", Id: "id"})
+		}},
+		{"confirmImage", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := confirmImage(ctx, c, "id", "hash")
+			return err
+		}},
+		{"postAPIKey", "", func(ctx context.Context, c *ApiClient) error {
+			_, err := postAPIKey(ctx, c, c.BaseUrl+"/credentials/v3/api-keys", "description", nil)
+			return err
+		}},
+	}
+}
+
+func requestCalls(t *testing.T) []requestCall {
+	t.Helper()
+	return slices.Concat(dataProductRequestCalls(), dataStructureRequestCalls(), imageAndAPIKeyRequestCalls(t))
+}
+
+func Test_RequestFunctionsCloseEveryResponseBodyOnce(t *testing.T) {
 	responses := []struct {
 		name     string
 		status   int
@@ -150,10 +217,10 @@ func Test_RequestFunctionsCloseEveryResponseBodyOnce(t *testing.T) {
 		{"500 with a failing body", http.StatusInternalServerError, true},
 	}
 
-	for _, call := range calls {
+	for _, call := range requestCalls(t) {
 		for _, response := range responses {
 			t.Run(call.name+"/"+response.name, func(t *testing.T) {
-				tr := &closeCountingTransport{status: response.status, failRead: response.failRead}
+				tr := &closeCountingTransport{status: response.status, body: call.body, failRead: response.failRead}
 
 				err := call.call(t.Context(), closeCountingClient(tr))
 
@@ -167,6 +234,53 @@ func Test_RequestFunctionsCloseEveryResponseBodyOnce(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func Test_RequestFunctionsCloseTheBodyOnceWhenTheySucceed(t *testing.T) {
+	for _, call := range requestCalls(t) {
+		t.Run(call.name, func(t *testing.T) {
+			var errs []error
+			for _, status := range []int{http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusNoContent} {
+				tr := &closeCountingTransport{status: status, body: call.body}
+
+				err := call.call(t.Context(), closeCountingClient(tr))
+
+				if err != nil {
+					errs = append(errs, err)
+					continue
+				}
+				for i, body := range tr.bodies {
+					if body.closes != 1 {
+						t.Errorf("body of request %d closed %d times after a success with status %d, want 1", i+1, body.closes, status)
+					}
+				}
+				return
+			}
+			t.Errorf("call never succeeded, so its success return is not covered: %v", errs)
+		})
+	}
+}
+
+func Test_RequestFunctionsReturnAnErrorWhenTheRequestFails(t *testing.T) {
+	for _, call := range requestCalls(t) {
+		t.Run(call.name, func(t *testing.T) {
+			tr := &closeCountingTransport{err: errors.New("request failed")}
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("panicked on a failed request: %v", r)
+				}
+			}()
+
+			err := call.call(t.Context(), closeCountingClient(tr))
+
+			if err == nil {
+				t.Errorf("got no error, want the failed request reported")
+			}
+			if tr.requests == 0 {
+				t.Errorf("no request was made, call returned: %v", err)
+			}
+		})
 	}
 }
 
