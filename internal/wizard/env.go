@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package wizard
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"os"
@@ -48,19 +49,19 @@ func upsertDotenv(path string, values map[string]string) error {
 	return os.Chmod(path, 0600)
 }
 
-func git(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+func git(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err
 }
 
-func gitDirty(dir string) bool {
-	out, err := git(dir, "status", "--porcelain")
+func gitDirty(ctx context.Context, dir string) bool {
+	out, err := git(ctx, dir, "status", "--porcelain")
 	return err == nil && out != ""
 }
 
-func envTracked(dir string) bool {
-	_, err := git(dir, "ls-files", "--error-unmatch", "--", ".env")
+func envTracked(ctx context.Context, dir string) bool {
+	_, err := git(ctx, dir, "ls-files", "--error-unmatch", "--", ".env")
 	return err == nil
 }

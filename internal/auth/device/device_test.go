@@ -28,7 +28,17 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func createTestJWTWithOrg(userEmail, userName, userSub, orgID string) string {
+func marshalInTest(t *testing.T, v any) []byte {
+	t.Helper()
+	out, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func createTestJWTWithOrg(t *testing.T, userEmail, userName, userSub, orgID string) string {
+	t.Helper()
 	header := map[string]any{
 		"alg": "HS256",
 		"typ": "JWT",
@@ -49,10 +59,10 @@ func createTestJWTWithOrg(userEmail, userName, userSub, orgID string) string {
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
 
-	headerBytes, _ := json.Marshal(header)
+	headerBytes := marshalInTest(t, header)
 	encodedHeader := base64.RawURLEncoding.EncodeToString(headerBytes)
 
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 
 	signature := base64.RawURLEncoding.EncodeToString([]byte("fake-signature"))
@@ -61,7 +71,7 @@ func createTestJWTWithOrg(userEmail, userName, userSub, orgID string) string {
 }
 
 func Test_getOrgIDFromJWT_Success(t *testing.T) {
-	token := createTestJWTWithOrg("test@example.com", "Test User", "test-sub-123", "org-123")
+	token := createTestJWTWithOrg(t, "test@example.com", "Test User", "test-sub-123", "org-123")
 
 	orgID, err := getOrgIDFromJWT(token)
 
@@ -129,7 +139,7 @@ func Test_getOrgIDFromJWT_InvalidJSON(t *testing.T) {
 
 func Test_getOrgIDFromJWT_MissingSnowplowRoles(t *testing.T) {
 	payload := map[string]any{"sub": "test-sub"}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -150,7 +160,7 @@ func Test_getOrgIDFromJWT_MissingUserInfo(t *testing.T) {
 			"admin": map[string]any{"level": "org"},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -174,7 +184,7 @@ func Test_getOrgIDFromJWT_MissingOrganizationInfo(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -201,7 +211,7 @@ func Test_getOrgIDFromJWT_MissingOrganizationID(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -220,7 +230,7 @@ func Test_getOrgIDFromJWT_RolesNotMap(t *testing.T) {
 		"sub":                                 "test-sub",
 		"https://snowplowanalytics.com/roles": "not-a-map",
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -241,7 +251,7 @@ func Test_getOrgIDFromJWT_UserInfoNotMap(t *testing.T) {
 			"user": "not-a-map",
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -266,7 +276,7 @@ func Test_getOrgIDFromJWT_OrganizationInfoNotMap(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -293,7 +303,7 @@ func Test_getOrgIDFromJWT_OrganizationIDNotString(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -320,7 +330,7 @@ func Test_getOrgIDFromJWT_EmptyOrganizationID(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 

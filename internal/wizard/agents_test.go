@@ -88,13 +88,13 @@ func fakeBin(t *testing.T, name string) string {
 
 func TestLaunch(t *testing.T) {
 	bin := fakeBin(t, "claude")
-	if err := launch(bin, []string{"the prompt"}); err != nil {
+	if err := launch(t.Context(), bin, []string{"the prompt"}); err != nil {
 		t.Fatal(err)
 	}
 	if args, _ := os.ReadFile(bin + ".args"); string(args) != "the prompt\n--\n" {
 		t.Fatalf("unexpected args %q", args)
 	}
-	if err := launch(filepath.Join(t.TempDir(), "missing"), nil); err == nil {
+	if err := launch(t.Context(), filepath.Join(t.TempDir(), "missing"), nil); err == nil {
 		t.Fatal("expected an error when the agent can't start")
 	}
 }
