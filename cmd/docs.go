@@ -111,7 +111,7 @@ var docsCommand = &cobra.Command{
 		combinedContent.WriteString("---\n")
 		combinedContent.WriteString("title: \"Snowplow CLI command reference\"\n")
 		combinedContent.WriteString("sidebar_label: \"Command reference\"\n")
-		combinedContent.WriteString(fmt.Sprintf("date: %s\n", time.Now().Format("2006-01-02")))
+		fmt.Fprintf(&combinedContent, "date: %s\n", time.Now().Format("2006-01-02"))
 		combinedContent.WriteString("sidebar_position: 0\n")
 		combinedContent.WriteString("description: \"Complete reference for Snowplow CLI commands including data-products and data-structures subcommands with options and usage examples.\"\n")
 		combinedContent.WriteString("keywords: [\"Snowplow CLI reference\", \"CLI commands\", \"command options\", \"CLI documentation\"]\n")
@@ -126,7 +126,7 @@ var docsCommand = &cobra.Command{
 		// Add each command's content with appropriate heading
 		for _, doc := range allContent {
 			caser := cases.Title(language.English)
-			combinedContent.WriteString(fmt.Sprintf("## %s\n\n", caser.String(doc.title)))
+			fmt.Fprintf(&combinedContent, "## %s\n\n", caser.String(doc.title))
 			combinedContent.WriteString(doc.content)
 			combinedContent.WriteString("\n\n")
 		}

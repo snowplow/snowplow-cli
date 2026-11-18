@@ -205,9 +205,9 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 	if len(missingVars) > 0 {
 		var errorMsg strings.Builder
 		if len(missingVars) == 1 {
-			errorMsg.WriteString(fmt.Sprintf(`config value "%s" not set`, missingVars[0]))
+			fmt.Fprintf(&errorMsg, `config value "%s" not set`, missingVars[0])
 		} else {
-			errorMsg.WriteString(fmt.Sprintf(`config values not set: %s`, strings.Join(missingVars, ", ")))
+			fmt.Fprintf(&errorMsg, `config values not set: %s`, strings.Join(missingVars, ", "))
 		}
 
 		errorMsg.WriteString(`
@@ -221,8 +221,8 @@ Run 'snowplow-cli login' to sign in with your browser, or provide configuration 
 Required variables:`)
 
 		for _, v := range missingVars {
-			errorMsg.WriteString(fmt.Sprintf(`
-  %s: --%s or %s`, v, v, toEnvName(v)))
+			fmt.Fprintf(&errorMsg, `
+  %s: --%s or %s`, v, v, toEnvName(v))
 		}
 
 		errorMsg.WriteString(`
