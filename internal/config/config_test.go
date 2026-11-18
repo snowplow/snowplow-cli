@@ -49,6 +49,11 @@ func unsetConsoleEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
 }
 
 func Test_ConfigFromFile(t *testing.T) {

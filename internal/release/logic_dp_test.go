@@ -97,11 +97,11 @@ func Test_ReadLocalDataProducts(t *testing.T) {
 
 	result, err := ReadLocalDataProducts(context.Background(), input)
 	if err != nil {
-		t.Errorf("ReadLocalDataProducts_Test error %v", err)
+		t.Fatalf("ReadLocalDataProducts() error %v", err)
 	}
 
 	sourceAppsInAnyOrder := cmpopts.SortSlices(func(a, b model.SourceApp) bool { return a.ResourceName < b.ResourceName })
-	if diff := cmp.Diff(expected, *result, sourceAppsInAnyOrder); diff != "" {
+	if diff := cmp.Diff(expected, *result, sourceAppsInAnyOrder, cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
 		t.Errorf("ReadLocalDataProducts() mismatch (-want +got):\n%s", diff)
 	}
 }
