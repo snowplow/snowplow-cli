@@ -1,5 +1,69 @@
 version: "2"
 linters:
+  default: all
+  disable:
+    - exhaustruct
+    - exhaustruct_v5
+    - gomodguard
+    - mnd
+    - nlreturn
+    - varnamelen
+    - wsl
+    - wsl_v5
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - cyclop
+    - depguard
+    - dupl
+    - embeddedstructfieldcheck
+    - err113
+    - errchkjson
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - funcorder
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godoclint
+    - godot
+    - gosec
+    - intrange
+    - ireturn
+    - lll
+    - maintidx
+    - mirror
+    - misspell
+    - modernize
+    - musttag
+    - nestif
+    - nilnil
+    - noctx
+    - noinlineerr
+    - nonamedreturns
+    - paralleltest
+    - perfsprint
+    - prealloc
+    - predeclared
+    - recvcheck
+    - revive
+    - sloglint
+    - tagalign
+    - tagliatelle
+    - testpackage
+    - thelper
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - whitespace
+    - wrapcheck
   exclusions:
     presets:
       - std-error-handling
