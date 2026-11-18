@@ -62,44 +62,15 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeO
 		return nil, fmt.Errorf("failed to initiate device authentication flow: %w", err)
 	}
 
-	yellow := color.New(color.FgYellow, color.Bold)
 	green := color.New(color.FgGreen)
-	cyan := color.New(color.FgCyan)
 
 	authURL := deviceAuth.VerificationURIComplete
 	if authURL == "" {
 		authURL = deviceAuth.VerificationURI
 	}
 
-	fmt.Printf("You must sign in to continue. Would you like to sign in (Y/n)?")
-
-	var openBrowser string
-	browserOpened := false
-
-	_, _ = fmt.Scanln(&openBrowser)
-
-	if openBrowser == "" || strings.ToLower(openBrowser) == "y" {
-		if err := browser.OpenURL(authURL); err == nil {
-			browserOpened = true
-			green.Printf("\n✓ Opened %s in your browser\n", authURL)
-		}
-	}
-
-	if !browserOpened {
-		fmt.Printf("\n! Please manually open this URL in your browser:\n")
-	} else {
-		fmt.Printf("If the browser didn't open, manually visit:\n")
-	}
-	cyan.Printf("  %s\n", authURL)
-
-	if deviceAuth.VerificationURIComplete == "" {
-		fmt.Printf("Then enter the code: ")
-		yellow.Printf("%s\n", deviceAuth.UserCode)
-	} else {
-		fmt.Printf("(Your verification code ")
-		yellow.Printf("%s", deviceAuth.UserCode)
-		fmt.Printf(" should be pre-filled)\n")
-	}
+	browserOpened := askAndOpenSignInPage(authURL)
+	printSignInInstructions(deviceAuth, authURL, browserOpened)
 
 	fmt.Printf("\n⠋ Waiting for authentication...")
 
@@ -130,27 +101,73 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeO
 		return nil, errors.New("no organizations found for your account")
 	}
 
-	var selectedOrg *console.Organization
-	home := getDefaultIndex(organizations, jwtOrgID)
-
-	switch {
-	case len(organizations) == 1:
-		selectedOrg = &organizations[0]
-		green.Printf("✓ Found organization: %s\n", selectedOrg.Name)
-	case homeOrgOnly && home >= 0:
-		selectedOrg = &organizations[home]
-		green.Printf("✓ Using your organization: %s\n", selectedOrg.Name)
-	default:
-		selectedOrg, err = selectOrganization(organizations, jwtOrgID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to select organization: %w", err)
-		}
-		green.Printf("✓ Selected organization: %s\n", selectedOrg.Name)
+	selectedOrg, err := pickOrganizationAndPrintIt(organizations, jwtOrgID, homeOrgOnly)
+	if err != nil {
+		return nil, err
 	}
 
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
 	return &Session{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, Expiry: token.Expiry, Email: userInfo.Email, Org: *selectedOrg, HomeOrgID: jwtOrgID}, nil
+}
+
+func askAndOpenSignInPage(authURL string) bool {
+	fmt.Printf("You must sign in to continue. Would you like to sign in (Y/n)?")
+
+	var openBrowser string
+	_, _ = fmt.Scanln(&openBrowser)
+
+	if openBrowser != "" && strings.ToLower(openBrowser) != "y" {
+		return false
+	}
+	if err := browser.OpenURL(authURL); err != nil {
+		return false
+	}
+
+	color.New(color.FgGreen).Printf("\n✓ Opened %s in your browser\n", authURL)
+	return true
+}
+
+func printSignInInstructions(deviceAuth *oauth2.DeviceAuthResponse, authURL string, browserOpened bool) {
+	yellow := color.New(color.FgYellow, color.Bold)
+	cyan := color.New(color.FgCyan)
+
+	if !browserOpened {
+		fmt.Printf("\n! Please manually open this URL in your browser:\n")
+	} else {
+		fmt.Printf("If the browser didn't open, manually visit:\n")
+	}
+	cyan.Printf("  %s\n", authURL)
+
+	if deviceAuth.VerificationURIComplete == "" {
+		fmt.Printf("Then enter the code: ")
+		yellow.Printf("%s\n", deviceAuth.UserCode)
+	} else {
+		fmt.Printf("(Your verification code ")
+		yellow.Printf("%s", deviceAuth.UserCode)
+		fmt.Printf(" should be pre-filled)\n")
+	}
+}
+
+func pickOrganizationAndPrintIt(organizations []console.Organization, jwtOrgID string, homeOrgOnly bool) (*console.Organization, error) {
+	green := color.New(color.FgGreen)
+	home := getDefaultIndex(organizations, jwtOrgID)
+
+	if len(organizations) == 1 {
+		green.Printf("✓ Found organization: %s\n", organizations[0].Name)
+		return &organizations[0], nil
+	}
+	if homeOrgOnly && home >= 0 {
+		green.Printf("✓ Using your organization: %s\n", organizations[home].Name)
+		return &organizations[home], nil
+	}
+
+	selectedOrg, err := selectOrganization(organizations, jwtOrgID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select organization: %w", err)
+	}
+	green.Printf("✓ Selected organization: %s\n", selectedOrg.Name)
+	return selectedOrg, nil
 }
 
 func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceAuth *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {

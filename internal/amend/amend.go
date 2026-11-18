@@ -146,43 +146,9 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 		return []byte{}, fmt.Errorf("failed to parse data product YAML: %w", err)
 	}
 
-	mappingNode, ok := node.(*ast.MappingNode)
-	if !ok {
-		return []byte{}, errors.New("root node is not a mapping")
-	}
-
-	var dataValue ast.Node
-	for _, value := range mappingNode.Values {
-		mapValue := value
-		if mapValue.Key.String() == "data" {
-			dataValue = mapValue.Value
-			break
-		}
-	}
-	if dataValue == nil {
-		return []byte{}, errors.New("'data' key not found")
-	}
-
-	dataMappingNode, ok := dataValue.(*ast.MappingNode)
-	if !ok {
-		return []byte{}, errors.New("data value is not a mapping")
-	}
-
-	var eventSpecsValue ast.Node
-	for _, value := range dataMappingNode.Values {
-		mapValue := value
-		if mapValue.Key.String() == "eventSpecifications" {
-			eventSpecsValue = mapValue.Value
-			break
-		}
-	}
-	if eventSpecsValue == nil {
-		return []byte{}, errors.New("'eventSpecifications' key not found")
-	}
-
-	arrayNode, ok := eventSpecsValue.(*ast.SequenceNode)
-	if !ok {
-		return []byte{}, errors.New("data.eventSpecifications is not an array")
+	arrayNode, err := eventSpecificationsNode(node)
+	if err != nil {
+		return []byte{}, err
 	}
 
 	// if array is empty and is represented by [], switch to block style, and alight it back
@@ -194,22 +160,9 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 	}
 
 	for _, eventSpec := range ess {
-		// marshal the event spec using gopkg.in/yaml.v3 to use custom marshaler
-		specBytes, err := googleyaml.Marshal(eventSpec)
-		if err != nil {
-			return []byte{}, fmt.Errorf("failed to marshal event spec: %w", err)
+		if err := appendEventSpecToYamlArray(arrayNode, eventSpec); err != nil {
+			return []byte{}, err
 		}
-
-		var specNode ast.Node
-		if err := yaml.Unmarshal(specBytes, &specNode); err != nil {
-			return []byte{}, fmt.Errorf("failed to parse event spec YAML: %w", err)
-		}
-
-		if mappingNode, ok := specNode.(*ast.MappingNode); ok {
-			mappingNode.SetIsFlowStyle(arrayNode.IsFlowStyle)
-		}
-
-		arrayNode.Values = append(arrayNode.Values, specNode)
 	}
 
 	// marshal back to YAML with preserved formatting and comments
@@ -219,6 +172,27 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 	}
 
 	return output, nil
+}
+
+func appendEventSpecToYamlArray(arrayNode *ast.SequenceNode, eventSpec model.EventSpecCanonical) error {
+	// marshal the event spec using gopkg.in/yaml.v3 to use custom marshaler
+	specBytes, err := googleyaml.Marshal(eventSpec)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event spec: %w", err)
+	}
+
+	var specNode ast.Node
+	if err := yaml.Unmarshal(specBytes, &specNode); err != nil {
+		return fmt.Errorf("failed to parse event spec YAML: %w", err)
+	}
+
+	if mappingNode, ok := specNode.(*ast.MappingNode); ok {
+		mappingNode.SetIsFlowStyle(arrayNode.IsFlowStyle)
+	}
+
+	arrayNode.Values = append(arrayNode.Values, specNode)
+
+	return nil
 }
 
 func SetEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) error {
@@ -307,14 +281,7 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 			return nil, fmt.Errorf("version of event specification %d not found", idx)
 		}
 
-		var values []*ast.MappingValueNode
-		switch n := arrayNode.Values[idx].(type) {
-		case *ast.MappingNode:
-			values = n.Values
-		case *ast.MappingValueNode:
-			values = []*ast.MappingValueNode{n}
-		}
-
+		values := mappingValuesOf(arrayNode.Values[idx])
 		versionIdx := slices.IndexFunc(values, func(v *ast.MappingValueNode) bool { return v.Key.String() == "version" })
 		if versionIdx < 0 {
 			return nil, fmt.Errorf("version of event specification %d not found", idx)
@@ -333,6 +300,17 @@ func setVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	}
 
 	return withLineEndingsOf(file, output), nil
+}
+
+func mappingValuesOf(node ast.Node) []*ast.MappingValueNode {
+	switch n := node.(type) {
+	case *ast.MappingNode:
+		return n.Values
+	case *ast.MappingValueNode:
+		return []*ast.MappingValueNode{n}
+	default:
+		return nil
+	}
 }
 
 func AddEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) error {
@@ -377,42 +355,64 @@ func AddEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName s
 func addVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	content := string(file)
 
-	count := gjson.Get(content, "data.eventSpecifications.#").Int()
-
-	for idx := range versionsByIndex {
-		if idx < 0 || int64(idx) >= count {
-			return nil, fmt.Errorf("event specification %d not found", idx)
-		}
-		if gjson.Get(content, fmt.Sprintf("data.eventSpecifications.%d.version", idx)).Exists() {
-			return nil, fmt.Errorf("event specification %d already declares a version", idx)
-		}
+	if err := checkJsonSpecsExistWithoutVersion(content, versionsByIndex); err != nil {
+		return nil, err
 	}
 
 	for idx, version := range versionsByIndex {
 		path := fmt.Sprintf("data.eventSpecifications.%d", idx)
-		versionMember := fmt.Sprintf(`"version":%d`, version)
 
-		var members []string
-		added := false
-		gjson.Get(content, path).ForEach(func(key, value gjson.Result) bool {
-			members = append(members, key.Raw+":"+value.Raw)
-			if key.String() == "name" {
-				members = append(members, versionMember)
-				added = true
-			}
-			return true
-		})
-		if !added {
-			members = append(members, versionMember)
-		}
-
-		updated, err := sjson.SetRaw(content, path, "{"+strings.Join(members, ",")+"}")
+		updated, err := sjson.SetRaw(content, path, jsonSpecWithVersionAfterName(gjson.Get(content, path), version))
 		if err != nil {
 			return nil, err
 		}
 		content = updated
 	}
 
+	output, err := indentJsonKeepingFinalNewline(content, file)
+	if err != nil {
+		return nil, err
+	}
+
+	return withLineEndingsOf(file, output), nil
+}
+
+func checkJsonSpecsExistWithoutVersion(content string, versionsByIndex map[int]int) error {
+	count := gjson.Get(content, "data.eventSpecifications.#").Int()
+
+	for idx := range versionsByIndex {
+		if idx < 0 || int64(idx) >= count {
+			return fmt.Errorf("event specification %d not found", idx)
+		}
+		if gjson.Get(content, fmt.Sprintf("data.eventSpecifications.%d.version", idx)).Exists() {
+			return fmt.Errorf("event specification %d already declares a version", idx)
+		}
+	}
+
+	return nil
+}
+
+func jsonSpecWithVersionAfterName(spec gjson.Result, version int) string {
+	versionMember := fmt.Sprintf(`"version":%d`, version)
+
+	var members []string
+	added := false
+	spec.ForEach(func(key, value gjson.Result) bool {
+		members = append(members, key.Raw+":"+value.Raw)
+		if key.String() == "name" {
+			members = append(members, versionMember)
+			added = true
+		}
+		return true
+	})
+	if !added {
+		members = append(members, versionMember)
+	}
+
+	return "{" + strings.Join(members, ",") + "}"
+}
+
+func indentJsonKeepingFinalNewline(content string, file []byte) ([]byte, error) {
 	var compacted bytes.Buffer
 	if err := json.Compact(&compacted, []byte(content)); err != nil {
 		return nil, fmt.Errorf("failed to compact data product JSON: %w", err)
@@ -426,7 +426,7 @@ func addVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 		output = append(output, '\n')
 	}
 
-	return withLineEndingsOf(file, output), nil
+	return output, nil
 }
 
 // The version goes right after the name, where dp download writes it.
@@ -443,44 +443,23 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	}
 
 	for idx, version := range versionsByIndex {
-		if idx < 0 || idx >= len(arrayNode.Values) {
-			return nil, fmt.Errorf("event specification %d not found", idx)
+		specNode, err := eventSpecMappingNode(arrayNode, idx)
+		if err != nil {
+			return nil, err
 		}
 
-		var specNode *ast.MappingNode
-		switch n := arrayNode.Values[idx].(type) {
-		case *ast.MappingNode:
-			specNode = n
-		case *ast.MappingValueNode:
-			specNode = ast.Mapping(n.GetToken(), n.IsFlowStyle, n)
-		default:
-			return nil, fmt.Errorf("event specification %d is not a mapping", idx)
-		}
-
-		nameIdx := -1
-		for i, v := range specNode.Values {
-			switch v.Key.String() {
-			case "version":
-				return nil, fmt.Errorf("event specification %d already declares a version", idx)
-			case "name":
-				nameIdx = i
-			}
-		}
-		if nameIdx < 0 {
-			return nil, fmt.Errorf("name of event specification %d not found", idx)
+		nameIdx, err := nameIndexOfSpecWithoutVersion(specNode, idx)
+		if err != nil {
+			return nil, err
 		}
 
 		indent := strings.Repeat(" ", specNode.Values[nameIdx].Key.GetToken().Position.Column-1)
-		var versionNode ast.Node
-		if err := yaml.Unmarshal([]byte(fmt.Sprintf("%sversion: %d", indent, version)), &versionNode); err != nil {
-			return nil, fmt.Errorf("failed to parse version YAML: %w", err)
-		}
-		versionMapping, ok := versionNode.(*ast.MappingNode)
-		if !ok || len(versionMapping.Values) != 1 {
-			return nil, fmt.Errorf("failed to build version of event specification %d", idx)
+		versionValue, err := versionMappingValueNode(indent, version, idx)
+		if err != nil {
+			return nil, err
 		}
 
-		specNode.Values = slices.Insert(specNode.Values, nameIdx+1, versionMapping.Values[0])
+		specNode.Values = slices.Insert(specNode.Values, nameIdx+1, versionValue)
 		arrayNode.Values[idx] = specNode
 	}
 
@@ -490,6 +469,51 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 	}
 
 	return withLineEndingsOf(file, output), nil
+}
+
+func eventSpecMappingNode(arrayNode *ast.SequenceNode, idx int) (*ast.MappingNode, error) {
+	if idx < 0 || idx >= len(arrayNode.Values) {
+		return nil, fmt.Errorf("event specification %d not found", idx)
+	}
+
+	switch n := arrayNode.Values[idx].(type) {
+	case *ast.MappingNode:
+		return n, nil
+	case *ast.MappingValueNode:
+		return ast.Mapping(n.GetToken(), n.IsFlowStyle, n), nil
+	default:
+		return nil, fmt.Errorf("event specification %d is not a mapping", idx)
+	}
+}
+
+func nameIndexOfSpecWithoutVersion(specNode *ast.MappingNode, idx int) (int, error) {
+	nameIdx := -1
+	for i, v := range specNode.Values {
+		switch v.Key.String() {
+		case "version":
+			return 0, fmt.Errorf("event specification %d already declares a version", idx)
+		case "name":
+			nameIdx = i
+		}
+	}
+	if nameIdx < 0 {
+		return 0, fmt.Errorf("name of event specification %d not found", idx)
+	}
+
+	return nameIdx, nil
+}
+
+func versionMappingValueNode(indent string, version int, idx int) (*ast.MappingValueNode, error) {
+	var versionNode ast.Node
+	if err := yaml.Unmarshal([]byte(fmt.Sprintf("%sversion: %d", indent, version)), &versionNode); err != nil {
+		return nil, fmt.Errorf("failed to parse version YAML: %w", err)
+	}
+	versionMapping, ok := versionNode.(*ast.MappingNode)
+	if !ok || len(versionMapping.Values) != 1 {
+		return nil, fmt.Errorf("failed to build version of event specification %d", idx)
+	}
+
+	return versionMapping.Values[0], nil
 }
 
 func eventSpecificationsNode(node ast.Node) (*ast.SequenceNode, error) {

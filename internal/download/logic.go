@@ -34,25 +34,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 			versionedDpIds[dp.Id] = true
 		}
 	} else if root, err := filepath.EvalSymlinks(files.DataProductsLocation); err == nil {
-		existing := map[string]map[string]any{}
-		_ = filepath.WalkDir(root, func(path string, di fs.DirEntry, err error) error {
-			if err != nil {
-				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
-				return nil
-			}
-			ext := filepath.Ext(path)
-			if di.IsDir() || (ext != ".json" && ext != ".yaml" && ext != ".yml") {
-				return nil
-			}
-			resources, err := util.MaybeResourcesfromPaths([]string{path})
-			if err != nil {
-				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
-				return nil
-			}
-			maps.Copy(existing, resources)
-			return nil
-		})
-		versionedDpIds = dataProductsDeclaringVersions(existing)
+		versionedDpIds = dataProductsDeclaringVersions(readExistingResourcesLoggingUnreadable(root))
 	}
 
 	sas := remoteSasToLocalResources(res.SourceApplication)
@@ -86,6 +68,28 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 
 	slog.Info("download", "msg", "wrote data products", "count", len(dps))
 	return nil
+}
+
+func readExistingResourcesLoggingUnreadable(root string) map[string]map[string]any {
+	existing := map[string]map[string]any{}
+	_ = filepath.WalkDir(root, func(path string, di fs.DirEntry, err error) error {
+		if err != nil {
+			slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
+			return nil
+		}
+		ext := filepath.Ext(path)
+		if di.IsDir() || (ext != ".json" && ext != ".yaml" && ext != ".yml") {
+			return nil
+		}
+		resources, err := util.MaybeResourcesfromPaths([]string{path})
+		if err != nil {
+			slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
+			return nil
+		}
+		maps.Copy(existing, resources)
+		return nil
+	})
+	return existing
 }
 
 func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Context, client *console.ApiClient, files util.Files) (map[string]string, error) {

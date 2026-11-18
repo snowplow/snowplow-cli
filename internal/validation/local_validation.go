@@ -21,74 +21,58 @@ import (
 )
 
 func validateDs(validate *validator.Validate, ds model.DataStructure) error {
-	type validation struct {
-		field          string
-		path           string
-		validationType string
-		value          any
-		error          string
-	}
-
 	data, err := ds.ParseData()
 	if err != nil {
 		return err
 	}
 	errs := validate.Struct(ds)
 	errsData := validate.Struct(data)
-	var allErrs []validation
 
-	if errs != nil {
-		var fieldErrs validator.ValidationErrors
-		if !errors.As(errs, &fieldErrs) {
-			return errs
-		}
-		for _, e := range fieldErrs {
-			path := "dataStructure." + strings.TrimPrefix(e.Namespace(), "DataStructure.")
-			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
-			allErrs = append(allErrs, res)
-		}
+	dsErrs, err := dsFieldErrors(errs, "dataStructure.", "DataStructure.")
+	if err != nil {
+		return err
+	}
+	dataErrs, err := dsFieldErrors(errsData, "dataStructure.data.", "DataStructureData.")
+	if err != nil {
+		return err
 	}
 
-	if errsData != nil {
-		var dataFieldErrs validator.ValidationErrors
-		if !errors.As(errsData, &dataFieldErrs) {
-			return errsData
-		}
-		for _, e := range dataFieldErrs {
-			path := "dataStructure.data." + strings.TrimPrefix(e.Namespace(), "DataStructureData.")
-			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
-			allErrs = append(allErrs, res)
-		}
+	return errors.Join(append(dsErrs, dataErrs...)...)
+}
+
+func dsFieldErrors(errs error, pathPrefix string, namespacePrefix string) ([]error, error) {
+	if errs == nil {
+		return nil, nil
+	}
+	var fieldErrs validator.ValidationErrors
+	if !errors.As(errs, &fieldErrs) {
+		return nil, errs
 	}
 	var result []error
-
-	if len(allErrs) > 0 {
-		for _, err := range allErrs {
-			switch err.validationType {
-			case "required":
-				result = append(result, fmt.Errorf("required field %s is missing", err.path))
-			case "oneof":
-				firstSentence := fmt.Sprintf("Invalid value %s at %s. Available values are: ", err.value, err.path)
-				var secondSentence string
-				switch err.field {
-				case "schemaType":
-					secondSentence = "event, entity"
-				case "apiVersion":
-					secondSentence = "v1"
-				case "resourceType":
-					secondSentence = "data-structure"
-				case "format":
-					secondSentence = "jsonschema"
-				}
-				result = append(result, errors.New(firstSentence+secondSentence))
-			default:
-				result = append(result, errors.New(err.error))
-			}
-		}
-		return errors.Join(result...)
+	for _, e := range fieldErrs {
+		path := pathPrefix + strings.TrimPrefix(e.Namespace(), namespacePrefix)
+		result = append(result, dsFieldError(e, path))
 	}
+	return result, nil
+}
 
-	return nil
+var dsOneOfValues = map[string]string{
+	"schemaType":   "event, entity",
+	"apiVersion":   "v1",
+	"resourceType": "data-structure",
+	"format":       "jsonschema",
+}
+
+func dsFieldError(e validator.FieldError, path string) error {
+	switch e.Tag() {
+	case "required":
+		return fmt.Errorf("required field %s is missing", path)
+	case "oneof":
+		firstSentence := fmt.Sprintf("Invalid value %s at %s. Available values are: ", e.Value(), path)
+		return errors.New(firstSentence + dsOneOfValues[e.Field()])
+	default:
+		return errors.New(e.Error())
+	}
 }
 
 func ValidateLocalDs(dss map[string]model.DataStructure) []error {
