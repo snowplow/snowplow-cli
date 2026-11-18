@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -59,71 +60,95 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 	mergeBase := strings.TrimSpace(out)
 
 	for _, searchPath := range searchPaths {
-		absPath, err := filepath.Abs(searchPath)
+		relPath, err := evalSymlinksRelativeToRepo(topLevel, searchPath)
 		if err != nil {
 			return nil, err
 		}
-		realPath, err := filepath.EvalSymlinks(absPath)
+		found, err := gitListAndShowResourcesAtMergeBase(ctx, topLevel, mergeBase, relPath)
 		if err != nil {
 			return nil, err
 		}
-		relPath, err := filepath.Rel(topLevel, realPath)
-		if err != nil {
-			return nil, err
-		}
-		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-			return nil, fmt.Errorf("path %s is outside the git repository %s", searchPath, topLevel)
-		}
-
-		listed, err := runGit(ctx, topLevel, "ls-tree", "-r", "-z", mergeBase, "--", filepath.ToSlash(relPath))
-		if err != nil {
-			return nil, err
-		}
-
-		for entry := range strings.SplitSeq(listed, "\x00") {
-			mode, _, gitPath, ok := parseLsTreeEntry(entry)
-			if !ok {
-				continue
-			}
-			ext := filepath.Ext(gitPath)
-			if ext != ".json" && ext != ".yaml" && ext != ".yml" {
-				continue
-			}
-
-			blobPath := gitPath
-			if mode == "120000" {
-				resolved, found, err := resolveLinkAtMergeBase(ctx, topLevel, mergeBase, gitPath)
-				if err != nil {
-					return nil, err
-				}
-				if !found {
-					slog.Debug("validation", "msg", "skipping symbolic link at base, its target is outside the repository, missing or loops", "file", gitPath, "base", mergeBase)
-					continue
-				}
-				blobPath = resolved
-			}
-
-			body, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, blobPath))
-			if err != nil {
-				return nil, err
-			}
-
-			ds := map[string]any{}
-			switch ext {
-			case ".json":
-				err = kjson.Unmarshal([]byte(body), &ds)
-			case ".yaml", ".yml":
-				err = yaml.Unmarshal([]byte(body), &ds)
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to read %s at %s: %w", gitPath, mergeBase, err)
-			}
-
-			files[filepath.Join(topLevel, filepath.FromSlash(gitPath))] = ds
-		}
+		maps.Copy(files, found)
 	}
 
 	return files, nil
+}
+
+func evalSymlinksRelativeToRepo(topLevel string, searchPath string) (string, error) {
+	absPath, err := filepath.Abs(searchPath)
+	if err != nil {
+		return "", err
+	}
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return "", err
+	}
+	relPath, err := filepath.Rel(topLevel, realPath)
+	if err != nil {
+		return "", err
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %s is outside the git repository %s", searchPath, topLevel)
+	}
+	return relPath, nil
+}
+
+func gitListAndShowResourcesAtMergeBase(ctx context.Context, topLevel string, mergeBase string, relPath string) (map[string]map[string]any, error) {
+	files := map[string]map[string]any{}
+
+	listed, err := runGit(ctx, topLevel, "ls-tree", "-r", "-z", mergeBase, "--", filepath.ToSlash(relPath))
+	if err != nil {
+		return nil, err
+	}
+
+	for entry := range strings.SplitSeq(listed, "\x00") {
+		mode, _, gitPath, ok := parseLsTreeEntry(entry)
+		if !ok {
+			continue
+		}
+		ext := filepath.Ext(gitPath)
+		if ext != ".json" && ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		blobPath := gitPath
+		if mode == "120000" {
+			resolved, found, err := resolveLinkAtMergeBase(ctx, topLevel, mergeBase, gitPath)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				slog.Debug("validation", "msg", "skipping symbolic link at base, its target is outside the repository, missing or loops", "file", gitPath, "base", mergeBase)
+				continue
+			}
+			blobPath = resolved
+		}
+
+		body, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, blobPath))
+		if err != nil {
+			return nil, err
+		}
+		ds, err := unmarshalResource(ext, body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s at %s: %w", gitPath, mergeBase, err)
+		}
+
+		files[filepath.Join(topLevel, filepath.FromSlash(gitPath))] = ds
+	}
+
+	return files, nil
+}
+
+func unmarshalResource(ext string, body string) (map[string]any, error) {
+	ds := map[string]any{}
+	var err error
+	switch ext {
+	case ".json":
+		err = kjson.Unmarshal([]byte(body), &ds)
+	case ".yaml", ".yml":
+		err = yaml.Unmarshal([]byte(body), &ds)
+	}
+	return ds, err
 }
 
 func parseLsTreeEntry(entry string) (string, string, string, bool) {
