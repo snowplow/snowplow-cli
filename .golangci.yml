@@ -16,7 +16,6 @@ linters:
     - err113
     - errchkjson
     - forbidigo
-    - funlen
     - gochecknoglobals
     - gochecknoinits
     - goconst
@@ -35,6 +34,8 @@ linters:
   settings:
     cyclop:
       max-complexity: 17
+    funlen:
+      lines: 295
   exclusions:
     presets:
       - std-error-handling
