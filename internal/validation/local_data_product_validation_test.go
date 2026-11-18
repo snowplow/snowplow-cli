@@ -11,6 +11,8 @@
 package validation
 
 import (
+	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -116,5 +118,69 @@ func Test_ValidateDPEventSpecCompatFail(t *testing.T) {
 	if _, ok := result.WarningsWithPaths[expectedWarningsPath]; !ok {
 		t.Log(result.WarningsWithPaths)
 		t.Fatalf("missing warning at: %s", expectedWarningsPath)
+	}
+}
+
+func Test_ValidateDPEventSpecCompatUnknownSourceSkipped(t *testing.T) {
+	dp := newValidDPForCompatTesting()
+
+	cc := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+		return &console.CompatResult{
+			Status: "incompatible",
+			Sources: []console.CompatSource{
+				{
+					Source: "iglu:vendor/unknown/format/version",
+					Status: "incompatible",
+					Properties: map[string]string{
+						"key": "incompatible",
+					},
+				},
+				{
+					Source: "iglu:vendor/alsounknown/format/version",
+					Status: "undecidable",
+					Properties: map[string]string{
+						"key": "undecidable",
+					},
+				},
+				{
+					Source: dp.Data.EventSpecifications[0].Event.Source,
+					Status: "incompatible",
+				},
+			},
+		}, nil
+	}
+
+	result := ValidateDPEventSpecCompat(cc, 1, dp)
+
+	expectedErrors := map[string][]string{
+		"/data/eventSpecifications/0/event/schema": {"definition incompatible with source data structure (iglu:vendor/event/format/version)"},
+	}
+
+	if !reflect.DeepEqual(result.ErrorsWithPaths, expectedErrors) {
+		t.Fatalf("unexpected errors got: %#v want %#v", result.ErrorsWithPaths, expectedErrors)
+	}
+
+	if len(result.WarningsWithPaths) != 0 || len(result.Errors) != 0 {
+		t.Fatalf("unexpected warnings %#v or errors %#v", result.WarningsWithPaths, result.Errors)
+	}
+}
+
+func Test_ValidateDPEventSpecCompatCheckerError(t *testing.T) {
+	dp := newValidDPForCompatTesting()
+
+	cc := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+		return nil, errors.New("boom")
+	}
+
+	result := ValidateDPEventSpecCompat(cc, 1, dp)
+
+	expected := []string{"unexpected error checking compatibility: boom"}
+
+	if !slices.Equal(result.Errors, expected) {
+		t.Fatalf("unexpected got: %#v want %#v", result.Errors, expected)
+	}
+
+	if len(result.ErrorsWithPaths) != 0 || len(result.WarningsWithPaths) != 0 {
+		t.Fatalf("unexpected errors %#v or warnings %#v with paths", result.ErrorsWithPaths, result.WarningsWithPaths)
 	}
 }

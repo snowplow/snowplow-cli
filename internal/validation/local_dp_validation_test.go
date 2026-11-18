@@ -13,9 +13,13 @@ package validation
 import (
 	"fmt"
 	"reflect"
+	"slices"
+	"sync/atomic"
 	"testing"
 
+	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
 func Test_DPLookup_RelativePaths(t *testing.T) {
@@ -96,6 +100,270 @@ func Test_DPLookup_EventSpecBadSourceApp(t *testing.T) {
 
 	if len(v.Errors) != 1 {
 		t.Fatal("expected bad event spec source app $ref error")
+	}
+}
+
+func Test_DPLookup_RefErrorsOrder(t *testing.T) {
+	input := map[string]map[string]any{
+		"/base/sa/app.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+		},
+		"/base/dp/file.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"data": map[string]any{
+				"sourceApplications": []map[string]string{
+					{"$ref": "../sa/gone1.yml"},
+					{"$ref": "../sa/app.yml"},
+					{"$ref": "../sa/gone2.yml"},
+				},
+				"eventSpecifications": []map[string]any{
+					{
+						"resourceName": "spec-1",
+						"excludedSourceApplications": []map[string]string{
+							{"$ref": "../sa/other1.yml"},
+						},
+					},
+					{
+						"resourceName": "spec-2",
+						"excludedSourceApplications": []map[string]string{
+							{"$ref": "../sa/other2.yml"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{
+		"source application $ref not found ../sa/gone1.yml, available list [../sa/app.yml]",
+		"source application $ref not found ../sa/gone2.yml, available list [../sa/app.yml]",
+		"event spec source app not in parent data product list (event spec: spec-1, source app: ../sa/other1.yml), available list [../sa/app.yml]",
+		"event spec source app not in parent data product list (event spec: spec-2, source app: ../sa/other2.yml), available list [../sa/app.yml]",
+	}
+
+	got := lookup.Validations["/base/dp/file.yml"].Errors
+	if !slices.Equal(got, want) {
+		t.Fatalf("got: %q want: %q", got, want)
+	}
+}
+
+func Test_DPLookup_SourceAppWithoutRefSkipped(t *testing.T) {
+	input := map[string]map[string]any{
+		"/base/somedir/file1.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+		},
+		"/base/somedir/file2.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"data": map[string]any{
+				"sourceApplications": []map[string]string{
+					{"name": "no ref here"},
+					{"$ref": "file1.yml"},
+				},
+				"eventSpecifications": []map[string]any{
+					{
+						"excludedSourceApplications": []map[string]string{
+							{"$ref": "file1.yml"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if errs := lookup.Validations["/base/somedir/file2.yml"].Errors; len(errs) != 0 {
+		t.Fatal("unexpected errors", errs)
+	}
+
+	sas := lookup.DataProducts["/base/somedir/file2.yml"].Data.SourceApplications
+	want := []map[string]string{
+		{"name": "no ref here"},
+		{"$ref": "/base/somedir/file1.yml"},
+	}
+	if !reflect.DeepEqual(sas, want) {
+		t.Fatalf("got: %q want: %q", sas, want)
+	}
+}
+
+func Test_DPLookup_ExcludedSourceAppWithoutRefSkipped(t *testing.T) {
+	input := map[string]map[string]any{
+		"/base/somedir/file1.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+		},
+		"/base/somedir/file2.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"data": map[string]any{
+				"sourceApplications": []map[string]string{
+					{"$ref": "file1.yml"},
+				},
+				"eventSpecifications": []map[string]any{
+					{
+						"resourceName": "spec-1",
+						"excludedSourceApplications": []map[string]string{
+							{"name": "no ref here"},
+							{"$ref": "file7.yml"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{
+		"event spec source app not in parent data product list (event spec: spec-1, source app: file7.yml), available list [file1.yml]",
+	}
+
+	got := lookup.Validations["/base/somedir/file2.yml"].Errors
+	if !slices.Equal(got, want) {
+		t.Fatalf("got: %q want: %q", got, want)
+	}
+}
+
+func Test_DPLookup_ExcludedSourceAppInParent(t *testing.T) {
+	input := map[string]map[string]any{
+		"/base/somedir/file1.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+		},
+		"/base/somedir/file2.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "source-application",
+		},
+		"/base/somedir/file3.yml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"data": map[string]any{
+				"sourceApplications": []map[string]string{
+					{"$ref": "file1.yml"},
+					{"$ref": "file2.yml"},
+				},
+				"eventSpecifications": []map[string]any{
+					{
+						"resourceName": "spec-1",
+						"excludedSourceApplications": []map[string]string{
+							{"$ref": "file1.yml"},
+							{"$ref": "file7.yml"},
+							{"$ref": "file2.yml"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{
+		"event spec source app not in parent data product list (event spec: spec-1, source app: file7.yml), available list [file1.yml file2.yml]",
+	}
+
+	got := lookup.Validations["/base/somedir/file3.yml"].Errors
+	if !slices.Equal(got, want) {
+		t.Fatalf("got: %q want: %q", got, want)
+	}
+
+	excluded := lookup.DataProducts["/base/somedir/file3.yml"].Data.EventSpecifications[0].ExcludedSourceApplications
+	wantExcluded := []map[string]string{
+		{"$ref": "/base/somedir/file1.yml"},
+		{"$ref": "/base/somedir/file7.yml"},
+		{"$ref": "/base/somedir/file2.yml"},
+	}
+	if !reflect.DeepEqual(excluded, wantExcluded) {
+		t.Fatalf("got: %q want: %q", excluded, wantExcluded)
+	}
+}
+
+func Test_DPLookup_CompatCheckForAllOrChanged(t *testing.T) {
+	validDP := `
+apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: test_data_product
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Test Event
+      event:
+        source: iglu:com.example/test_event/jsonschema/1-0-0
+        schema:
+          type: object
+          additionalProperties: false
+          properties:
+            testField:
+              type: string
+      entities:
+        tracked: []
+        enriched: []
+`
+	file := "/base/somedir/dp.yml"
+	skipped := []string{"skipping compatibility check for /base/somedir/dp.yml, since it was not changed, use --full to include it in validation"}
+
+	tests := []struct {
+		name        string
+		validateAll bool
+		changed     map[string]string
+		wantCalls   int32
+		wantDebug   []string
+	}{
+		{"all, not changed", true, nil, 1, nil},
+		{"all, changed", true, map[string]string{"dbc68917-3bcb-4640-a165-483de5fc033c": file}, 1, nil},
+		{"not all, changed", false, map[string]string{"dbc68917-3bcb-4640-a165-483de5fc033c": file}, 1, nil},
+		{"not all, not changed", false, nil, 0, skipped},
+		{"not all, other file changed", false, map[string]string{"other": "/base/somedir/other.yml"}, 0, skipped},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var dp map[string]any
+			if err := yaml.Unmarshal([]byte(validDP), &dp); err != nil {
+				t.Fatal(err)
+			}
+
+			var calls atomic.Int32
+			cc := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+				calls.Add(1)
+				return &console.CompatResult{Status: "compatible"}, nil
+			}
+
+			lookup, err := NewDPLookup(cc, nil, map[string]map[string]any{file: dp}, tt.changed, tt.validateAll, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if calls.Load() != tt.wantCalls {
+				t.Errorf("compat checker calls got: %d want: %d", calls.Load(), tt.wantCalls)
+			}
+			if got := lookup.Validations[file].Debug; !slices.Equal(got, tt.wantDebug) {
+				t.Errorf("got: %q want: %q", got, tt.wantDebug)
+			}
+			if lookup.ValidationErrorCount() != 0 {
+				t.Errorf("unexpected errors %#v", lookup.Validations[file])
+			}
+		})
 	}
 }
 

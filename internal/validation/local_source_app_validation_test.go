@@ -229,9 +229,19 @@ func Test_checkSchemaDeployed(t *testing.T) {
 		{"deployed", &mockSdcWithAlternatives{found: true}, []string{}},
 		{"not deployed", &mockSdcWithAlternatives{}, []string{"could not find deployment of " + uri}},
 		{
+			"not deployed, empty list of other versions",
+			&mockSdcWithAlternatives{alternatives: []string{}},
+			[]string{"could not find deployment of " + uri},
+		},
+		{
 			"other versions deployed",
 			&mockSdcWithAlternatives{alternatives: []string{"a", "b"}},
 			[]string{"could not find deployment of " + uri + ", available versions (a, b)"},
+		},
+		{
+			"five other versions deployed",
+			&mockSdcWithAlternatives{alternatives: []string{"a", "b", "c", "d", "e"}},
+			[]string{"could not find deployment of " + uri + ", available versions (a, b, c, d, e)"},
 		},
 		{
 			"many other versions deployed",
