@@ -106,13 +106,7 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 		}
 	}
 
-	dpFiles := make([]string, 0, len(filenameToDp))
-	for f := range filenameToDp {
-		dpFiles = append(dpFiles, f)
-	}
-	slices.Sort(dpFiles)
-
-	for _, dpFile := range dpFiles {
+	for _, dpFile := range slices.Sorted(maps.Keys(filenameToDp)) {
 		dp := filenameToDp[dpFile]
 		if err := replaceSourceAppRefsWithIds(&dp, dpFile, filenameToSa); err != nil {
 			return nil, err

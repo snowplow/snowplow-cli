@@ -315,26 +315,30 @@ func structuralEntityList(entities []console.Entity, isSent bool) any {
 	}
 	res := []any{}
 	for _, e := range entities {
-		minCardinality := 0
-		if e.MinCardinality != nil {
-			minCardinality = *e.MinCardinality
-		}
-		entity := map[string]any{
-			"source":         e.Source,
-			"minCardinality": minCardinality,
-		}
-		if e.MaxCardinality != nil {
-			entity["maxCardinality"] = *e.MaxCardinality
-		}
-		if !isSent && e.Comment != nil {
-			entity["comment"] = *e.Comment
-		}
-		if (isSent && len(e.Schema) > 0) || (!isSent && e.Schema != nil) {
-			entity["schema"] = e.Schema
-		}
-		res = append(res, entity)
+		res = append(res, structuralEntity(e, isSent))
 	}
 	return res
+}
+
+func structuralEntity(e console.Entity, isSent bool) map[string]any {
+	minCardinality := 0
+	if e.MinCardinality != nil {
+		minCardinality = *e.MinCardinality
+	}
+	entity := map[string]any{
+		"source":         e.Source,
+		"minCardinality": minCardinality,
+	}
+	if e.MaxCardinality != nil {
+		entity["maxCardinality"] = *e.MaxCardinality
+	}
+	if !isSent && e.Comment != nil {
+		entity["comment"] = *e.Comment
+	}
+	if (isSent && len(e.Schema) > 0) || (!isSent && e.Schema != nil) {
+		entity["schema"] = e.Schema
+	}
+	return entity
 }
 
 func normalizeStructure(structure any) (any, error) {

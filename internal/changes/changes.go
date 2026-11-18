@@ -121,32 +121,11 @@ func (c *Changes) addLocal(f string, ds model.DataStructure, remotesSet map[Data
 
 func PerformChangesDev(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {
 	// Create and create new version both follow the same logic
-	validatePublish := slices.Concat(changes.ToCreate, changes.ToUpdateNewVersion)
-	for _, ds := range validatePublish {
-		vr, err := console.Validate(cnx, c, ds.DS)
-		if err != nil {
-			return err
-		}
-		if !vr.Valid {
-			return errors.New(vr.Message)
-		}
-		_, err = console.PublishDev(cnx, c, ds.DS, false, managedFrom)
-		if err != nil {
-			return err
-		}
+	if err := validateAndPublishDev(cnx, c, slices.Concat(changes.ToCreate, changes.ToUpdateNewVersion), false, managedFrom); err != nil {
+		return err
 	}
-	for _, ds := range changes.ToUpdatePatch {
-		vr, err := console.Validate(cnx, c, ds.DS)
-		if err != nil {
-			return err
-		}
-		if !vr.Valid {
-			return errors.New(vr.Message)
-		}
-		_, err = console.PublishDev(cnx, c, ds.DS, true, managedFrom)
-		if err != nil {
-			return err
-		}
+	if err := validateAndPublishDev(cnx, c, changes.ToUpdatePatch, true, managedFrom); err != nil {
+		return err
 	}
 	for _, ds := range changes.ToUpdateMeta {
 		err := console.MetadateUpdate(cnx, c, &ds.DS, managedFrom)
@@ -155,6 +134,23 @@ func PerformChangesDev(cnx context.Context, c *console.ApiClient, changes Change
 		}
 	}
 
+	return nil
+}
+
+func validateAndPublishDev(cnx context.Context, c *console.ApiClient, toPublish []model.DSChangeContext, isPatch bool, managedFrom string) error {
+	for _, ds := range toPublish {
+		vr, err := console.Validate(cnx, c, ds.DS)
+		if err != nil {
+			return err
+		}
+		if !vr.Valid {
+			return errors.New(vr.Message)
+		}
+		_, err = console.PublishDev(cnx, c, ds.DS, isPatch, managedFrom)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -94,30 +94,28 @@ func (vr *ValidationResults) Slog(ctx context.Context) {
 	}
 }
 
+func (vr *ValidationResults) failures() int {
+	failed := len(vr.Migration)
+	for _, iglu := range vr.Iglu {
+		if iglu.Level == igluValidationError {
+			failed++
+		}
+	}
+	return failed
+}
+
 func ValidateChanges(cnx context.Context, c *console.ApiClient, changes changes.Changes) (*ValidationResults, error) {
 	var vr ValidationResults
 
 	// Create and create new version both follow the same logic
 	// Patch there will error out on validate, we'll implement it separately
 	validate := append(append(changes.ToCreate, changes.ToUpdateNewVersion...), changes.ToUpdatePatch...)
-	failed := 0
 	for _, ds := range validate {
 		resp, err := console.Validate(cnx, c, ds.DS)
-		if resp != nil {
-			if len(resp.Warnings) > 0 {
-				vr.Iglu = append(vr.Iglu, igluValidation{ds.FileName, resp.Warnings, igluValidationWarn})
-			}
-			if len(resp.Info) > 0 {
-				vr.Iglu = append(vr.Iglu, igluValidation{ds.FileName, resp.Info, igluValidationInfo})
-			}
-			if len(resp.Errors) > 0 {
-				vr.Iglu = append(vr.Iglu, igluValidation{ds.FileName, resp.Errors, igluValidationError})
-				failed++
-			}
-		}
 		if err != nil {
 			return nil, err
 		}
+		vr.Iglu = append(vr.Iglu, igluValidations(ds.FileName, resp)...)
 	}
 
 	migrationsToCheck := slices.Concat(changes.ToUpdateNewVersion, changes.ToUpdatePatch)
@@ -128,11 +126,10 @@ func ValidateChanges(cnx context.Context, c *console.ApiClient, changes changes.
 		}
 		for dest, r := range result {
 			vr.Migration = append(vr.Migration, migrationValidation{ds.FileName, r.SuggestedVersion, dest, r.Messages})
-			failed++
 		}
 	}
 
-	if failed > 0 {
+	if failed := vr.failures(); failed > 0 {
 		vr.Valid = false
 		vr.Message = fmt.Sprintf("%d validation failures", failed)
 	} else {
@@ -140,4 +137,18 @@ func ValidateChanges(cnx context.Context, c *console.ApiClient, changes changes.
 	}
 
 	return &vr, nil
+}
+
+func igluValidations(fileName string, resp *console.ValidateResponse) []igluValidation {
+	var res []igluValidation
+	if len(resp.Warnings) > 0 {
+		res = append(res, igluValidation{fileName, resp.Warnings, igluValidationWarn})
+	}
+	if len(resp.Info) > 0 {
+		res = append(res, igluValidation{fileName, resp.Info, igluValidationInfo})
+	}
+	if len(resp.Errors) > 0 {
+		res = append(res, igluValidation{fileName, resp.Errors, igluValidationError})
+	}
+	return res
 }

@@ -156,31 +156,41 @@ func ValidateMigrations(cnx context.Context, client *ApiClient, ds model.DSChang
 		if m == nil {
 			return nil, errors.New("migration failed to parse")
 		}
-		if m.ChangeType != "no-change" {
-			var messages []string
-			for _, migration := range m.Migrations {
-				messages = append(messages, migration.Message)
-			}
-
-			remoteV, err := model.ParseSemVer(ds.RemoteVersion)
-			if err != nil {
-				return nil, err
-			}
-			localV, err := model.ParseSemVer(f.Self.Version)
-			if err != nil {
-				return nil, err
-			}
-
-			nextVer := model.SemNextVer(*remoteV, m.ChangeType)
-
-			if model.SemVerCmp(nextVer, *localV) == 1 {
-				result[dest.Type] = MigrationReport{
-					Messages:         messages,
-					SuggestedVersion: nextVer.String(),
-				}
-			}
+		report, err := migrationReport(m, ds.RemoteVersion, f.Self.Version)
+		if err != nil {
+			return nil, err
+		}
+		if report != nil {
+			result[dest.Type] = *report
 		}
 	}
 
 	return result, nil
+}
+
+func migrationReport(m *migrationResponse, remoteVersion string, localVersion string) (*MigrationReport, error) {
+	if m.ChangeType == "no-change" {
+		return nil, nil
+	}
+	remoteV, err := model.ParseSemVer(remoteVersion)
+	if err != nil {
+		return nil, err
+	}
+	localV, err := model.ParseSemVer(localVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	nextVer := model.SemNextVer(*remoteV, m.ChangeType)
+	if model.SemVerCmp(nextVer, *localV) != 1 {
+		return nil, nil
+	}
+	var messages []string
+	for _, migration := range m.Migrations {
+		messages = append(messages, migration.Message)
+	}
+	return &MigrationReport{
+		Messages:         messages,
+		SuggestedVersion: nextVer.String(),
+	}, nil
 }
