@@ -57,11 +57,11 @@ Example:
 
 		name := args[0]
 
-		if ok := nameRegexp.Match([]byte(name)); !ok {
+		if ok := nameRegexp.MatchString(name); !ok {
 			logging.LogFatal(errors.New("name did not match [a-zA-Z0-9-_]+"))
 		}
 
-		if ok := vendorRegexp.Match([]byte(vendor)); vendor != "" && !ok {
+		if ok := vendorRegexp.MatchString(vendor); vendor != "" && !ok {
 			logging.LogFatal(errors.New("vendor did not match [a-zA-Z0-9-_.]+"))
 		}
 

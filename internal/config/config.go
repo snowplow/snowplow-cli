@@ -41,7 +41,7 @@ func InitConsoleHostFlag(cmd *cobra.Command) {
 }
 
 type rawAppConfig struct {
-	Console map[string]string
+	Console map[string]string `yaml:"console"`
 }
 
 func loadEnvFiles(cmd *cobra.Command, baseDir string) error {
@@ -348,7 +348,7 @@ func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
 	}
 }
 
-// getConfigPath is a variable holding the function to get config path (for testability)
+// getConfigPath is a variable holding the function to get config path (for testability).
 var getConfigPath = func() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "snowplow", "snowplow.yml")

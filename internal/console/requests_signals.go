@@ -40,7 +40,7 @@ func (e SignalsEnvironment) APIURL() string {
 	return "https://" + e.Config.PersonalizationApiHost
 }
 
-// The app's key can also edit Signals, so the app can set up attributes through a Signals SDK.
+// SignalsAppCapabilities let the app's key also edit Signals, so the app can set up attributes through a Signals SDK.
 var SignalsAppCapabilities = []Capability{
 	{ResourceType: "SIGNALS", Action: "LIST", Filters: []any{}},
 	{ResourceType: "SIGNALS", Action: "VIEW", Filters: []any{}},

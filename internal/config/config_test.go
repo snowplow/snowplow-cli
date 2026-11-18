@@ -108,10 +108,10 @@ func Test_ConfigValidate(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
 
 	table := [][]string{
-		{"xxx", "-a", "something", "-H", "something", "-S", "somethign", "-o", ""},
+		{"xxx", "-a", "something", "-H", "something", "-S", "something", "-o", ""},
 		{"xxx", "-a", "something", "-H", "something", "-S", "", "-o", "something"},
-		{"xxx", "-a", "something", "-H", "", "-S", "somethign", "-o", "something"},
-		{"xxx", "-a", "", "-H", "something", "-S", "somethign", "-o", "something"},
+		{"xxx", "-a", "something", "-H", "", "-S", "something", "-o", "something"},
+		{"xxx", "-a", "", "-H", "something", "-S", "something", "-o", "something"},
 	}
 
 	testCmd := build()

@@ -80,7 +80,7 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 			return nil, err
 		}
 
-		for _, entry := range strings.Split(listed, "\x00") {
+		for entry := range strings.SplitSeq(listed, "\x00") {
 			mode, _, gitPath, ok := parseLsTreeEntry(entry)
 			if !ok {
 				continue
@@ -140,7 +140,7 @@ func parseLsTreeEntry(entry string) (mode string, objectType string, gitPath str
 
 func resolveLinkAtMergeBase(ctx context.Context, topLevel string, mergeBase string, linkPath string) (string, bool, error) {
 	current := linkPath
-	for hop := 0; hop < 5; hop++ {
+	for range 5 {
 		target, err := runGit(ctx, topLevel, "show", fmt.Sprintf("%s:%s", mergeBase, current))
 		if err != nil {
 			return "", false, err

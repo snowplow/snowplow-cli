@@ -27,13 +27,35 @@ type SchemaDeployChecker interface {
 	IsDSDeployed(uri string) (found bool, deployedVersions []string, err error)
 }
 
-type schemaDeployCheckProvider struct {
+type SchemaDeployCheckProvider struct {
 	igluCentralList  []string
 	dsList           []ListResponse
 	getDsDeployments func(hash string) ([]Deployment, error)
 }
 
-func (sdc *schemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, deployedVersions []string, err error) {
+func NewSchemaDeployChecker(cnx context.Context, c *ApiClient) (*SchemaDeployCheckProvider, error) {
+	igluCentral, err := GetIgluCentralListing(cnx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	dsList, err := GetDataStructureListing(cnx, c)
+	if err != nil {
+		return nil, err
+	}
+
+	lookup := func(hash string) ([]Deployment, error) {
+		deploys, err := GetDataStructureDeployments(cnx, c, hash)
+		if err != nil {
+			return nil, err
+		}
+		return deploys, nil
+	}
+
+	return &SchemaDeployCheckProvider{igluCentral, dsList, lookup}, nil
+}
+
+func (sdc *SchemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, deployedVersions []string, err error) {
 	splut := strings.Split(strings.TrimPrefix(uri, "iglu:"), "/")
 
 	if len(splut) != 4 {
@@ -62,6 +84,7 @@ func (sdc *schemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, depl
 					case PROD:
 						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deployment.Env))
 						return true, nil, nil
+					case VALIDATED:
 					}
 				}
 			}
@@ -81,6 +104,7 @@ func (sdc *schemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, depl
 					case PROD:
 						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deploy.Env))
 						return true, nil, nil
+					case VALIDATED:
 					}
 				} else {
 					alternativeVersions[deploy.Version] = true
@@ -97,26 +121,4 @@ func (sdc *schemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, depl
 	}
 
 	return false, nil, nil
-}
-
-func NewSchemaDeployChecker(cnx context.Context, c *ApiClient) (SchemaDeployChecker, error) {
-	igluCentral, err := GetIgluCentralListing(cnx, c)
-	if err != nil {
-		return nil, err
-	}
-
-	dsList, err := GetDataStructureListing(cnx, c)
-	if err != nil {
-		return nil, err
-	}
-
-	lookup := func(hash string) ([]Deployment, error) {
-		deploys, err := GetDataStructureDeployments(cnx, c, hash)
-		if err != nil {
-			return nil, err
-		}
-		return deploys, nil
-	}
-
-	return &schemaDeployCheckProvider{igluCentral, dsList, lookup}, nil
 }

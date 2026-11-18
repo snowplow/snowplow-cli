@@ -444,10 +444,9 @@ func Test_displayAvailableOrgs_WithDefault(t *testing.T) {
 		{ID: "org-2", Name: "Organization 2"},
 		{ID: "org-3", Name: "Organization 3"},
 	}
-	jwtOrgID := "org-2"
 	defaultIndex := 1
 
-	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
+	displayAvailableOrgs(organizations, defaultIndex)
 
 }
 
@@ -456,19 +455,17 @@ func Test_displayAvailableOrgs_NoDefault(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-3"
 	defaultIndex := -1
 
-	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
+	displayAvailableOrgs(organizations, defaultIndex)
 
 }
 
 func Test_displayAvailableOrgs_EmptyOrganizations(t *testing.T) {
 	organizations := []console.Organization{}
-	jwtOrgID := "org-1"
 	defaultIndex := -1
 
-	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
+	displayAvailableOrgs(organizations, defaultIndex)
 
 }
 
@@ -476,10 +473,9 @@ func Test_displayAvailableOrgs_SingleOrganization(t *testing.T) {
 	organizations := []console.Organization{
 		{ID: "org-1", Name: "Organization 1"},
 	}
-	jwtOrgID := "org-1"
 	defaultIndex := 0
 
-	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
+	displayAvailableOrgs(organizations, defaultIndex)
 
 }
 
@@ -488,11 +484,10 @@ func Test_selectOrganizationForInput_EmptyInputWithDefault(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := ""
 	defaultIndex := 0
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -511,11 +506,10 @@ func Test_selectOrganizationForInput_EmptyInputNoDefault(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-3"
 	input := ""
 	defaultIndex := -1
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -531,11 +525,10 @@ func Test_selectOrganizationForInput_ValidSelection(t *testing.T) {
 		{ID: "org-2", Name: "Organization 2"},
 		{ID: "org-3", Name: "Organization 3"},
 	}
-	jwtOrgID := "org-1"
 	input := "2"
 	defaultIndex := 0
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -554,11 +547,10 @@ func Test_selectOrganizationForInput_FirstSelection(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-2"
 	input := "1"
 	defaultIndex := 1
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -578,11 +570,10 @@ func Test_selectOrganizationForInput_LastSelection(t *testing.T) {
 		{ID: "org-2", Name: "Organization 2"},
 		{ID: "org-3", Name: "Organization 3"},
 	}
-	jwtOrgID := "org-1"
 	input := "3"
 	defaultIndex := 0
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -601,11 +592,10 @@ func Test_selectOrganizationForInput_SelectionTooLow(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "0"
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -620,11 +610,10 @@ func Test_selectOrganizationForInput_SelectionTooHigh(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "3"
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -639,11 +628,10 @@ func Test_selectOrganizationForInput_NegativeSelection(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "-1"
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -658,11 +646,10 @@ func Test_selectOrganizationForInput_InvalidInput(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "abc"
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -677,12 +664,11 @@ func Test_selectOrganizationForInput_NumberWithLetters(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "1abc"
 	defaultIndex := 0
 
 	// fmt.Sscanf with %d will parse "1abc" as "1", so this should succeed
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -702,11 +688,10 @@ func Test_selectOrganizationForInput_FloatInput(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := "1.5"
 	defaultIndex := 0
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -724,11 +709,10 @@ func Test_selectOrganizationForInput_SingleOrganization(t *testing.T) {
 	organizations := []console.Organization{
 		{ID: "org-1", Name: "Organization 1"},
 	}
-	jwtOrgID := "org-1"
 	input := "1"
 	defaultIndex := 0
 
-	result, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	result, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -746,11 +730,10 @@ func Test_selectOrganizationForInput_SingleOrganizationInvalidSelection(t *testi
 	organizations := []console.Organization{
 		{ID: "org-1", Name: "Organization 1"},
 	}
-	jwtOrgID := "org-1"
 	input := "2"
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -762,11 +745,10 @@ func Test_selectOrganizationForInput_SingleOrganizationInvalidSelection(t *testi
 
 func Test_selectOrganizationForInput_EmptyOrganizations(t *testing.T) {
 	organizations := []console.Organization{}
-	jwtOrgID := "org-1"
 	input := "1"
 	defaultIndex := -1
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")
@@ -781,11 +763,10 @@ func Test_selectOrganizationForInput_WhitespaceInput(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
-	jwtOrgID := "org-1"
 	input := " "
 	defaultIndex := 0
 
-	_, err := selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	_, err := selectOrganizationForInput(organizations, input, defaultIndex)
 
 	if err == nil {
 		t.Error("expected error but got none")

@@ -33,11 +33,12 @@ type msgResponse struct {
 }
 
 type pubResponse struct {
+	msgResponse
+
 	Success  bool     `json:"success" yaml:"success"`
 	Errors   []string `json:"errors" yaml:"errors"`
 	Warnings []string `json:"warnings" yaml:"warnings"`
 	Info     []string `json:"info" yaml:"info"`
-	msgResponse
 }
 
 type pubError struct {
@@ -47,6 +48,7 @@ type pubError struct {
 type PublishResponse = pubResponse
 type ValidateResponse struct {
 	pubResponse
+
 	Valid bool `json:"valid" yaml:"valid"`
 }
 

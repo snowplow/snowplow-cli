@@ -12,36 +12,21 @@ linters:
     - wsl_v5
     - bodyclose
     - canonicalheader
-    - containedctx
     - cyclop
     - depguard
     - dupl
-    - embeddedstructfieldcheck
     - err113
     - errchkjson
-    - errorlint
-    - exhaustive
     - forbidigo
-    - forcetypeassert
-    - funcorder
     - funlen
     - gochecknoglobals
     - gochecknoinits
     - gocognit
     - goconst
-    - gocritic
     - gocyclo
-    - godoclint
-    - godot
     - gosec
-    - intrange
-    - ireturn
     - lll
     - maintidx
-    - mirror
-    - misspell
-    - modernize
-    - musttag
     - nestif
     - nilnil
     - noctx
@@ -50,20 +35,20 @@ linters:
     - paralleltest
     - perfsprint
     - prealloc
-    - predeclared
-    - recvcheck
     - revive
     - sloglint
     - tagalign
     - tagliatelle
     - testpackage
     - thelper
-    - unconvert
-    - unparam
     - usestdlibvars
     - usetesting
     - whitespace
     - wrapcheck
+  settings:
+    misspell:
+      ignore-rules:
+        - avaliable
   exclusions:
     presets:
       - std-error-handling

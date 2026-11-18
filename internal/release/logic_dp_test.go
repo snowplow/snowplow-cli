@@ -7,6 +7,7 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
+
 package release
 
 import (
@@ -258,17 +259,17 @@ type mockPurgeApi struct {
 	deletedDataProducts []string
 }
 
-func (a *mockPurgeApi) DeleteSourceApp(sa console.RemoteSourceApplication) error {
+func (a *mockPurgeApi) DeleteSourceApp(_ context.Context, sa console.RemoteSourceApplication) error {
 	a.deletedSourceApps = append(a.deletedSourceApps, sa.Id)
 	return nil
 }
 
-func (a *mockPurgeApi) DeleteDataProduct(dp console.RemoteDataProduct) error {
+func (a *mockPurgeApi) DeleteDataProduct(_ context.Context, dp console.RemoteDataProduct) error {
 	a.deletedDataProducts = append(a.deletedDataProducts, dp.Id)
 	return nil
 }
 
-func (a *mockPurgeApi) FetchDataProduct() (*console.DataProductsAndRelatedResources, error) {
+func (a *mockPurgeApi) FetchDataProduct(_ context.Context) (*console.DataProductsAndRelatedResources, error) {
 	return a.remoteResources, nil
 }
 
@@ -1475,10 +1476,14 @@ func Test_FindVersionMismatchesAgainstBase(t *testing.T) {
 			if len(skipped) != 0 {
 				t.Errorf("expected nothing skipped, got %v", skipped)
 			}
+			name, ok := localSpec["name"].(string)
+			if !ok {
+				t.Fatalf("expected name to be a string, got %v", localSpec["name"])
+			}
 			want := []model.EventSpecVersionMismatch{{
 				FileName: "/base/dp.yaml",
 				Index:    0,
-				Name:     localSpec["name"].(string),
+				Name:     name,
 				Declared: 99,
 				Expected: tt.wantExpected,
 				Changed:  tt.wantChanged,

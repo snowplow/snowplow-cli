@@ -159,8 +159,8 @@ func processDocFile(filepath string) (string, error) {
 	// Extract title from the first heading
 	title := ""
 	for _, line := range lines {
-		if strings.HasPrefix(line, "## ") {
-			title = strings.TrimPrefix(line, "## ")
+		if after, ok := strings.CutPrefix(line, "## "); ok {
+			title = after
 			break
 		}
 	}

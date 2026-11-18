@@ -7,6 +7,7 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
+
 package release
 
 import (
@@ -202,7 +203,7 @@ func TestEsToDiff(t *testing.T) {
 	}
 
 	// Verify event JSON
-	var eventData map[string]interface{}
+	var eventData map[string]any
 	if err := kjson.Unmarshal([]byte(result.Event), &eventData); err != nil {
 		t.Fatalf("Failed to unmarshal event JSON: %v", err)
 	}

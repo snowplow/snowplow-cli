@@ -11,9 +11,6 @@
 package dp
 
 import (
-	"context"
-
-	"github.com/snowplow/snowplow-cli/internal/console"
 	"github.com/snowplow/snowplow-cli/internal/release"
 	"github.com/spf13/cobra"
 )
@@ -31,9 +28,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 	Example: `  $ snowplow-cli dp release
   $ snowplow-cli dp release ./my-data-products`,
 	Run: func(cmd *cobra.Command, args []string) {
-		runDpWorkflow(cmd, args, func(cnx context.Context, c *console.ApiClient, changes *release.DataProductChangeSet, dryRun bool) error {
-			return release.Release(cnx, c, changes, dryRun)
-		})
+		runDpWorkflow(cmd, args, release.Release)
 	},
 }
 

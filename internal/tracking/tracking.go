@@ -22,14 +22,15 @@ import (
 )
 
 type selfDescJSON struct {
-	Schema string                 `json:"schema"`
-	Data   map[string]interface{} `json:"data"`
+	Schema string         `json:"schema"`
+	Data   map[string]any `json:"data"`
 }
 
 func getSdJSON(sdjson string, schema string, jsonData string) (*gt.SelfDescribingJson, error) {
-	if sdjson == "" && schema == "" && jsonData == "" {
+	switch {
+	case sdjson == "" && schema == "" && jsonData == "":
 		return nil, errors.New("fatal: --sdjson or --schema URI plus a --json needs to be specified")
-	} else if sdjson != "" {
+	case sdjson != "":
 		res := selfDescJSON{}
 		d := json.NewDecoder(strings.NewReader(sdjson))
 		d.UseNumber()
@@ -37,11 +38,11 @@ func getSdJSON(sdjson string, schema string, jsonData string) (*gt.SelfDescribin
 			return nil, err
 		}
 		return gt.InitSelfDescribingJson(res.Schema, res.Data), nil
-	} else if schema != "" && jsonData == "" {
+	case schema != "" && jsonData == "":
 		return nil, errors.New("fatal: --json needs to be specified")
-	} else if schema == "" && jsonData != "" {
+	case schema == "" && jsonData != "":
 		return nil, errors.New("fatal: --schema URI needs to be specified")
-	} else {
+	default:
 		jsonDataMap, err := stringToMap(jsonData)
 		if err != nil {
 			return nil, err
@@ -122,8 +123,8 @@ func parseStatusCode(statusCode int) int {
 	}
 }
 
-func stringToMap(str string) (map[string]interface{}, error) {
-	var jsonDataMap map[string]interface{}
+func stringToMap(str string) (map[string]any, error) {
+	var jsonDataMap map[string]any
 	d := json.NewDecoder(strings.NewReader(str))
 	d.UseNumber()
 	if err := d.Decode(&jsonDataMap); err != nil {

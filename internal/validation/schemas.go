@@ -21,7 +21,7 @@ var dataProductSchema string
 //go:embed schema/source-application.json
 var sourceApplicationSchema string
 
-// GetEmbeddedSchemas returns all embedded schema files as a map
+// GetEmbeddedSchemas returns all embedded schema files as a map.
 func GetEmbeddedSchemas() map[string]string {
 	return map[string]string{
 		"data-structure":     dataStructureSchema,
@@ -30,7 +30,7 @@ func GetEmbeddedSchemas() map[string]string {
 	}
 }
 
-// GetEmbeddedSchema returns a specific embedded schema file
+// GetEmbeddedSchema returns a specific embedded schema file.
 func GetEmbeddedSchema(schemaType string) (string, bool) {
 	schemas := GetEmbeddedSchemas()
 	schema, exists := schemas[schemaType]

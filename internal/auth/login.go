@@ -252,11 +252,11 @@ func LoadAndRefresh(ctx context.Context, host string) (*Login, error) {
 	return result, err
 }
 
-func (l *Login) fresh() bool {
+func (l Login) fresh() bool {
 	return l.ExpiresAt.IsZero() || time.Until(l.ExpiresAt) > expiryMargin
 }
 
-func (l *Login) refreshable() bool {
+func (l Login) refreshable() bool {
 	return l.RefreshToken != "" && l.ClientID != "" && l.Auth0Domain != ""
 }
 

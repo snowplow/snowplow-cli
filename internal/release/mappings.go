@@ -7,6 +7,7 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
+
 package release
 
 import (
@@ -186,7 +187,7 @@ func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
 		sourceApps = es.SourceApplicationIds
 	}
 
-	// the local fiels are getting serialized by mapstructure
+	// the local fields are getting serialized by mapstructure
 	// while the remote ones are getting serialized by json
 	// this lead to different numeric types
 	// serializeing them back to json help the comparison

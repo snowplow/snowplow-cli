@@ -44,7 +44,7 @@ var (
 )
 
 func SetupSignals(ctx context.Context, opts SignalsOptions) error {
-	if gitTracked(opts.ProjectDir, ".env") {
+	if envTracked(opts.ProjectDir) {
 		return errors.New(".env is committed to git, so the Signals key would be committed too. " +
 			"Stop tracking it with `git rm --cached .env`, commit that, then run this again")
 	}
