@@ -811,3 +811,98 @@ func Test_ConfigForSetupIgnoresSavedLogin(t *testing.T) {
 		t.Fatalf("a setup command must not fail on an unreadable login file: %v", err)
 	}
 }
+
+func Test_ConfigUnparsableValueOrMissingValue(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-a", "id", "-S", "key", "-o", "org"}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	err := testCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), `invalid argument "notabool" for "--dry-run" flag`) {
+		t.Errorf("expected the unparsable value to be reported, got: %v", err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-a", "id", "-S", "key"}
+	testCmd = build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	err = testCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), `config value "org-id" not set`) {
+		t.Errorf("expected the missing value to be reported first, got: %v", err)
+	}
+}
+
+func Test_ConfigUnparsableFileValueSkipsEnv(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "")
+	t.Setenv("SNOWPLOW_CONSOLE_ORG_ID", "env-org")
+
+	configFile := filepath.Join(t.TempDir(), "snowplow.yml")
+	config := "console:\n  api-key-id: id\n  api-key: key\n  dry-run: maybe\n"
+	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", configFile}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	err := testCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), `config value "org-id" not set`) {
+		t.Errorf("expected org-id to be reported as not set, got: %v", err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "" {
+		t.Errorf("org-id got %s, env vars should not be applied after a config file value failed to parse", org)
+	}
+}
+
+func Test_ConfigUnparsableValueSkipsSavedLogin(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	err := testCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "config values not set: api-key-id, api-key, org-id") {
+		t.Errorf("expected the api key and org-id to be reported as not set, got: %v", err)
+	}
+	if org, _ := testCmd.Flags().GetString("org-id"); org != "" {
+		t.Errorf("org-id got %s, the saved login should not be used after a value failed to parse", org)
+	}
+}
+
+func Test_ConfigForSetupReportsUnparsableValue(t *testing.T) {
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	setup := &cobra.Command{Run: func(cmd *cobra.Command, args []string) {}}
+	setup.Flags().String("host", "the-host", "")
+	setup.Flags().String("config", "/nonexistent.yml", "")
+	setup.Flags().String("env-file", "", "")
+	setup.Flags().Bool("dry-run", false, "")
+
+	err := InitConsoleConfigForSetup(setup)
+	if err == nil || !strings.Contains(err.Error(), `invalid argument "notabool" for "--dry-run" flag`) {
+		t.Errorf("expected the unparsable value to be reported, got: %v", err)
+	}
+}
+
+func Test_ConfigInvalidYamlFile(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+
+	configFile := filepath.Join(t.TempDir(), "snowplow.yml")
+	if err := os.WriteFile(configFile, []byte("console: ["), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", configFile, "-a", "id", "-S", "key", "-o", "org"}
+	err := build().Execute()
+	if err == nil || !strings.Contains(err.Error(), "yaml:") {
+		t.Errorf("expected the invalid config file to be reported, got: %v", err)
+	}
+}

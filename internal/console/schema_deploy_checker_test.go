@@ -156,3 +156,31 @@ func Test_IsDeployed_ConsoleAlternativesFail(t *testing.T) {
 		t.Fatal("should have errored")
 	}
 }
+
+func Test_IsDeployed_ConsoleAlternativesWithoutRequestedVersion(t *testing.T) {
+	uri := "iglu:vendor/name/format/1-0-10"
+
+	mock := &SchemaDeployCheckProvider{
+		[]string{},
+		[]ListResponse{{
+			Hash:        "hash",
+			Vendor:      "vendor",
+			Name:        "name",
+			Format:      "format",
+			Deployments: []Deployment{},
+		}},
+		func(h string) ([]Deployment, error) {
+			return []Deployment{{"1-0-10", VALIDATED, ""}, {"1-0-0", DEV, ""}}, nil
+		},
+	}
+
+	found, alts, _ := mock.IsDSDeployed(uri)
+
+	if found {
+		t.Fatal("!!found")
+	}
+
+	if !slices.Equal([]string{"1-0-0"}, alts) {
+		t.Fatal("bad alternatives", alts)
+	}
+}

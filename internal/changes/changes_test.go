@@ -13,6 +13,7 @@ package changes
 import (
 	. "github.com/snowplow/snowplow-cli/internal/console"
 	. "github.com/snowplow/snowplow-cli/internal/model"
+	"math"
 	"testing"
 )
 
@@ -189,5 +190,54 @@ func Test_GetChangesProdDeploy(t *testing.T) {
 
 	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 1 {
 		t.Fatalf("Unexpected result, expecting one data structre to update, got %+v", res)
+	}
+}
+
+func Test_GetChangesParseDataError(t *testing.T) {
+	local := DataStructure{
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity"},
+		Data: map[string]any{
+			"self":   "not an object",
+			"schema": "string"},
+	}
+
+	_, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{}, "DEV")
+
+	if err == nil {
+		t.Fatal("Expected an error for data that can't be parsed")
+	}
+}
+
+func Test_GetChangesContentHashError(t *testing.T) {
+	local := DataStructure{
+		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity"},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "string",
+				"name":    "string",
+				"format":  "string",
+				"version": "1-0-0",
+			},
+			"schema": math.Inf(1)},
+	}
+	remote := ListResponse{
+		Hash:   "different",
+		Vendor: "string",
+		Name:   "string",
+		Meta:   DataStructureMeta{Hidden: true, SchemaType: "entity"},
+		Format: "string",
+		Deployments: []Deployment{
+			{
+				Version:     "1-0-0",
+				Env:         "DEV",
+				ContentHash: "different",
+			},
+		},
+	}
+
+	_, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
+
+	if err == nil {
+		t.Fatal("Expected an error for data that can't be hashed")
 	}
 }
