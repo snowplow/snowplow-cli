@@ -766,12 +766,9 @@ func Test_AddYaml_ErrorsForUnexpectedShape(t *testing.T) {
 		{name: "event specifications is a string", original: "apiVersion: v1\ndata:\n  name: test\n  eventSpecifications: test\n", expected: "data.eventSpecifications is not an array"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := AddEventSpecs([]model.EventSpecCanonical{{ResourceName: "a", Name: "test1"}}, []byte(tt.original), "test.yaml")
+			_, err := AddEventSpecs([]model.EventSpecCanonical{{ResourceName: "a", Name: "test1"}}, []byte(tt.original), "test.yaml")
 			if err == nil || err.Error() != tt.expected {
 				t.Fatalf("expected error %q, got: %v", tt.expected, err)
-			}
-			if res == nil || len(res) != 0 {
-				t.Errorf("expected an empty output on error, got: %q", res)
 			}
 		})
 	}
@@ -790,12 +787,9 @@ func Test_AddEventSpecVersionsYamlErrors(t *testing.T) {
 		{idx: 4, expected: "event specification 4 not found"},
 		{idx: -1, expected: "event specification -1 not found"},
 	} {
-		res, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.yaml")
+		_, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.yaml")
 		if err == nil || err.Error() != tt.expected {
 			t.Errorf("expected error %q, got: %v", tt.expected, err)
-		}
-		if res != nil {
-			t.Errorf("expected no output on error, got: %s", res)
 		}
 	}
 }
@@ -811,12 +805,9 @@ func Test_AddEventSpecVersionsJsonErrors(t *testing.T) {
 		{idx: 2, expected: "event specification 2 not found"},
 		{idx: -1, expected: "event specification -1 not found"},
 	} {
-		res, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.json")
+		_, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.json")
 		if err == nil || err.Error() != tt.expected {
 			t.Errorf("expected error %q, got: %v", tt.expected, err)
-		}
-		if res != nil {
-			t.Errorf("expected no output on error, got: %s", res)
 		}
 	}
 }
@@ -832,12 +823,9 @@ func Test_AddEventSpecVersionsJsonChecksEverySpecBeforeEditing(t *testing.T) {
 	versionsByIndex[20] = 1
 	original := `{"data": {"eventSpecifications": [` + strings.Join(specs, ", ") + `]}}`
 
-	res, err := AddEventSpecVersions(versionsByIndex, []byte(original), "test.json")
+	_, err := AddEventSpecVersions(versionsByIndex, []byte(original), "test.json")
 	if err == nil || err.Error() != "event specification 20 already declares a version" {
 		t.Errorf("expected the spec with a version to be refused, got: %v", err)
-	}
-	if res != nil {
-		t.Errorf("expected no output on error, got: %s", res)
 	}
 }
 

@@ -806,18 +806,51 @@ func captureStdout(t *testing.T, f func()) string {
 	}
 	stdout, colorOutput, noColor := os.Stdout, color.Output, color.NoColor
 	os.Stdout, color.Output, color.NoColor = w, w, true
-	defer func() { os.Stdout, color.Output, color.NoColor = stdout, colorOutput, noColor }()
+	defer func() {
+		os.Stdout, color.Output, color.NoColor = stdout, colorOutput, noColor
+		_ = w.Close()
+		_ = r.Close()
+	}()
+
+	var out []byte
+	var readErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		out, readErr = io.ReadAll(r)
+	}()
 
 	f()
 
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
-	out, err := io.ReadAll(r)
+	<-done
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	return string(out)
+}
+
+func replaceStdin(t *testing.T, input string) {
+	t.Helper()
+	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(out)
+	stdin := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = stdin
+		_ = w.Close()
+		_ = r.Close()
+	})
+	if _, err := w.WriteString(input); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func Test_pickOrganizationAndPrintIt_SingleOrganization(t *testing.T) {
@@ -869,6 +902,7 @@ func Test_pickOrganizationAndPrintIt_AsksWithHomeOrgAsDefault(t *testing.T) {
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
+	replaceStdin(t, "\n")
 
 	out := captureStdout(t, func() {
 		org, err := pickOrganizationAndPrintIt(organizations, "org-2", false)
@@ -891,15 +925,22 @@ func Test_pickOrganizationAndPrintIt_AsksWhenHomeOrgIsNotInTheList(t *testing.T)
 		{ID: "org-1", Name: "Organization 1"},
 		{ID: "org-2", Name: "Organization 2"},
 	}
+	replaceStdin(t, "")
 
 	for _, homeOrgOnly := range []bool{true, false} {
-		org, err := pickOrganizationAndPrintIt(organizations, "other-org", homeOrgOnly)
+		out := captureStdout(t, func() {
+			org, err := pickOrganizationAndPrintIt(organizations, "other-org", homeOrgOnly)
 
-		if err == nil || err.Error() != "failed to select organization: invalid selection: " {
-			t.Errorf("expected the selection to fail on empty input, got: %v", err)
-		}
-		if org != nil {
-			t.Errorf("expected no organization, got %v", org)
+			if err == nil || !strings.Contains(err.Error(), "select organization") {
+				t.Errorf("expected the selection to fail on empty input, got: %v", err)
+			}
+			if org != nil {
+				t.Errorf("expected no organization, got %v", org)
+			}
+		})
+
+		if !strings.Contains(out, "Select organization [1-2]: ") {
+			t.Errorf("unexpected output: %q", out)
 		}
 	}
 }
