@@ -1430,63 +1430,68 @@ func TestValidateDataProductsAgainstBase_FixAddsMissingVersions(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			original := localWithoutVersions(tt.finishedName, "")
-			writeRepoFiles(t, tracking, map[string]string{"checkout.yaml": original, "other.yaml": other})
-
-			var logOutput bytes.Buffer
-			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
-
-			err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
-			if err != nil {
-				t.Fatalf("Expected validate without versions to pass, got: %v", err)
-			}
-			if strings.Contains(logOutput.String(), "version") {
-				t.Errorf("Expected no version output without --fix, got:\n%s", logOutput.String())
-			}
-
-			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
-			if err != nil {
-				t.Fatalf("Expected --fix to succeed, got: %v", err)
-			}
-			fixed, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := strings.Replace(original, "      name: "+tt.finishedName+"\n", fmt.Sprintf("      name: %s\n      version: %d\n", tt.finishedName, tt.wantFinished), 1)
-			want = strings.Replace(want, "      name: Pedido añadido 🛒\n", "      name: Pedido añadido 🛒\n      version: 0\n", 1)
-			if string(fixed) != want {
-				t.Errorf("Expected versions only where they are known offline\nwant:\n%s\ngot:\n%s", want, fixed)
-			}
-			untouched, err := os.ReadFile(filepath.Join(tracking, "other.yaml"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(untouched) != other {
-				t.Errorf("Expected the file holding only a duplicated spec to be left untouched, got:\n%s", untouched)
-			}
-			for _, want := range []string{
-				`msg="event specification version not added" file=` + filepath.Join(tracking, "checkout.yaml") + ` name="Checkout Started" reason="no version declared at the base, run dp validate --fix against Snowplow Console to add it"`,
-				`msg="event specification version not added" file=` + filepath.Join(tracking, "other.yaml") + ` name=Shared reason="defined in more than one file"`,
-			} {
-				if !strings.Contains(logOutput.String(), want) {
-					t.Errorf("Expected log line\nwant: %s\ngot:\n%s", want, logOutput.String())
-				}
-			}
-
-			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
-			if err != nil {
-				t.Errorf("Expected validate to pass after --fix, got: %v", err)
-			}
-			err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
-			if err != nil {
-				t.Errorf("Expected a second --fix to succeed, got: %v", err)
-			}
-			again, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(again) != want {
-				t.Errorf("Expected a second --fix to change nothing, got:\n%s", again)
-			}
+			checkFixAddsMissingVersions(t, tracking, original, other, tt.finishedName, tt.wantFinished)
 		})
+	}
+}
+
+func checkFixAddsMissingVersions(t *testing.T, tracking string, original string, other string, finishedName string, wantFinished int) {
+	t.Helper()
+	writeRepoFiles(t, tracking, map[string]string{"checkout.yaml": original, "other.yaml": other})
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err != nil {
+		t.Fatalf("Expected validate without versions to pass, got: %v", err)
+	}
+	if strings.Contains(logOutput.String(), "version") {
+		t.Errorf("Expected no version output without --fix, got:\n%s", logOutput.String())
+	}
+
+	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
+	if err != nil {
+		t.Fatalf("Expected --fix to succeed, got: %v", err)
+	}
+	fixed, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(original, "      name: "+finishedName+"\n", fmt.Sprintf("      name: %s\n      version: %d\n", finishedName, wantFinished), 1)
+	want = strings.Replace(want, "      name: Pedido añadido 🛒\n", "      name: Pedido añadido 🛒\n      version: 0\n", 1)
+	if string(fixed) != want {
+		t.Errorf("Expected versions only where they are known offline\nwant:\n%s\ngot:\n%s", want, fixed)
+	}
+	untouched, err := os.ReadFile(filepath.Join(tracking, "other.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(untouched) != other {
+		t.Errorf("Expected the file holding only a duplicated spec to be left untouched, got:\n%s", untouched)
+	}
+	for _, want := range []string{
+		`msg="event specification version not added" file=` + filepath.Join(tracking, "checkout.yaml") + ` name="Checkout Started" reason="no version declared at the base, run dp validate --fix against Snowplow Console to add it"`,
+		`msg="event specification version not added" file=` + filepath.Join(tracking, "other.yaml") + ` name=Shared reason="defined in more than one file"`,
+	} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Errorf("Expected log line\nwant: %s\ngot:\n%s", want, logOutput.String())
+		}
+	}
+
+	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
+	if err != nil {
+		t.Errorf("Expected validate to pass after --fix, got: %v", err)
+	}
+	err = ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
+	if err != nil {
+		t.Errorf("Expected a second --fix to succeed, got: %v", err)
+	}
+	again, err := os.ReadFile(filepath.Join(tracking, "checkout.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(again) != want {
+		t.Errorf("Expected a second --fix to change nothing, got:\n%s", again)
 	}
 }
