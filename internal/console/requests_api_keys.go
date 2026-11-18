@@ -21,8 +21,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-
-	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type APIKeyResponse struct {
@@ -89,7 +87,7 @@ func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description stri
 	if err != nil {
 		return nil, err
 	}
-	defer util.LoggingCloser(ctx, resp.Body)
+	defer closeBody(ctx, resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

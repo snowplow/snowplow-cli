@@ -25,7 +25,6 @@ import (
 	kjson "k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
-	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type msgResponse struct {
@@ -100,7 +99,7 @@ func Validate(cnx context.Context, client *ApiClient, ds model.DataStructure) (*
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +177,7 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +225,7 @@ func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, er
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +255,7 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -284,13 +283,13 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 	if err != nil {
 		return nil, err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 	}
 
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +364,7 @@ func getLatestSchemaVersions(cnx context.Context, client *ApiClient) (map[string
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +425,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -520,10 +519,10 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}

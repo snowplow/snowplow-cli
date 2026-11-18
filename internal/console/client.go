@@ -96,7 +96,7 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	if err != nil {
 		return nil, err
 	}
-	defer util.LoggingCloser(ctx, resp.Body)
+	defer closeBody(ctx, resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		return nil, &TokenError{StatusCode: resp.StatusCode}
 	}
@@ -160,5 +160,12 @@ func addStandardHeadersWithJwt(req *http.Request, cnx context.Context, jwt strin
 
 	if fromMCP, ok := cnx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
 		req.Header.Add("X-Snowplow-Cli-Source", "mcp")
+	}
+}
+
+func closeBody(ctx context.Context, body io.Closer) {
+	if err := body.Close(); err != nil {
+		logger := logging.LoggerFromContext(ctx)
+		logger.Error("Error closing", "msg", err.Error())
 	}
 }
