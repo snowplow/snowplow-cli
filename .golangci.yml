@@ -37,7 +37,7 @@ linters:
     - wrapcheck
   settings:
     gocognit:
-      min-complexity: 90
+      min-complexity: 84
     gocyclo:
       min-complexity: 42
     maintidx:

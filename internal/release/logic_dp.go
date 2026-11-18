@@ -193,200 +193,253 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 	return &res, nil
 }
 
+type changeFinder struct {
+	local               LocalFilesRefsResolved
+	remoteDataProducts  map[string]console.RemoteDataProduct
+	remoteEventSpecs    map[string]console.RemoteEventSpec
+	remoteImageHashById map[string]string
+	changes             *DataProductChangeSet
+	seen                seenEventSpecs
+	missingVersions     []model.EventSpecMissingVersion
+	missingVersionIds   []string
+}
+
+type seenEventSpecs struct {
+	files     map[string]string
+	versioned map[string]bool
+	count     map[string]int
+}
+
+func (seen seenEventSpecs) add(es model.EventSpec, dpFile string) {
+	seen.files[es.ResourceName] = dpFile
+	seen.count[es.ResourceName]++
+	if es.Version != nil {
+		seen.versioned[es.ResourceName] = true
+	}
+}
+
+type expectedEventSpecVersion struct {
+	version               int
+	isNew                 bool
+	changed               []string
+	entityCommentsRemoved bool
+}
+
 func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRelatedResources, remoteImageHashById map[string]string) (*DataProductChangeSet, error) {
+	finder := changeFinder{
+		local:               local,
+		remoteDataProducts:  make(map[string]console.RemoteDataProduct),
+		remoteEventSpecs:    make(map[string]console.RemoteEventSpec),
+		remoteImageHashById: remoteImageHashById,
+		changes: &DataProductChangeSet{
+			IdToFileName:     make(map[string]string),
+			declaredVersions: make(map[string]int),
+		},
+		seen: seenEventSpecs{
+			files:     make(map[string]string),
+			versioned: make(map[string]bool),
+			count:     make(map[string]int),
+		},
+	}
+	for _, remoteDp := range remote.DataProducts {
+		finder.remoteDataProducts[remoteDp.Id] = remoteDp
+	}
+	for _, remoteEs := range remote.EventSpecs {
+		finder.remoteEventSpecs[remoteEs.Id] = remoteEs
+	}
+
+	finder.addSourceAppChanges(remote.SourceApplication)
+	for _, localDp := range local.DataProudcts {
+		finder.addDataProductChange(localDp)
+		if err := finder.addEventSpecChanges(localDp); err != nil {
+			return nil, err
+		}
+		finder.addEventSpecDeletes(localDp)
+	}
+
+	finder.changes.localEventSpecIds = make([]string, 0, len(finder.seen.files))
+	for id := range finder.seen.files {
+		finder.changes.localEventSpecIds = append(finder.changes.localEventSpecIds, id)
+	}
+	finder.changes.MissingVersions = withoutDuplicatedEventSpecs(finder.missingVersions, finder.missingVersionIds, finder.seen.count)
+
+	return finder.changes, nil
+}
+
+func (f *changeFinder) addFileName(id string) {
+	f.changes.IdToFileName[id] = f.local.IdToFileName[id]
+}
+
+func (f *changeFinder) addSourceAppChanges(remote []console.RemoteSourceApplication) {
 	saRemoteIds := make(map[string]console.RemoteSourceApplication)
-	idToFileName := make(map[string]string)
-	for _, remoteSa := range remote.SourceApplication {
+	for _, remoteSa := range remote {
 		saRemoteIds[remoteSa.Id] = remoteSa
 	}
-	var saCreate []console.RemoteSourceApplication
-	var saUpdate []console.RemoteSourceApplication
 
-	for _, localSa := range local.SourceApps {
+	for _, localSa := range f.local.SourceApps {
+		possibleUpdate := localSaToRemote(localSa)
 		currentRemote, remoteExists := saRemoteIds[localSa.ResourceName]
+		if !remoteExists {
+			f.changes.saCreate = append(f.changes.saCreate, possibleUpdate)
+			f.addFileName(localSa.ResourceName)
+			continue
+		}
+		if !reflect.DeepEqual(saToDiff(possibleUpdate), saToDiff(currentRemote)) {
+			f.changes.saUpdate = append(f.changes.saUpdate, possibleUpdate)
+			f.addFileName(localSa.ResourceName)
+		}
+	}
+}
 
-		if remoteExists {
-			possibleUpdate := localSaToRemote(localSa)
-			if !reflect.DeepEqual(saToDiff(possibleUpdate), saToDiff(currentRemote)) {
-				saUpdate = append(saUpdate, possibleUpdate)
-				idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
-			}
-		} else {
-			saCreate = append(saCreate, localSaToRemote(localSa))
-			idToFileName[localSa.ResourceName] = local.IdToFileName[localSa.ResourceName]
+func (f *changeFinder) addDataProductChange(localDp model.DataProduct) {
+	possibleUpdate := LocalDpToRemote(localDp)
+	remoteDp, remoteExists := f.remoteDataProducts[localDp.ResourceName]
+	if !remoteExists {
+		f.changes.dpCreate = append(f.changes.dpCreate, possibleUpdate)
+		f.addFileName(localDp.ResourceName)
+		return
+	}
+	if !reflect.DeepEqual(dpToDiff(possibleUpdate), dpToDiff(remoteDp)) {
+		f.changes.dpUpdate = append(f.changes.dpUpdate, possibleUpdate)
+		f.addFileName(localDp.ResourceName)
+	}
+}
+
+func (f *changeFinder) addEventSpecChanges(localDp model.DataProduct) error {
+	dpFile := f.local.IdToFileName[localDp.ResourceName]
+	var dpSaIds []string
+	for _, sa := range localDp.Data.SourceApplications {
+		dpSaIds = append(dpSaIds, sa["id"])
+	}
+
+	for esIdx, es := range localDp.Data.EventSpecifications {
+		if previousFile, seen := f.seen.files[es.ResourceName]; seen && (es.Version != nil || f.seen.versioned[es.ResourceName]) {
+			return duplicateEventSpecError(es.ResourceName, previousFile, dpFile)
+		}
+		f.seen.add(es, dpFile)
+
+		expected, err := f.addEventSpecChange(LocalEventSpecToRemote(es, dpSaIds, localDp.ResourceName))
+		if err != nil {
+			return err
+		}
+		f.recordEventSpecVersion(localEventSpec{fileName: dpFile, index: esIdx, spec: es}, expected)
+	}
+
+	return nil
+}
+
+func (f *changeFinder) addEventSpecChange(possibleUpdate console.RemoteEventSpec) (expectedEventSpecVersion, error) {
+	remoteEs, remoteExists := f.remoteEventSpecs[possibleUpdate.Id]
+	if remoteExists {
+		return f.addEventSpecUpdate(possibleUpdate, remoteEs)
+	}
+
+	f.changes.esCreate = append(f.changes.esCreate, possibleUpdate)
+	f.addFileName(possibleUpdate.Id)
+	for _, t := range possibleUpdate.Triggers {
+		triggerImage, exists := f.local.TriggerImageRefsById[t.Id]
+		if exists {
+			f.changes.imageCreate = append(f.changes.imageCreate, triggerImage)
 		}
 	}
 
-	dpRemoteIds := make(map[string]console.RemoteDataProduct)
-	for _, remoteDp := range remote.DataProducts {
-		dpRemoteIds[remoteDp.Id] = remoteDp
+	return expectedEventSpecVersion{isNew: true, changed: []string{}}, nil
+}
+
+func (f *changeFinder) addEventSpecUpdate(possibleUpdate console.RemoteEventSpec, remoteEs console.RemoteEventSpec) (expectedEventSpecVersion, error) {
+	updateDiff, err := esToDiff(possibleUpdate)
+	if err != nil {
+		return expectedEventSpecVersion{}, err
+	}
+	remoteDiff, err := esToDiff(remoteEs)
+	if err != nil {
+		return expectedEventSpecVersion{}, err
+	}
+	// check triggers separately because of images
+	triggerChangeset := findTriggerChanges(possibleUpdate.Triggers, remoteEs.Triggers, f.local.TriggerImageRefsById, f.remoteImageHashById)
+	// assign remote variant urls to update where image hashes are the same
+	possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
+	if reflect.DeepEqual(*remoteDiff, *updateDiff) && !triggerChangeset.isChanged {
+		return expectedEventSpecVersion{version: remoteEs.Version, changed: []string{}}, nil
 	}
 
-	var dpCreate []console.RemoteDataProduct
-	var dpUpdate []console.RemoteDataProduct
+	expected, err := expectedVersionAfterUpdate(remoteEs, possibleUpdate)
+	if err != nil {
+		return expectedEventSpecVersion{}, err
+	}
+	f.changes.esUpdate = append(f.changes.esUpdate, possibleUpdate)
+	f.addFileName(possibleUpdate.Id)
+	f.changes.imageCreate = append(f.changes.imageCreate, triggerChangeset.imagesToUpload...)
 
-	esRemoteIds := make(map[string]console.RemoteEventSpec)
-	for _, remoteEs := range remote.EventSpecs {
-		esRemoteIds[remoteEs.Id] = remoteEs
+	return expected, nil
+}
+
+func expectedVersionAfterUpdate(remoteEs console.RemoteEventSpec, update console.RemoteEventSpec) (expectedEventSpecVersion, error) {
+	changedFields, err := changedStructuralFields(remoteEs, update)
+	if err != nil {
+		return expectedEventSpecVersion{}, err
+	}
+	expected := expectedEventSpecVersion{version: remoteEs.Version, changed: changedFields}
+	if len(changedFields) > 0 {
+		expected.version = remoteEs.Version + 1
+	}
+	if !slices.Contains(changedFields, "entities") {
+		return expected, nil
 	}
 
-	var esCreate []console.RemoteEventSpec
-	var esUpdate []console.RemoteEventSpec
-	var esDelete []console.RemoteEventSpec
+	remoteWithoutComments := remoteEs
+	remoteWithoutComments.Entities = console.Entities{
+		Tracked:  entitiesWithoutComments(remoteEs.Entities.Tracked),
+		Enriched: entitiesWithoutComments(remoteEs.Entities.Enriched),
+	}
+	changedIgnoringComments, err := changedStructuralFields(remoteWithoutComments, update)
+	if err != nil {
+		return expectedEventSpecVersion{}, err
+	}
+	expected.entityCommentsRemoved = !slices.Contains(changedIgnoringComments, "entities")
 
-	esLocalIds := make(map[string]bool)
-	esLocalFiles := make(map[string]string)
-	esLocalVersioned := make(map[string]bool)
-	declaredVersions := make(map[string]int)
-	var versionMismatches []model.EventSpecVersionMismatch
-	esLocalCount := make(map[string]int)
-	var missingVersions []model.EventSpecMissingVersion
-	var missingVersionIds []string
+	return expected, nil
+}
 
-	var imageCreate []TriggerImageReference
-
-	for _, localDp := range local.DataProudcts {
-		remoteDp, remoteExists := dpRemoteIds[localDp.ResourceName]
-		if remoteExists {
-			possibleUpdate := LocalDpToRemote(localDp)
-			if !reflect.DeepEqual(dpToDiff(possibleUpdate), dpToDiff(remoteDp)) {
-				dpUpdate = append(dpUpdate, possibleUpdate)
-				idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
-			}
-		} else {
-			dpCreate = append(dpCreate, LocalDpToRemote(localDp))
-			idToFileName[localDp.ResourceName] = local.IdToFileName[localDp.ResourceName]
-		}
-		var dpSaIds []string
-		for _, sa := range localDp.Data.SourceApplications {
-			dpSaIds = append(dpSaIds, sa["id"])
-		}
-
-		for esIdx, localEs := range localDp.Data.EventSpecifications {
-			dpFile := local.IdToFileName[localDp.ResourceName]
-			if previousFile, seen := esLocalFiles[localEs.ResourceName]; seen && (localEs.Version != nil || esLocalVersioned[localEs.ResourceName]) {
-				return nil, duplicateEventSpecError(localEs.ResourceName, previousFile, dpFile)
-			}
-			esLocalFiles[localEs.ResourceName] = dpFile
-			esLocalCount[localEs.ResourceName]++
-			if localEs.Version != nil {
-				esLocalVersioned[localEs.ResourceName] = true
-			}
-
-			remoteEs, remoteExists := esRemoteIds[localEs.ResourceName]
-			expectedVersion := 0
-			changedFields := []string{}
-			entityCommentsRemoved := false
-			if remoteExists {
-				expectedVersion = remoteEs.Version
-				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
-				updateDiff, err := esToDiff(possibleUpdate)
-				if err != nil {
-					return nil, err
-				}
-				remoteDiff, err := esToDiff(remoteEs)
-				if err != nil {
-					return nil, err
-				}
-				// check triggers separately because of images
-				triggerChangeset := findTriggerChanges(possibleUpdate.Triggers, remoteEs.Triggers, local.TriggerImageRefsById, remoteImageHashById)
-				// assign remote variant urls to update where image hashes are the same
-				possibleUpdate.Triggers = triggerChangeset.triggersWithOriginalVariantUrls
-				if !reflect.DeepEqual(*remoteDiff, *updateDiff) || triggerChangeset.isChanged {
-					changedFields, err = changedStructuralFields(remoteEs, possibleUpdate)
-					if err != nil {
-						return nil, err
-					}
-					if len(changedFields) > 0 {
-						expectedVersion = remoteEs.Version + 1
-					}
-					if slices.Contains(changedFields, "entities") {
-						remoteWithoutComments := remoteEs
-						remoteWithoutComments.Entities = console.Entities{
-							Tracked:  entitiesWithoutComments(remoteEs.Entities.Tracked),
-							Enriched: entitiesWithoutComments(remoteEs.Entities.Enriched),
-						}
-						changedIgnoringComments, err := changedStructuralFields(remoteWithoutComments, possibleUpdate)
-						if err != nil {
-							return nil, err
-						}
-						entityCommentsRemoved = !slices.Contains(changedIgnoringComments, "entities")
-					}
-					esUpdate = append(esUpdate, possibleUpdate)
-					idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
-					imageCreate = append(imageCreate, triggerChangeset.imagesToUpload...)
-				}
-			} else {
-				possibleUpdate := LocalEventSpecToRemote(localEs, dpSaIds, localDp.ResourceName)
-				esCreate = append(esCreate, possibleUpdate)
-				idToFileName[localEs.ResourceName] = local.IdToFileName[localEs.ResourceName]
-				for _, t := range possibleUpdate.Triggers {
-					triggerImage, exists := local.TriggerImageRefsById[t.Id]
-					if exists {
-						imageCreate = append(imageCreate, triggerImage)
-					}
-				}
-			}
-
-			esLocalIds[localEs.ResourceName] = true
-
-			if localEs.Version != nil {
-				declaredVersions[localEs.ResourceName] = *localEs.Version
-				if *localEs.Version != expectedVersion {
-					versionMismatches = append(versionMismatches, model.EventSpecVersionMismatch{
-						FileName:              local.IdToFileName[localEs.ResourceName],
-						Index:                 esIdx,
-						Name:                  localEs.Name,
-						Declared:              *localEs.Version,
-						Expected:              expectedVersion,
-						IsNew:                 !remoteExists,
-						Changed:               changedFields,
-						EntityCommentsRemoved: entityCommentsRemoved,
-					})
-				}
-			} else {
-				expected := expectedVersion
-				missingVersions = append(missingVersions, model.EventSpecMissingVersion{
-					FileName: dpFile,
-					Index:    esIdx,
-					Name:     localEs.Name,
-					Expected: &expected,
-				})
-				missingVersionIds = append(missingVersionIds, localEs.ResourceName)
-			}
-		}
-
-		for _, remoteEsId := range remoteDp.EventSpecs {
-			_, localExists := esLocalIds[remoteEsId.Id]
-			if !localExists {
-				// Remote exists, but local is missing, delete event spec
-				esDelete = append(esDelete, esRemoteIds[remoteEsId.Id])
-				// Not a filename, DP name, since file does not exist anymore
-				idToFileName[remoteEsId.Id] = remoteDp.Name
-			}
-		}
+func (f *changeFinder) recordEventSpecVersion(localEs localEventSpec, expected expectedEventSpecVersion) {
+	es := localEs.spec
+	if es.Version == nil {
+		f.missingVersions = append(f.missingVersions, model.EventSpecMissingVersion{
+			FileName: localEs.fileName,
+			Index:    localEs.index,
+			Name:     es.Name,
+			Expected: &expected.version,
+		})
+		f.missingVersionIds = append(f.missingVersionIds, es.ResourceName)
+		return
 	}
 
-	localEsIds := make([]string, 0, len(esLocalIds))
-	for id := range esLocalIds {
-		localEsIds = append(localEsIds, id)
+	f.changes.declaredVersions[es.ResourceName] = *es.Version
+	if *es.Version != expected.version {
+		f.changes.VersionMismatches = append(f.changes.VersionMismatches, model.EventSpecVersionMismatch{
+			FileName:              f.local.IdToFileName[es.ResourceName],
+			Index:                 localEs.index,
+			Name:                  es.Name,
+			Declared:              *es.Version,
+			Expected:              expected.version,
+			IsNew:                 expected.isNew,
+			Changed:               expected.changed,
+			EntityCommentsRemoved: expected.entityCommentsRemoved,
+		})
 	}
+}
 
-	return &DataProductChangeSet{
-		saCreate:          saCreate,
-		saUpdate:          saUpdate,
-		dpCreate:          dpCreate,
-		dpUpdate:          dpUpdate,
-		esCreate:          esCreate,
-		esUpdate:          esUpdate,
-		esDelete:          esDelete,
-		imageCreate:       imageCreate,
-		IdToFileName:      idToFileName,
-		localEventSpecIds: localEsIds,
-		declaredVersions:  declaredVersions,
-		VersionMismatches: versionMismatches,
-		MissingVersions:   withoutDuplicatedEventSpecs(missingVersions, missingVersionIds, esLocalCount),
-	}, nil
+func (f *changeFinder) addEventSpecDeletes(localDp model.DataProduct) {
+	remoteDp := f.remoteDataProducts[localDp.ResourceName]
+	for _, remoteEsId := range remoteDp.EventSpecs {
+		_, localExists := f.seen.files[remoteEsId.Id]
+		if !localExists {
+			// Remote exists, but local is missing, delete event spec
+			f.changes.esDelete = append(f.changes.esDelete, f.remoteEventSpecs[remoteEsId.Id])
+			// Not a filename, DP name, since file does not exist anymore
+			f.changes.IdToFileName[remoteEsId.Id] = remoteDp.Name
+		}
+	}
 }
 
 type triggerChangeset struct {

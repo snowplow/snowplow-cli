@@ -1732,3 +1732,69 @@ func Test_findChanges_MissingVersionOfDuplicateIsNotAdded(t *testing.T) {
 		t.Errorf("expected no version for a duplicated spec, reported in the last file, got %+v", m)
 	}
 }
+
+func Test_findChanges_FileNamesOfChanges(t *testing.T) {
+	local := LocalFilesRefsResolved{
+		SourceApps: []model.SourceApp{{ResourceName: "sa-new", Data: model.SourceAppData{Name: "Source App 1"}}},
+		DataProudcts: []model.DataProduct{{
+			ResourceName: "dp-changed",
+			Data: model.DataProductData{
+				Name:                "Data Product 1 Updated",
+				EventSpecifications: []model.EventSpec{{ResourceName: "es-new", Name: "Event Spec 1"}},
+			},
+		}},
+		IdToFileName: map[string]string{
+			"sa-new":     "/base/sa.yaml",
+			"dp-changed": "/base/dp.yaml",
+			"es-new":     "/base/dp.yaml",
+		},
+	}
+	remote := console.DataProductsAndRelatedResources{
+		DataProducts: []console.RemoteDataProduct{{
+			Id:         "dp-changed",
+			Name:       "Data Product 1",
+			EventSpecs: []console.EventSpecReference{{Id: "es-gone"}},
+		}},
+		EventSpecs: []console.RemoteEventSpec{{Id: "es-gone", Name: "Event Spec 2"}},
+	}
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]string{
+		"sa-new":     "/base/sa.yaml",
+		"dp-changed": "/base/dp.yaml",
+		"es-new":     "/base/dp.yaml",
+		"es-gone":    "Data Product 1",
+	}
+	if diff := cmp.Diff(want, changes.IdToFileName); diff != "" {
+		t.Errorf("unexpected file names (-want +got):\n%s", diff)
+	}
+}
+
+func Test_findChanges_NewEventSpecPublishesTriggerImage(t *testing.T) {
+	image := TriggerImageReference{eventSpecId: "es-new", triggerId: "trigger-1", fname: "/base/image.png", hash: "abc"}
+	local := LocalFilesRefsResolved{
+		DataProudcts: []model.DataProduct{{
+			ResourceName: "dp-new",
+			Data: model.DataProductData{
+				Name: "Data Product 1",
+				EventSpecifications: []model.EventSpec{{
+					ResourceName: "es-new",
+					Name:         "Event Spec 1",
+					Triggers:     []model.Trigger{{Id: "trigger-1"}, {Id: "trigger-without-image"}},
+				}},
+			},
+		}},
+		TriggerImageRefsById: map[string]TriggerImageReference{"trigger-1": image},
+	}
+
+	changes, err := findChanges(local, console.DataProductsAndRelatedResources{}, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(changes.imageCreate, []TriggerImageReference{image}) {
+		t.Errorf("expected the image of the new event spec to be published, got %+v", changes.imageCreate)
+	}
+}
