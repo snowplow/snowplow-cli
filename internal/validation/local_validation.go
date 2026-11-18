@@ -39,7 +39,11 @@ func validateDs(validate *validator.Validate, ds model.DataStructure) error {
 	var allErrs []validation
 
 	if errs != nil {
-		for _, e := range errs.(validator.ValidationErrors) {
+		var fieldErrs validator.ValidationErrors
+		if !errors.As(errs, &fieldErrs) {
+			return errs
+		}
+		for _, e := range fieldErrs {
 			path := "dataStructure." + strings.TrimPrefix(e.Namespace(), "DataStructure.")
 			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
@@ -47,7 +51,11 @@ func validateDs(validate *validator.Validate, ds model.DataStructure) error {
 	}
 
 	if errsData != nil {
-		for _, e := range errsData.(validator.ValidationErrors) {
+		var dataFieldErrs validator.ValidationErrors
+		if !errors.As(errsData, &dataFieldErrs) {
+			return errsData
+		}
+		for _, e := range dataFieldErrs {
 			path := "dataStructure.data." + strings.TrimPrefix(e.Namespace(), "DataStructureData.")
 			res := validation{e.Field(), path, e.Tag(), e.Value(), e.Error()}
 			allErrs = append(allErrs, res)
@@ -95,8 +103,7 @@ func ValidateLocalDs(dss map[string]model.DataStructure) []error {
 	for fileName, ds := range dss {
 		errs := validateDs(validate, ds)
 		if errs != nil {
-			error := errors.Join(fmt.Errorf("validation failed for %s", fileName), errs)
-			allErrors = append(allErrors, error)
+			allErrors = append(allErrors, errors.Join(fmt.Errorf("validation failed for %s", fileName), errs))
 		}
 		data, err := ds.ParseData()
 		if err != nil {

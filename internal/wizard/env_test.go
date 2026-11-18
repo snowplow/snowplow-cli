@@ -92,15 +92,15 @@ func TestGitTracked(t *testing.T) {
 	}
 	git("init", "-q")
 	_ = os.WriteFile(filepath.Join(dir, ".env"), []byte("A=1\n"), 0600)
-	if gitTracked(dir, ".env") {
+	if envTracked(dir) {
 		t.Fatal("an untracked .env reported as tracked")
 	}
 	git("add", ".env")
 	git("commit", "-q", "-m", "oops")
-	if !gitTracked(dir, ".env") {
+	if !envTracked(dir) {
 		t.Fatal("a committed .env wasn't detected")
 	}
-	if gitTracked(t.TempDir(), ".env") {
+	if envTracked(t.TempDir()) {
 		t.Fatal("outside a repo nothing is tracked")
 	}
 }

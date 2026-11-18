@@ -7,6 +7,7 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
+
 package release
 
 import (
@@ -585,9 +586,9 @@ func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string, is
 }
 
 type DataProductPurger interface {
-	DeleteSourceApp(sa console.RemoteSourceApplication) error
-	DeleteDataProduct(dp console.RemoteDataProduct) error
-	FetchDataProduct() (*console.DataProductsAndRelatedResources, error)
+	DeleteSourceApp(ctx context.Context, sa console.RemoteSourceApplication) error
+	DeleteDataProduct(ctx context.Context, dp console.RemoteDataProduct) error
+	FetchDataProduct(ctx context.Context) (*console.DataProductsAndRelatedResources, error)
 }
 
 func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]any, commit bool) error {
@@ -595,7 +596,7 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 	if err != nil {
 		return err
 	}
-	remote, err := api.FetchDataProduct()
+	remote, err := api.FetchDataProduct(ctx)
 	if err != nil {
 		return err
 	}
@@ -637,7 +638,7 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 
 	for n, r := range purgeApps {
 		slog.Debug("purge", "msg", "deleting remote", "source app", n)
-		if err := api.DeleteSourceApp(r); err != nil {
+		if err := api.DeleteSourceApp(ctx, r); err != nil {
 			slog.Error("purge", "msg", "failed", "source app", n)
 			return fmt.Errorf("purge failed: %w", err)
 		}
@@ -647,7 +648,7 @@ func Purge(ctx context.Context, api DataProductPurger, dp map[string]map[string]
 
 	for n, r := range purgeProds {
 		slog.Debug("purge", "msg", "deleting remote", "data product", n)
-		if err := api.DeleteDataProduct(r); err != nil {
+		if err := api.DeleteDataProduct(ctx, r); err != nil {
 			slog.Error("purge", "msg", "failed", "data product", n)
 			return fmt.Errorf("purge failed: %w", err)
 		}

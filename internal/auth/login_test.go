@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -940,9 +941,7 @@ func Test_Contract_RefreshKeepsUnknownFields(t *testing.T) {
 				"expires_in":    3600,
 			})
 			expired := map[string]json.RawMessage{}
-			for key, value := range c.File {
-				expired[key] = value
-			}
+			maps.Copy(expired, c.File)
 			expired["expires_at"] = json.RawMessage(`"2020-01-01T00:00:00.000Z"`)
 			writeContractFile(t, path, expired)
 

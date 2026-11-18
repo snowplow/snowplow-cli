@@ -60,7 +60,7 @@ func gitDirty(dir string) bool {
 	return err == nil && out != ""
 }
 
-func gitTracked(dir, name string) bool {
-	_, err := git(dir, "ls-files", "--error-unmatch", "--", name)
+func envTracked(dir string) bool {
+	_, err := git(dir, "ls-files", "--error-unmatch", "--", ".env")
 	return err == nil
 }

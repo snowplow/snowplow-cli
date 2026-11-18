@@ -42,11 +42,9 @@ func cardinalityCheck(key string, i int, s model.SchemaRef) DPValidations {
 				errors[path] = append(errors[path], fmt.Sprintf("must be > minCardinality: %d", *s.MinCardinality))
 			}
 		}
-	} else {
-		if s.MaxCardinality != nil {
-			path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
-			errors[path] = append(errors[path], "without minCardinality")
-		}
+	} else if s.MaxCardinality != nil {
+		path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
+		errors[path] = append(errors[path], "without minCardinality")
 	}
 	return DPValidations{ErrorsWithPaths: errors}
 }

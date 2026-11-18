@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 
 	"github.com/r3labs/diff/v3"
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -82,7 +83,7 @@ func GetChanges(locals map[string]model.DataStructure, remoteListing []console.L
 		if !exists {
 			res.ToCreate = append(res.ToCreate, NewDSChangeContext(ds, f))
 		} else {
-			//Remote DS exists,
+			// Remote DS exists,
 			if !reflect.DeepEqual(ds.Meta, remotePair.Meta) {
 				// Meta is different, needs updating
 				res.ToUpdateMeta = append(res.ToUpdateMeta, NewDSChangeContext(ds, f))
@@ -120,7 +121,7 @@ func GetChanges(locals map[string]model.DataStructure, remoteListing []console.L
 
 func PerformChangesDev(cnx context.Context, c *console.ApiClient, changes Changes, managedFrom string) error {
 	// Create and create new version both follow the same logic
-	validatePublish := append(changes.ToCreate, changes.ToUpdateNewVersion...)
+	validatePublish := slices.Concat(changes.ToCreate, changes.ToUpdateNewVersion)
 	for _, ds := range validatePublish {
 		vr, err := console.Validate(cnx, c, ds.DS)
 		if err != nil {
@@ -169,7 +170,7 @@ func PerformChangesProd(cnx context.Context, c *console.ApiClient, changes Chang
 	if err != nil {
 		return err
 	}
-	validatePublish := append(changes.ToCreate, changes.ToUpdateNewVersion...)
+	validatePublish := slices.Concat(changes.ToCreate, changes.ToUpdateNewVersion)
 	for _, ds := range validatePublish {
 		_, err := console.PublishProd(cnx, c, ds.DS, managedFrom)
 		if err != nil {

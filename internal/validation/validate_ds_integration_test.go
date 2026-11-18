@@ -28,7 +28,7 @@ import (
 
 func TestValidateDataStructuresWithClient_HappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataStructure(t, tmpDir, "test.yaml")
+	writeValidDataStructure(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -83,7 +83,7 @@ func TestValidateDataStructuresWithClient_LocalValidationFailure(t *testing.T) {
 
 func TestValidateDataStructuresWithClient_NetworkFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataStructure(t, tmpDir, "test.yaml")
+	writeValidDataStructure(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -110,7 +110,7 @@ func TestValidateDataStructuresWithClient_NetworkFailure(t *testing.T) {
 
 func TestValidateDataStructuresWithClient_RemoteValidationFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataStructure(t, tmpDir, "test.yaml")
+	writeValidDataStructure(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -137,7 +137,7 @@ func TestValidateDataStructuresWithClient_RemoteValidationFailure(t *testing.T) 
 
 func TestValidateDataStructuresWithClient_GitHubAnnotations(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataStructure(t, tmpDir, "test.yaml")
+	writeValidDataStructure(t, tmpDir)
 
 	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 
@@ -176,7 +176,7 @@ func TestValidateDataStructuresWithClient_EmptyPaths(t *testing.T) {
 
 func TestValidateDataStructuresWithClient_NoLoggerInContext(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataStructure(t, tmpDir, "test.yaml")
+	writeValidDataStructure(t, tmpDir)
 
 	ctx := context.Background()
 
@@ -187,7 +187,7 @@ func TestValidateDataStructuresWithClient_NoLoggerInContext(t *testing.T) {
 	t.Logf("Function completed with error: %v", err)
 }
 
-func writeValidDataStructure(t *testing.T, dir, filename string) {
+func writeValidDataStructure(t *testing.T, dir string) {
 	validDS := `apiVersion: v1
 resourceType: data-structure
 meta:
@@ -207,7 +207,7 @@ data:
       type: string
 `
 
-	err := os.WriteFile(filepath.Join(dir, filename), []byte(validDS), 0644)
+	err := os.WriteFile(filepath.Join(dir, "test.yaml"), []byte(validDS), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write valid test file: %v", err)
 	}

@@ -108,17 +108,18 @@ func fileDeclaresVersions(dpFileName string) bool {
 func AddEventSpecs(ess []model.EventSpecCanonical, file []byte, dpFileName string) ([]byte, error) {
 	var output []byte
 	var err error
-	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
+	switch {
+	case strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml"):
 		output, err = modifyYaml(ess, file)
 		if err != nil {
 			return []byte{}, err
 		}
-	} else if strings.HasSuffix(dpFileName, ".json") {
+	case strings.HasSuffix(dpFileName, ".json"):
 		output, err = modifyJson(ess, file)
 		if err != nil {
 			return []byte{}, err
 		}
-	} else {
+	default:
 		return []byte{}, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
 	}
 	return output, nil
@@ -243,17 +244,18 @@ func SetEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) 
 func SetEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName string) ([]byte, error) {
 	var output []byte
 	var err error
-	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
+	switch {
+	case strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml"):
 		output, err = setVersionsYaml(versionsByIndex, file)
 		if err != nil {
 			return nil, err
 		}
-	} else if strings.HasSuffix(dpFileName, ".json") {
+	case strings.HasSuffix(dpFileName, ".json"):
 		output, err = setVersionsJson(versionsByIndex, file)
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
 	}
 	return output, nil
@@ -357,17 +359,18 @@ func AddEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) 
 func AddEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName string) ([]byte, error) {
 	var output []byte
 	var err error
-	if strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml") {
+	switch {
+	case strings.HasSuffix(dpFileName, ".yaml") || strings.HasSuffix(dpFileName, "yml"):
 		output, err = addVersionsYaml(versionsByIndex, file)
 		if err != nil {
 			return nil, err
 		}
-	} else if strings.HasSuffix(dpFileName, ".json") {
+	case strings.HasSuffix(dpFileName, ".json"):
 		output, err = addVersionsJson(versionsByIndex, file)
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("file has not recognized extension %s. Recognized are .yaml, .yml, .json", dpFileName)
 	}
 	return output, nil

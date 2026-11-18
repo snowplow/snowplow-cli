@@ -311,7 +311,7 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 
 	if err := server.ServeStdio(s); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			return fmt.Errorf("MCP server error: %v", err)
+			return fmt.Errorf("MCP server error: %w", err)
 		}
 	}
 
@@ -458,13 +458,13 @@ func getSnowplowContext(_ context.Context) (string, error) {
 
 	tmpl, err := template.New("context").Parse(contextTemplate)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %v", err)
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var result strings.Builder
 	err = tmpl.Execute(&result, ContextData{Schemas: schemas})
 	if err != nil {
-		return "", fmt.Errorf("failed to execute template: %v", err)
+		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return result.String(), nil

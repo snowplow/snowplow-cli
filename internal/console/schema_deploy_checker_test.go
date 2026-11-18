@@ -21,7 +21,7 @@ func Test_IsDeployed_Iglu(t *testing.T) {
 
 	uri := "iglu:vendor/name/format/version"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{uri},
 		[]ListResponse{},
 		func(h string) ([]Deployment, error) {
@@ -40,7 +40,7 @@ func Test_IsDeployed_BuiltIn(t *testing.T) {
 
 	uri := "iglu:com.snowplowanalytics.snowplow/page_view/jsonschema/1-0-0"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{},
 		[]ListResponse{},
 		func(h string) ([]Deployment, error) {
@@ -58,7 +58,7 @@ func Test_IsDeployed_BuiltIn(t *testing.T) {
 func Test_IsDeployed_ConsoleLucky(t *testing.T) {
 	uri := "iglu:vendor/name/format/1-0-0"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{},
 		[]ListResponse{{
 			Hash:        "hash",
@@ -82,7 +82,7 @@ func Test_IsDeployed_ConsoleLucky(t *testing.T) {
 func Test_IsDeployed_ConsoleUnLucky(t *testing.T) {
 	uri := "iglu:vendor/name/format/1-0-0"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{},
 		[]ListResponse{{
 			Hash:        "hash",
@@ -106,7 +106,7 @@ func Test_IsDeployed_ConsoleUnLucky(t *testing.T) {
 func Test_IsDeployed_ConsoleAlternatives(t *testing.T) {
 	uri := "iglu:vendor/name/format/1-0-10"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{},
 		[]ListResponse{{
 			Hash:        "hash",
@@ -138,7 +138,7 @@ func Test_IsDeployed_ConsoleAlternatives(t *testing.T) {
 func Test_IsDeployed_ConsoleAlternativesFail(t *testing.T) {
 	uri := "iglu:vendor/name/format/1-0-10"
 
-	mock := &schemaDeployCheckProvider{
+	mock := &SchemaDeployCheckProvider{
 		[]string{},
 		[]ListResponse{{
 			Hash:        "hash",

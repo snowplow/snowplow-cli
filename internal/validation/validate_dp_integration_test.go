@@ -34,8 +34,8 @@ import (
 
 func TestValidateDataProductsWithClient_HappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -87,8 +87,8 @@ func TestValidateDataProductsWithClient_LocalValidationFailure(t *testing.T) {
 
 func TestValidateDataProductsWithClient_NetworkFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -110,8 +110,8 @@ func TestValidateDataProductsWithClient_NetworkFailure(t *testing.T) {
 
 func TestValidateDataProductsWithClient_CompatibilityCheckFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -135,8 +135,8 @@ func TestValidateDataProductsWithClient_CompatibilityCheckFailure(t *testing.T) 
 
 func TestValidateDataProductsWithClient_GitHubAnnotations(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 
@@ -151,8 +151,8 @@ func TestValidateDataProductsWithClient_GitHubAnnotations(t *testing.T) {
 
 func TestValidateDataProductsWithClient_ConcurrencyLimits(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	var logOutput bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logOutput, &slog.HandlerOptions{
@@ -188,8 +188,8 @@ func TestValidateDataProductsWithClient_ConcurrencyLimits(t *testing.T) {
 
 func TestValidateDataProductsWithClient_NoLoggerInContext(t *testing.T) {
 	tmpDir := t.TempDir()
-	writeValidDataProduct(t, tmpDir, "test-dp.yaml")
-	writeValidSourceApp(t, tmpDir, "test-sa.yaml")
+	writeValidDataProduct(t, tmpDir)
+	writeValidSourceApp(t, tmpDir)
 
 	ctx := context.Background()
 
@@ -200,7 +200,7 @@ func TestValidateDataProductsWithClient_NoLoggerInContext(t *testing.T) {
 	t.Logf("Function completed with error: %v", err)
 }
 
-func writeValidDataProduct(t *testing.T, dir, filename string) {
+func writeValidDataProduct(t *testing.T, dir string) {
 	validDP := `apiVersion: v1
 resourceType: data-product
 resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
@@ -232,13 +232,13 @@ data:
       excludedSourceApplications: []
 `
 
-	err := os.WriteFile(filepath.Join(dir, filename), []byte(validDP), 0644)
+	err := os.WriteFile(filepath.Join(dir, "test-dp.yaml"), []byte(validDP), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write valid data product file: %v", err)
 	}
 }
 
-func writeValidSourceApp(t *testing.T, dir, filename string) {
+func writeValidSourceApp(t *testing.T, dir string) {
 	validSA := `apiVersion: v1
 resourceType: source-application
 resourceName: c85f1787-6a42-48c5-afeb-455b6380cb62
@@ -253,7 +253,7 @@ data:
     enriched: []
 `
 
-	err := os.WriteFile(filepath.Join(dir, filename), []byte(validSA), 0644)
+	err := os.WriteFile(filepath.Join(dir, "test-sa.yaml"), []byte(validSA), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write valid source app file: %v", err)
 	}
@@ -789,6 +789,7 @@ func TestValidateDataProductsWithClient_TwoMismatchesInOneFile(t *testing.T) {
 
 type MockDataProductRecordingTransport struct {
 	MockDataProductRemoteTransport
+
 	writes []string
 }
 

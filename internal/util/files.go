@@ -99,7 +99,7 @@ type idFileName struct {
 }
 
 func createUniqueNames(idsToFileNames []idFileName) []idFileName {
-	//sort to map conflicting names to suffixes consistently between runs
+	// sort to map conflicting names to suffixes consistently between runs
 	sort.Slice(idsToFileNames, func(i, j int) bool {
 		return idsToFileNames[i].Id < idsToFileNames[j].Id
 	})

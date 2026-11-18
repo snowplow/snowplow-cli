@@ -24,19 +24,18 @@ import (
 
 type purgeApi struct {
 	client *console.ApiClient
-	cnx    context.Context
 }
 
-func (a purgeApi) DeleteSourceApp(sa console.RemoteSourceApplication) error {
-	return console.DeleteSourceApp(a.cnx, a.client, sa)
+func (a purgeApi) DeleteSourceApp(cnx context.Context, sa console.RemoteSourceApplication) error {
+	return console.DeleteSourceApp(cnx, a.client, sa)
 }
 
-func (a purgeApi) DeleteDataProduct(dp console.RemoteDataProduct) error {
-	return console.DeleteDataProduct(a.cnx, a.client, dp)
+func (a purgeApi) DeleteDataProduct(cnx context.Context, dp console.RemoteDataProduct) error {
+	return console.DeleteDataProduct(cnx, a.client, dp)
 }
 
-func (a purgeApi) FetchDataProduct() (*console.DataProductsAndRelatedResources, error) {
-	return console.GetDataProductsAndRelatedResources(a.cnx, a.client)
+func (a purgeApi) FetchDataProduct(cnx context.Context) (*console.DataProductsAndRelatedResources, error) {
+	return console.GetDataProductsAndRelatedResources(cnx, a.client)
 }
 
 var purgeCommand = &cobra.Command{
@@ -75,7 +74,7 @@ If no directory is provided then defaults to 'data-products' in the current dire
 			snplog.LogFatal(err)
 		}
 
-		err = release.Purge(cnx, purgeApi{c, cnx}, files, yes)
+		err = release.Purge(cnx, purgeApi{c}, files, yes)
 		if err != nil {
 			snplog.LogFatal(err)
 		}

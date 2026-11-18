@@ -7,12 +7,14 @@ located at https://docs.snowplow.io/limited-use-license-1.0
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY PORTION
 OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 */
+
 package download
 
 import (
 	"context"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"path/filepath"
 
 	"github.com/snowplow/snowplow-cli/internal/console"
@@ -47,9 +49,7 @@ func DownloadDataProductsAndRelatedResources(files util.Files, cnx context.Conte
 				slog.Debug("download", "msg", "could not read existing file, its versions are not kept", "file", path, "error", err)
 				return nil
 			}
-			for f, resource := range resources {
-				existing[f] = resource
-			}
+			maps.Copy(existing, resources)
 			return nil
 		})
 		versionedDpIds = dataProductsDeclaringVersions(existing)

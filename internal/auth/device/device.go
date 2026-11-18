@@ -196,13 +196,13 @@ func pollForTokenWithSpinner(ctx context.Context, config *oauth2.Config, deviceA
 
 func selectOrganization(organizations []console.Organization, jwtOrgID string) (*console.Organization, error) {
 	defaultIndex := getDefaultIndex(organizations, jwtOrgID)
-	displayAvailableOrgs(organizations, jwtOrgID, defaultIndex)
+	displayAvailableOrgs(organizations, defaultIndex)
 	var input string
 	_, _ = fmt.Scanln(&input)
-	return selectOrganizationForInput(organizations, jwtOrgID, input, defaultIndex)
+	return selectOrganizationForInput(organizations, input, defaultIndex)
 }
 
-func selectOrganizationForInput(organizations []console.Organization, jwtOrgID, input string, defaultIndex int) (*console.Organization, error) {
+func selectOrganizationForInput(organizations []console.Organization, input string, defaultIndex int) (*console.Organization, error) {
 	i, err := SelectIndex(input, len(organizations), defaultIndex)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func SelectIndex(input string, n, defaultIndex int) (int, error) {
 	return selection - 1, nil
 }
 
-func displayAvailableOrgs(organizations []console.Organization, jwtOrgID string, defaultIndex int) {
+func displayAvailableOrgs(organizations []console.Organization, defaultIndex int) {
 	cyan := color.New(color.FgCyan)
 	yellow := color.New(color.FgYellow, color.Bold)
 

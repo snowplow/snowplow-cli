@@ -13,6 +13,7 @@ package validation
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/changes"
@@ -119,7 +120,7 @@ func ValidateChanges(cnx context.Context, c *console.ApiClient, changes changes.
 		}
 	}
 
-	migrationsToCheck := append(changes.ToUpdateNewVersion, changes.ToUpdatePatch...)
+	migrationsToCheck := slices.Concat(changes.ToUpdateNewVersion, changes.ToUpdatePatch)
 	for _, ds := range migrationsToCheck {
 		result, err := console.ValidateMigrations(cnx, c, ds)
 		if err != nil {

@@ -12,7 +12,7 @@ package util
 
 import "fmt"
 
-// Set in .goreleaser file using ldflags
+// Version, Os and Arch are set in .goreleaser file using ldflags.
 var Version = "dev"
 var Os = "unknown"
 var Arch = "unknown"

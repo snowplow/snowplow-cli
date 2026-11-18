@@ -120,7 +120,7 @@ func TestTrackSelfDescribingEventGood(t *testing.T) {
 	defer server.Close()
 
 	collector := strings.TrimPrefix(server.URL, "http://")
-	httpClient := &http.Client{Timeout: time.Duration(5 * time.Second)}
+	httpClient := &http.Client{Timeout: 5 * time.Second}
 
 	trackerChan := make(chan int, 1)
 	tracker := initTracker(collector, "myapp", "GET", "http", "", trackerChan, httpClient)
@@ -146,7 +146,7 @@ func TestTrackSelfDescribingEventBad(t *testing.T) {
 	defer server.Close()
 
 	collector := strings.TrimPrefix(server.URL, "http://")
-	httpClient := &http.Client{Timeout: time.Duration(5 * time.Second)}
+	httpClient := &http.Client{Timeout: 5 * time.Second}
 
 	trackerChan := make(chan int, 1)
 	tracker := initTracker(collector, "myapp", "POST", "http", "", trackerChan, httpClient)
@@ -225,7 +225,7 @@ func TestTrackSuccess(t *testing.T) {
 		Schema:    "iglu:com.acme/event/jsonschema/1-0-0",
 		Json:      "{\"hello\":\"world\"}",
 		Entities:  "[]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestTrackHttpError(t *testing.T) {
 		Protocol:  "http",
 		Sdjson:    "{\"data\":{\"hello\":\"world\"},\"schema\":\"iglu:com.acme/event/jsonschema/1-0-0\"}",
 		Entities:  "[]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err == nil {
 		t.Fatal("expected error for 5xx response")
 	}
@@ -300,7 +300,7 @@ func TestTrackNormalizesMethodAndProtocolCase(t *testing.T) {
 		Protocol:  "HTTP",
 		Sdjson:    "{\"data\":{\"hello\":\"world\"},\"schema\":\"iglu:com.acme/event/jsonschema/1-0-0\"}",
 		Entities:  "[]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestTrackRedirectSuccess(t *testing.T) {
 		Protocol:  "http",
 		Sdjson:    "{\"data\":{\"hello\":\"world\"},\"schema\":\"iglu:com.acme/event/jsonschema/1-0-0\"}",
 		Entities:  "[]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestTrackSendsEntitiesAndIpAddress(t *testing.T) {
 		IpAddress: "1.2.3.4",
 		Sdjson:    "{\"data\":{\"hello\":\"world\"},\"schema\":\"iglu:com.acme/event/jsonschema/1-0-0\"}",
 		Entities:  "[{\"data\":{\"k\":\"v\"},\"schema\":\"iglu:com.acme/context_1/jsonschema/1-0-0\"}]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestTrackOmitsContextsWhenNoEntities(t *testing.T) {
 		Protocol:  "http",
 		Sdjson:    "{\"data\":{\"hello\":\"world\"},\"schema\":\"iglu:com.acme/event/jsonschema/1-0-0\"}",
 		Entities:  "[]",
-	}, &http.Client{Timeout: time.Duration(5 * time.Second)})
+	}, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

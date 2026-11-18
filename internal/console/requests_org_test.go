@@ -25,18 +25,18 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
-func createTestJWTForOrg(userEmail, userName, userSub string) string {
+func createTestJWTForOrg() string {
 	header := map[string]any{
 		"alg": "HS256",
 		"typ": "JWT",
 	}
 
 	payload := map[string]any{
-		"sub": userSub,
+		"sub": "test-sub-123",
 		"https://snowplowanalytics.com/roles": map[string]any{
 			"user": map[string]any{
-				"email": userEmail,
-				"name":  userName,
+				"email": "test@example.com",
+				"name":  "Test User",
 			},
 		},
 		"iat": time.Now().Unix(),
@@ -55,7 +55,7 @@ func createTestJWTForOrg(userEmail, userName, userSub string) string {
 }
 
 func Test_GetOrganizations_Success(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -112,7 +112,7 @@ func Test_GetOrganizations_Success(t *testing.T) {
 }
 
 func Test_GetOrganizations_EmptyResponse(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -143,7 +143,7 @@ func Test_GetOrganizations_EmptyResponse(t *testing.T) {
 }
 
 func Test_GetOrganizations_SingleOrganization(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -186,7 +186,7 @@ func Test_GetOrganizations_SingleOrganization(t *testing.T) {
 }
 
 func Test_GetOrganizations_ServerError(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -210,7 +210,7 @@ func Test_GetOrganizations_ServerError(t *testing.T) {
 }
 
 func Test_GetOrganizations_Unauthorized(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -234,7 +234,7 @@ func Test_GetOrganizations_Unauthorized(t *testing.T) {
 }
 
 func Test_GetOrganizations_Forbidden(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -258,7 +258,7 @@ func Test_GetOrganizations_Forbidden(t *testing.T) {
 }
 
 func Test_GetOrganizations_InvalidResponseJSON(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -282,7 +282,7 @@ func Test_GetOrganizations_InvalidResponseJSON(t *testing.T) {
 }
 
 func Test_GetOrganizations_MalformedJSONArray(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -306,7 +306,7 @@ func Test_GetOrganizations_MalformedJSONArray(t *testing.T) {
 }
 
 func Test_GetOrganizations_NetworkError(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	ctx := context.Background()
 	_, err := GetOrganizations(ctx, accessToken, "http://invalid-host-that-does-not-exist")
@@ -317,7 +317,7 @@ func Test_GetOrganizations_NetworkError(t *testing.T) {
 }
 
 func Test_GetOrganizations_ContextCancellation(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulate slow server
@@ -338,7 +338,7 @@ func Test_GetOrganizations_ContextCancellation(t *testing.T) {
 }
 
 func Test_GetOrganizations_PartialOrganizationData(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -389,7 +389,7 @@ func Test_GetOrganizations_PartialOrganizationData(t *testing.T) {
 }
 
 func Test_GetOrganizations_ExtraJSONFields(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
@@ -433,7 +433,7 @@ func Test_GetOrganizations_ExtraJSONFields(t *testing.T) {
 }
 
 func Test_GetOrganizations_EmptyFieldValues(t *testing.T) {
-	accessToken := createTestJWTForOrg("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {

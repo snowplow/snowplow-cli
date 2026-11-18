@@ -138,86 +138,6 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 	return result, nil
 }
 
-func (lookup *DPLookup) allSourceAppsRelativeTo(filename string) ([]string, error) {
-	relativeSas := []string{}
-	for path := range lookup.SourceApps {
-		relPath, err := filepath.Rel(filepath.Dir(filename), path)
-		if err != nil {
-			return nil, err
-		}
-		relativeSas = append(relativeSas, relPath)
-	}
-
-	return relativeSas, nil
-
-}
-
-func (lookup *DPLookup) resolveRefs() error {
-	for dpFile, dp := range lookup.DataProducts {
-
-		resolvedSas := []string{}
-
-		v, ok := lookup.Validations[dpFile]
-		if !ok {
-			v = DPValidations{}
-		}
-
-		for _, ref := range dp.Data.SourceApplications {
-			if saRef, ok := ref["$ref"]; ok {
-				absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
-				if err != nil {
-					return err
-				}
-
-				if _, ok := lookup.SourceApps[absPath]; ok {
-					ref["$ref"] = absPath
-					resolvedSas = append(resolvedSas, absPath)
-				} else {
-					available, err := lookup.allSourceAppsRelativeTo(dpFile)
-					if err != nil {
-						return err
-					}
-					v.Errors = append(v.Errors, fmt.Sprintf("source application $ref not found %s, available list %v", saRef, available))
-				}
-			}
-		}
-		for _, spec := range dp.Data.EventSpecifications {
-			for _, ref := range spec.ExcludedSourceApplications {
-				if saRef, ok := ref["$ref"]; ok {
-					absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
-					if err != nil {
-						return err
-					}
-					ref["$ref"] = absPath
-
-					if !slices.Contains(resolvedSas, absPath) {
-
-						relativeSas := []string{}
-						for _, absSaPath := range resolvedSas {
-							relPath, err := filepath.Rel(filepath.Dir(dpFile), absSaPath)
-							if err != nil {
-								logging.LogFatal(err)
-							}
-							relativeSas = append(relativeSas, relPath)
-						}
-
-						v.Errors = append(v.Errors, fmt.Sprintf(
-							"event spec source app not in parent data product list (event spec: %s, source app: %s), available list %v",
-							spec.ResourceName,
-							saRef,
-							relativeSas,
-						))
-					}
-				}
-			}
-		}
-
-		lookup.Validations[dpFile] = v
-	}
-
-	return nil
-}
-
 func (lookup *DPLookup) SlogValidations(ctx context.Context, basePath string) error {
 	logger := logging.LoggerFromContext(ctx)
 	for f, v := range lookup.Validations {
@@ -309,4 +229,84 @@ func (lookup *DPLookup) ValidationErrorCount() int {
 		count += len(v.Errors) + len(v.ErrorsWithPaths)
 	}
 	return count
+}
+
+func (lookup *DPLookup) allSourceAppsRelativeTo(filename string) ([]string, error) {
+	relativeSas := []string{}
+	for path := range lookup.SourceApps {
+		relPath, err := filepath.Rel(filepath.Dir(filename), path)
+		if err != nil {
+			return nil, err
+		}
+		relativeSas = append(relativeSas, relPath)
+	}
+
+	return relativeSas, nil
+
+}
+
+func (lookup *DPLookup) resolveRefs() error {
+	for dpFile, dp := range lookup.DataProducts {
+
+		resolvedSas := []string{}
+
+		v, ok := lookup.Validations[dpFile]
+		if !ok {
+			v = DPValidations{}
+		}
+
+		for _, ref := range dp.Data.SourceApplications {
+			if saRef, ok := ref["$ref"]; ok {
+				absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
+				if err != nil {
+					return err
+				}
+
+				if _, ok := lookup.SourceApps[absPath]; ok {
+					ref["$ref"] = absPath
+					resolvedSas = append(resolvedSas, absPath)
+				} else {
+					available, err := lookup.allSourceAppsRelativeTo(dpFile)
+					if err != nil {
+						return err
+					}
+					v.Errors = append(v.Errors, fmt.Sprintf("source application $ref not found %s, available list %v", saRef, available))
+				}
+			}
+		}
+		for _, spec := range dp.Data.EventSpecifications {
+			for _, ref := range spec.ExcludedSourceApplications {
+				if saRef, ok := ref["$ref"]; ok {
+					absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
+					if err != nil {
+						return err
+					}
+					ref["$ref"] = absPath
+
+					if !slices.Contains(resolvedSas, absPath) {
+
+						relativeSas := []string{}
+						for _, absSaPath := range resolvedSas {
+							relPath, err := filepath.Rel(filepath.Dir(dpFile), absSaPath)
+							if err != nil {
+								logging.LogFatal(err)
+							}
+							relativeSas = append(relativeSas, relPath)
+						}
+
+						v.Errors = append(v.Errors, fmt.Sprintf(
+							"event spec source app not in parent data product list (event spec: %s, source app: %s), available list %v",
+							spec.ResourceName,
+							saRef,
+							relativeSas,
+						))
+					}
+				}
+			}
+		}
+
+		lookup.Validations[dpFile] = v
+	}
+
+	return nil
 }

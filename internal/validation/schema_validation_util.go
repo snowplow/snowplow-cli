@@ -12,6 +12,7 @@ package validation
 
 import (
 	_ "embed"
+	"errors"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
@@ -19,7 +20,8 @@ import (
 func validateWithSchema(sch *jsonschema.Schema, dp map[string]any) (DPValidations, bool) {
 	errorOut := map[string][]string{}
 	if err := sch.Validate(dp); err != nil {
-		if e, ok := err.(*jsonschema.ValidationError); ok {
+		var e *jsonschema.ValidationError
+		if errors.As(err, &e) {
 			aggr := map[string][]string{}
 			for _, ie := range e.BasicOutput().Errors {
 				path := ie.InstanceLocation
