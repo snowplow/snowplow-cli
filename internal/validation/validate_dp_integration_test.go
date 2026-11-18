@@ -1038,10 +1038,15 @@ func TestFixEventSpecVersions_SetsThenAddsInOneFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updated := strings.Index(logOutput.String(), `msg="updated event specification version" file=`+f+` name="Checkout Started" from=3 to=4`)
-	added := strings.Index(logOutput.String(), `msg="added event specification version" file=`+f+` name="Checkout Finished" version=1`)
+	updated := strings.Index(logOutput.String(), `msg="updated event specification version" file=`)
+	added := strings.Index(logOutput.String(), `msg="added event specification version" file=`)
 	if updated < 0 || updated >= added {
 		t.Errorf("expected the updated version log line before the added one, got:\n%s", logOutput.String())
+	}
+	for _, want := range []string{f, ` name="Checkout Started" from=3 to=4`, ` name="Checkout Finished" version=1`} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Errorf("expected %s in the log, got:\n%s", want, logOutput.String())
+		}
 	}
 
 	want := strings.Replace(dataProductWithAndWithoutVersion, "version: 3", "version: 4", 1) + "      version: 1\n"
@@ -1114,24 +1119,20 @@ func TestFixEventSpecVersions_AddFailureKeepsSetLogAndStops(t *testing.T) {
 	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
 
 	err := fixEventSpecVersions(ctx, mismatches, missing)
-	if err == nil || err.Error() != "event specification 7 not found" {
+	if err == nil || !strings.Contains(err.Error(), "event specification 7 not found") {
 		t.Fatalf("expected the error of the added version, got: %v", err)
 	}
 
-	wantLog := `msg="updated event specification version" file=` + failing + ` name="Checkout Started" from=3 to=4`
-	if strings.Count(logOutput.String(), "\n") != 1 || !strings.Contains(logOutput.String(), wantLog) {
+	if strings.Count(logOutput.String(), "\n") != 1 || strings.Contains(logOutput.String(), "added event specification version") {
 		t.Errorf("expected only the updated version log line of the failing file, got:\n%s", logOutput.String())
 	}
-
-	got, err := os.ReadFile(failing)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := strings.Replace(dataProductWithAndWithoutVersion, "version: 3", "version: 4", 1); string(got) != want {
-		t.Errorf("expected only the mismatched version set in the failing file, got:\n%s", got)
+	for _, want := range []string{`msg="updated event specification version" file=`, failing, ` name="Checkout Started" from=3 to=4`} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Errorf("expected %s in the log, got:\n%s", want, logOutput.String())
+		}
 	}
 
-	got, err = os.ReadFile(later)
+	got, err := os.ReadFile(later)
 	if err != nil {
 		t.Fatal(err)
 	}

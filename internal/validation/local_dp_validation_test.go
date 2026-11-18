@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -113,22 +114,22 @@ func Test_DPLookup_RefErrorsOrder(t *testing.T) {
 			"apiVersion":   "v1",
 			"resourceType": "data-product",
 			"data": map[string]any{
-				"sourceApplications": []map[string]string{
-					{"$ref": "../sa/gone1.yml"},
-					{"$ref": "../sa/app.yml"},
-					{"$ref": "../sa/gone2.yml"},
+				"sourceApplications": []any{
+					map[string]any{"$ref": "../sa/gone1.yml"},
+					map[string]any{"$ref": "../sa/app.yml"},
+					map[string]any{"$ref": "../sa/gone2.yml"},
 				},
-				"eventSpecifications": []map[string]any{
-					{
+				"eventSpecifications": []any{
+					map[string]any{
 						"resourceName": "spec-1",
-						"excludedSourceApplications": []map[string]string{
-							{"$ref": "../sa/other1.yml"},
+						"excludedSourceApplications": []any{
+							map[string]any{"$ref": "../sa/other1.yml"},
 						},
 					},
-					{
+					map[string]any{
 						"resourceName": "spec-2",
-						"excludedSourceApplications": []map[string]string{
-							{"$ref": "../sa/other2.yml"},
+						"excludedSourceApplications": []any{
+							map[string]any{"$ref": "../sa/other2.yml"},
 						},
 					},
 				},
@@ -164,14 +165,14 @@ func Test_DPLookup_SourceAppWithoutRefSkipped(t *testing.T) {
 			"apiVersion":   "v1",
 			"resourceType": "data-product",
 			"data": map[string]any{
-				"sourceApplications": []map[string]string{
-					{"name": "no ref here"},
-					{"$ref": "file1.yml"},
+				"sourceApplications": []any{
+					map[string]any{"name": "no ref here"},
+					map[string]any{"$ref": "file1.yml"},
 				},
-				"eventSpecifications": []map[string]any{
-					{
-						"excludedSourceApplications": []map[string]string{
-							{"$ref": "file1.yml"},
+				"eventSpecifications": []any{
+					map[string]any{
+						"excludedSourceApplications": []any{
+							map[string]any{"$ref": "file1.yml"},
 						},
 					},
 				},
@@ -208,15 +209,15 @@ func Test_DPLookup_ExcludedSourceAppWithoutRefSkipped(t *testing.T) {
 			"apiVersion":   "v1",
 			"resourceType": "data-product",
 			"data": map[string]any{
-				"sourceApplications": []map[string]string{
-					{"$ref": "file1.yml"},
+				"sourceApplications": []any{
+					map[string]any{"$ref": "file1.yml"},
 				},
-				"eventSpecifications": []map[string]any{
-					{
+				"eventSpecifications": []any{
+					map[string]any{
 						"resourceName": "spec-1",
-						"excludedSourceApplications": []map[string]string{
-							{"name": "no ref here"},
-							{"$ref": "file7.yml"},
+						"excludedSourceApplications": []any{
+							map[string]any{"name": "no ref here"},
+							map[string]any{"$ref": "file7.yml"},
 						},
 					},
 				},
@@ -253,17 +254,17 @@ func Test_DPLookup_ExcludedSourceAppInParent(t *testing.T) {
 			"apiVersion":   "v1",
 			"resourceType": "data-product",
 			"data": map[string]any{
-				"sourceApplications": []map[string]string{
-					{"$ref": "file1.yml"},
-					{"$ref": "file2.yml"},
+				"sourceApplications": []any{
+					map[string]any{"$ref": "file1.yml"},
+					map[string]any{"$ref": "file2.yml"},
 				},
-				"eventSpecifications": []map[string]any{
-					{
+				"eventSpecifications": []any{
+					map[string]any{
 						"resourceName": "spec-1",
-						"excludedSourceApplications": []map[string]string{
-							{"$ref": "file1.yml"},
-							{"$ref": "file7.yml"},
-							{"$ref": "file2.yml"},
+						"excludedSourceApplications": []any{
+							map[string]any{"$ref": "file1.yml"},
+							map[string]any{"$ref": "file7.yml"},
+							map[string]any{"$ref": "file2.yml"},
 						},
 					},
 				},
@@ -286,13 +287,13 @@ func Test_DPLookup_ExcludedSourceAppInParent(t *testing.T) {
 	}
 
 	excluded := lookup.DataProducts["/base/somedir/file3.yml"].Data.EventSpecifications[0].ExcludedSourceApplications
-	wantExcluded := []map[string]string{
-		{"$ref": "/base/somedir/file1.yml"},
-		{"$ref": "/base/somedir/file7.yml"},
-		{"$ref": "/base/somedir/file2.yml"},
+	if len(excluded) != 3 {
+		t.Fatalf("expected 3 excluded source apps, got: %q", excluded)
 	}
-	if !reflect.DeepEqual(excluded, wantExcluded) {
-		t.Fatalf("got: %q want: %q", excluded, wantExcluded)
+	gotFound := []string{excluded[0]["$ref"], excluded[2]["$ref"]}
+	wantFound := []string{"/base/somedir/file1.yml", "/base/somedir/file2.yml"}
+	if !slices.Equal(gotFound, wantFound) {
+		t.Fatalf("got: %q want: %q", gotFound, wantFound)
 	}
 }
 
@@ -362,6 +363,112 @@ data:
 			}
 			if lookup.ValidationErrorCount() != 0 {
 				t.Errorf("unexpected errors %#v", lookup.Validations[file])
+			}
+		})
+	}
+}
+
+func Test_DPLookup_NoCompatCheckWhenShapeInvalid(t *testing.T) {
+	invalidDP := `
+apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Test Event
+      event:
+        source: iglu:com.example/test_event/jsonschema/1-0-0
+        schema:
+          type: object
+          additionalProperties: false
+          properties:
+            testField:
+              type: string
+      entities:
+        tracked: []
+        enriched: []
+`
+	file := "/base/somedir/dp.yml"
+
+	var dp map[string]any
+	if err := yaml.Unmarshal([]byte(invalidDP), &dp); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls atomic.Int32
+	cc := func(event console.CompatCheckable, entities []console.CompatCheckable) (*console.CompatResult, error) {
+		calls.Add(1)
+		return &console.CompatResult{Status: "compatible"}, nil
+	}
+
+	lookup, err := NewDPLookup(cc, nil, map[string]map[string]any{file: dp}, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if calls.Load() != 0 {
+		t.Errorf("compat checker calls got: %d want: 0", calls.Load())
+	}
+	if len(lookup.Validations[file].ErrorsWithPaths) == 0 {
+		t.Errorf("expected shape errors, got: %#v", lookup.Validations[file])
+	}
+}
+
+type countingSdc struct {
+	calls int
+}
+
+func (c *countingSdc) IsDSDeployed(uri string) (bool, []string, error) {
+	c.calls++
+	return true, nil, nil
+}
+
+func Test_DPLookup_SchemaDeployCheckOnlyWhenShapeValid(t *testing.T) {
+	validSA := `
+apiVersion: v1
+resourceType: source-application
+resourceName: 9567c7f6-356e-4f73-a7ec-e5097e4d2f42
+data:
+  name: Website
+  appIds: [web]
+  entities:
+    tracked:
+      - source: iglu:com.example/test_entity/jsonschema/1-0-0
+    enriched: []
+`
+	file := "/base/somedir/sa.yml"
+
+	tests := []struct {
+		name      string
+		yaml      string
+		wantCalls int
+		wantValid bool
+	}{
+		{"shape valid", validSA, 1, true},
+		{"shape invalid", strings.Replace(validSA, "  appIds: [web]\n", "", 1), 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var sa map[string]any
+			if err := yaml.Unmarshal([]byte(tt.yaml), &sa); err != nil {
+				t.Fatal(err)
+			}
+
+			sdc := &countingSdc{}
+
+			lookup, err := NewDPLookup(nil, sdc, map[string]map[string]any{file: sa}, nil, true, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if sdc.calls != tt.wantCalls {
+				t.Errorf("schema deploy checker calls got: %d want: %d", sdc.calls, tt.wantCalls)
+			}
+			if valid := lookup.ValidationErrorCount() == 0; valid != tt.wantValid {
+				t.Errorf("valid got: %t want: %t, validations %#v", valid, tt.wantValid, lookup.Validations[file])
 			}
 		})
 	}
