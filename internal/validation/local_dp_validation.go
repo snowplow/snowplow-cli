@@ -331,26 +331,31 @@ func resolveExcludedSourceAppRefs(dpFile string, spec model.EventSpec, resolvedS
 			continue
 		}
 
+		relativeSas, err := pathsRelativeTo(dpFile, resolvedSas)
+		if err != nil {
+			logging.LogFatal(err)
+		}
+
 		notInParent = append(notInParent, fmt.Sprintf(
 			"event spec source app not in parent data product list (event spec: %s, source app: %s), available list %v",
 			spec.ResourceName,
 			saRef,
-			mustRelativeTo(dpFile, resolvedSas),
+			relativeSas,
 		))
 	}
 
 	return notInParent, nil
 }
 
-func mustRelativeTo(filename string, absPaths []string) []string {
+func pathsRelativeTo(filename string, absPaths []string) ([]string, error) {
 	relPaths := []string{}
 	for _, absPath := range absPaths {
 		relPath, err := filepath.Rel(filepath.Dir(filename), absPath)
 		if err != nil {
-			logging.LogFatal(err)
+			return nil, err
 		}
 		relPaths = append(relPaths, relPath)
 	}
 
-	return relPaths
+	return relPaths, nil
 }

@@ -59,7 +59,7 @@ func ValidateDPEventSpecCompat(cc console.CompatChecker, concurrency int, dp mod
 			semaphore <- struct{}{}        // Acquire semaphore
 			defer func() { <-semaphore }() // Release semaphore
 
-			for _, res := range compatResults(cc, event, entities, pathLookup) {
+			for _, res := range checkCompatWithConsole(cc, event, entities, pathLookup) {
 				resultsChan <- res
 			}
 		}(*event, entities, pathLookup)
@@ -111,7 +111,7 @@ func eventSpecCompatCheckables(i int, spec model.EventSpec) (*console.CompatChec
 	return event, entities, pathLookup
 }
 
-func compatResults(cc console.CompatChecker, event console.CompatCheckable, entities []console.CompatCheckable, pathLookup map[string]string) []result {
+func checkCompatWithConsole(cc console.CompatChecker, event console.CompatCheckable, entities []console.CompatCheckable, pathLookup map[string]string) []result {
 	cc_result, err := cc(event, entities)
 	if err != nil {
 		return []result{{
