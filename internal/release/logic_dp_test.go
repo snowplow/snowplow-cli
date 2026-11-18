@@ -1823,8 +1823,8 @@ func Test_findChanges_FileNamesOfChanges(t *testing.T) {
 			"sa-changed": "/base/sa-changed.yaml",
 			"dp-changed": "/base/dp.yaml",
 			"dp-new":     "/base/dp-new.yaml",
-			"es-new":     "/base/es-new.yaml",
-			"es-changed": "/base/es-changed.yaml",
+			"es-new":     "/base/dp.yaml",
+			"es-changed": "/base/dp.yaml",
 		},
 	}
 	remote := console.DataProductsAndRelatedResources{
@@ -1846,8 +1846,8 @@ func Test_findChanges_FileNamesOfChanges(t *testing.T) {
 		"sa-changed": "/base/sa-changed.yaml",
 		"dp-changed": "/base/dp.yaml",
 		"dp-new":     "/base/dp-new.yaml",
-		"es-new":     "/base/es-new.yaml",
-		"es-changed": "/base/es-changed.yaml",
+		"es-new":     "/base/dp.yaml",
+		"es-changed": "/base/dp.yaml",
 		"es-gone":    "Data Product 1",
 	}
 	if diff := cmp.Diff(want, changes.IdToFileName); diff != "" {
@@ -1963,6 +1963,9 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 		if _, image, found := strings.Cut(string(body), `"variantUrls":{"original":"uploaded-`); found {
 			call += " with uploaded " + image[:len("image-1")]
 		}
+		if strings.HasSuffix(r.URL.Path, "/confirm-upload") {
+			call += " " + string(body)
+		}
 		calls = append(calls, call)
 		switch {
 		case r.URL.Path == "/images/v1":
@@ -1993,8 +1996,8 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 		esUpdate: []console.RemoteEventSpec{{Id: "es-update", Triggers: []console.RemoteTrigger{{Id: "trigger-update"}}}},
 		esDelete: []console.RemoteEventSpec{{Id: "es-delete"}},
 		imageCreate: []TriggerImageReference{
-			{triggerId: "trigger-create", fname: imageFile, hash: "hash"},
-			{triggerId: "trigger-update", fname: imageFile, hash: "hash"},
+			{triggerId: "trigger-create", fname: imageFile, hash: "hash-create"},
+			{triggerId: "trigger-update", fname: imageFile, hash: "hash-update"},
 		},
 	}
 
@@ -2010,10 +2013,10 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 		"PUT /data-products/v2/dp-update",
 		"POST /images/v1",
 		"POST /upload",
-		"POST /images/v1/image-1/confirm-upload",
+		"POST /images/v1/image-1/confirm-upload {\"hash\":\"hash-create\"}",
 		"POST /images/v1",
 		"POST /upload",
-		"POST /images/v1/image-2/confirm-upload",
+		"POST /images/v1/image-2/confirm-upload {\"hash\":\"hash-update\"}",
 		"POST /event-specs/v1 with uploaded image-1",
 		"PUT /event-specs/v1/es-update with uploaded image-2",
 		"DELETE /event-specs/v1/es-delete",

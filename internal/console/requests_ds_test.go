@@ -11,9 +11,12 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package console
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -1074,12 +1077,88 @@ func TestGetAllDataStructuresDrafts_WithoutSelf(t *testing.T) {
 	if len(result) != 1 || result[0].Data["description"] != nil {
 		t.Errorf("expected only the draft with a self section when a filter is set, got: %+v", result)
 	}
+}
 
-	result, err = GetAllDataStructuresDrafts(cnx, client, []string{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+func TestGetAllDataStructures_LogsLegacyCounts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data-structures/v1":
+			_, _ = io.WriteString(w, `[{
+				"hash": "abc123",
+				"vendor": "com.acme",
+				"name": "legacy",
+				"format": "jsonschema",
+				"meta": { "schemaType": "" },
+				"deployments": [
+					{ "env": "DEV", "version": "1-0-0" },
+					{ "env": "DEV", "version": "2-0-0" }
+				]
+			}]`)
+		case "/data-structures/v1/schemas/versions":
+			_, _ = io.WriteString(w, `[
+				{ "self": { "name": "legacy", "vendor": "com.acme", "version": "1-0-0", "format": "jsonschema" } },
+				{ "self": { "name": "legacy", "vendor": "com.acme", "version": "2-0-0", "format": "jsonschema" } }
+			]`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := &ApiClient{
+		BaseUrl: server.URL,
+		Jwt:     "fake-jwt",
+		Http:    server.Client(),
 	}
-	if len(result) != 2 {
-		t.Errorf("expected both drafts when no filter is set, got: %d", len(result))
+
+	for _, tt := range []struct {
+		name          string
+		includeLegacy bool
+		wantResults   int
+		wantLog       string
+	}{
+		{
+			name:          "skipped",
+			includeLegacy: false,
+			wantResults:   0,
+			wantLog:       "level=INFO msg=\"skipped legacy data structures with empty schemaType\" count=2 note=\"use --include-legacy to include them\"\n",
+		},
+		{
+			name:          "included",
+			includeLegacy: true,
+			wantResults:   2,
+			wantLog:       "level=WARN msg=\"included legacy data structures with empty schemaType, converted to 'entity'\" count=2\n",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			previous := slog.Default()
+			previousWriter := log.Writer()
+			previousFlags := log.Flags()
+			t.Cleanup(func() {
+				slog.SetDefault(previous)
+				log.SetOutput(previousWriter)
+				log.SetFlags(previousFlags)
+			})
+			slog.SetDefault(slog.New(slog.NewTextHandler(&out, &slog.HandlerOptions{
+				ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+					if a.Key == slog.TimeKey {
+						return slog.Attr{}
+					}
+					return a
+				},
+			})))
+
+			res, err := GetAllDataStructures(context.Background(), client, []string{}, tt.includeLegacy)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(res) != tt.wantResults {
+				t.Errorf("expected %d data structures, got %d", tt.wantResults, len(res))
+			}
+			if out.String() != tt.wantLog {
+				t.Errorf("unexpected log output, want %q got %q", tt.wantLog, out.String())
+			}
+		})
 	}
 }
