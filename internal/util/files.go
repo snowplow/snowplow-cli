@@ -230,7 +230,7 @@ func (f Files) WriteImage(name string, dir string, image *model.Image) (string, 
 		return "", err
 	}
 
-	relativePath := fmt.Sprintf("./%s", rel)
+	relativePath := "./" + rel
 
 	return relativePath, err
 }
@@ -284,5 +284,4 @@ func getLspComment(resourceType string) (string, error) {
 	} else {
 		return "", fmt.Errorf("value %s is not a valid resource type", resourceType)
 	}
-
 }

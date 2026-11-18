@@ -49,7 +49,7 @@ func GetImage(cnx context.Context, client *ApiClient, path string) (*model.Image
 }
 
 type ImageResource struct {
-	Id   string `json:"id" yaml:"id"`
+	Id   string `json:"id"   yaml:"id"`
 	Hash string `json:"hash" yaml:"hash"`
 }
 
@@ -58,7 +58,7 @@ type imageLookup struct {
 }
 
 func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]string, error) {
-	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
+	resp, err := DoConsoleRequest("GET", client.BaseUrl+"/images/v1", client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +86,11 @@ func GetImageHashLookup(cnx context.Context, client *ApiClient) (map[string]stri
 
 type imageUploadLinkResponse struct {
 	UploadURL string `json:"uploadURL" yaml:"uploadURL"`
-	Id        string `json:"id" yaml:"id"`
+	Id        string `json:"id"        yaml:"id"`
 }
 
 func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUploadLinkResponse, error) {
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/images/v1", client.BaseUrl), client, cnx, nil)
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/images/v1", client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +148,11 @@ func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLin
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(cnx, "POST", uploadLink.UploadURL, &upBuf)
+	req, err := http.NewRequestWithContext(cnx, http.MethodPost, uploadLink.UploadURL, &upBuf)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("content-type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Note: This is uploading to an external service (Cloudflare), not our API,
 	// so we don't add standard console headers here

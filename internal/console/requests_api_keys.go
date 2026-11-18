@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -49,10 +50,10 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	description := fmt.Sprintf("%s CLI key", userInfo.Email)
+	description := userInfo.Email + " CLI key"
 	capabilities := []Capability{{ResourceType: "*", Action: "*", Filters: []any{}}}
 	if readOnly {
-		description = fmt.Sprintf("%s CLI key (read-only)", userInfo.Email)
+		description = userInfo.Email + " CLI key (read-only)"
 		capabilities = []Capability{
 			{ResourceType: "DATA-PRODUCTS", Action: "LIST", Filters: []any{}},
 			{ResourceType: "DATA-PRODUCTS", Action: "VIEW", Filters: []any{}},
@@ -60,12 +61,12 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 	}
 
 	client := userClient(consoleHost, orgID, accessToken)
-	return postAPIKey(ctx, client, fmt.Sprintf("%s/credentials/v2/api-keys", client.BaseUrl), description, capabilities)
+	return postAPIKey(ctx, client, client.BaseUrl+"/credentials/v2/api-keys", description, capabilities)
 }
 
 func CreateScopedAPIKey(ctx context.Context, accessToken, consoleHost, orgID, description string, capabilities []Capability) (*APIKeyResponse, error) {
 	client := userClient(consoleHost, orgID, accessToken)
-	return postAPIKey(ctx, client, fmt.Sprintf("%s/credentials/v3/api-keys", client.BaseUrl), description, capabilities)
+	return postAPIKey(ctx, client, client.BaseUrl+"/credentials/v3/api-keys", description, capabilities)
 }
 
 func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description string, capabilities []Capability) (*APIKeyResponse, error) {
@@ -109,7 +110,7 @@ func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description stri
 func GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
 	parts := strings.Split(accessToken, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid JWT token format")
+		return nil, errors.New("invalid JWT token format")
 	}
 
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -124,12 +125,12 @@ func GetUserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
 
 	roles, ok := claims["https://snowplowanalytics.com/roles"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("missing Snowplow roles in JWT")
+		return nil, errors.New("missing Snowplow roles in JWT")
 	}
 
 	user, ok := roles["user"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("missing user info in JWT")
+		return nil, errors.New("missing user info in JWT")
 	}
 
 	email, _ := user["email"].(string)

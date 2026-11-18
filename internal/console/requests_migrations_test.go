@@ -33,7 +33,7 @@ func Test_ValidateMigrationsDestinations_Fail(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := ValidateMigrations(cnx, client, DSChangeContext{})
 
@@ -65,7 +65,7 @@ func Test_ValidateMigrations_Fail(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := ValidateMigrations(cnx, client, DSChangeContext{
 		DS: DataStructure{
@@ -114,7 +114,7 @@ func Test_ValidateMigrationsMajor_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := ValidateMigrations(cnx, client, DSChangeContext{
 		RemoteVersion: "1-0-1",
@@ -152,7 +152,7 @@ func Test_ValidateMigrationsMinor_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := ValidateMigrations(cnx, client, DSChangeContext{
 		RemoteVersion: "1-0-1",

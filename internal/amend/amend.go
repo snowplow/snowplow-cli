@@ -3,6 +3,7 @@ package amend
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -48,7 +49,6 @@ func PrintEventSpecsToStdout(esNames []string, ext string) error {
 }
 
 func AddEventSpecsToFile(esNames []string, dpFileName string) error {
-
 	if _, err := os.Stat(dpFileName); os.IsNotExist(err) {
 		return fmt.Errorf("file does not exist at %s", dpFileName)
 	}
@@ -126,7 +126,6 @@ func AddEventSpecs(ess []model.EventSpecCanonical, file []byte, dpFileName strin
 }
 
 func modifyJson(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
-
 	updatedDp := string(file)
 
 	for _, eventSpec := range ess {
@@ -149,7 +148,7 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 
 	mappingNode, ok := node.(*ast.MappingNode)
 	if !ok {
-		return []byte{}, fmt.Errorf("root node is not a mapping")
+		return []byte{}, errors.New("root node is not a mapping")
 	}
 
 	var dataValue ast.Node
@@ -161,12 +160,12 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 		}
 	}
 	if dataValue == nil {
-		return []byte{}, fmt.Errorf("'data' key not found")
+		return []byte{}, errors.New("'data' key not found")
 	}
 
 	dataMappingNode, ok := dataValue.(*ast.MappingNode)
 	if !ok {
-		return []byte{}, fmt.Errorf("data value is not a mapping")
+		return []byte{}, errors.New("data value is not a mapping")
 	}
 
 	var eventSpecsValue ast.Node
@@ -178,12 +177,12 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 		}
 	}
 	if eventSpecsValue == nil {
-		return []byte{}, fmt.Errorf("'eventSpecifications' key not found")
+		return []byte{}, errors.New("'eventSpecifications' key not found")
 	}
 
 	arrayNode, ok := eventSpecsValue.(*ast.SequenceNode)
 	if !ok {
-		return []byte{}, fmt.Errorf("data.eventSpecifications is not an array")
+		return []byte{}, errors.New("data.eventSpecifications is not an array")
 	}
 
 	// if array is empty and is represented by [], switch to block style, and alight it back
@@ -220,7 +219,6 @@ func modifyYaml(ess []model.EventSpecCanonical, file []byte) ([]byte, error) {
 	}
 
 	return output, nil
-
 }
 
 func SetEventSpecVersionsInFile(versionsByIndex map[int]int, dpFileName string) error {
@@ -262,7 +260,6 @@ func SetEventSpecVersions(versionsByIndex map[int]int, file []byte, dpFileName s
 }
 
 func setVersionsJson(versionsByIndex map[int]int, file []byte) ([]byte, error) {
-
 	var dp struct {
 		Data struct {
 			EventSpecifications []map[string]json.RawMessage `json:"eventSpecifications"`
@@ -498,7 +495,7 @@ func addVersionsYaml(versionsByIndex map[int]int, file []byte) ([]byte, error) {
 func eventSpecificationsNode(node ast.Node) (*ast.SequenceNode, error) {
 	mappingNode, ok := node.(*ast.MappingNode)
 	if !ok {
-		return nil, fmt.Errorf("root node is not a mapping")
+		return nil, errors.New("root node is not a mapping")
 	}
 
 	var dataValue ast.Node
@@ -509,12 +506,12 @@ func eventSpecificationsNode(node ast.Node) (*ast.SequenceNode, error) {
 		}
 	}
 	if dataValue == nil {
-		return nil, fmt.Errorf("'data' key not found")
+		return nil, errors.New("'data' key not found")
 	}
 
 	dataMappingNode, ok := dataValue.(*ast.MappingNode)
 	if !ok {
-		return nil, fmt.Errorf("data value is not a mapping")
+		return nil, errors.New("data value is not a mapping")
 	}
 
 	var eventSpecsValue ast.Node
@@ -525,12 +522,12 @@ func eventSpecificationsNode(node ast.Node) (*ast.SequenceNode, error) {
 		}
 	}
 	if eventSpecsValue == nil {
-		return nil, fmt.Errorf("'eventSpecifications' key not found")
+		return nil, errors.New("'eventSpecifications' key not found")
 	}
 
 	arrayNode, ok := eventSpecsValue.(*ast.SequenceNode)
 	if !ok {
-		return nil, fmt.Errorf("data.eventSpecifications is not an array")
+		return nil, errors.New("data.eventSpecifications is not an array")
 	}
 
 	return arrayNode, nil

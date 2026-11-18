@@ -30,7 +30,6 @@ import (
 )
 
 func DataStructuresFromPaths(paths []string) (map[string]model.DataStructure, error) {
-
 	files := map[string]bool{}
 
 	for _, path := range paths {
@@ -127,7 +126,6 @@ func dataFromFileName(f string) (map[string]any, error) {
 }
 
 func MaybeResourcesfromPaths(paths []string) (map[string]map[string]any, error) {
-
 	files := map[string]map[string]any{}
 
 	for _, path := range paths {

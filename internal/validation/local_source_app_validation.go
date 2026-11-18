@@ -24,7 +24,7 @@ import (
 //go:embed schema/source-application.json
 var saSchema string
 
-func ValidateSAShape(sa map[string]any) (validations DPValidations, ok bool) {
+func ValidateSAShape(sa map[string]any) (DPValidations, bool) {
 	sch := jsonschema.MustCompileString("data://source-application.json", saSchema)
 	return validateWithSchema(sch, sa)
 }
@@ -72,7 +72,7 @@ func validIgluUri(uri string) bool {
 	return uriRegex.MatchString(uri)
 }
 
-func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri string) (path string, errors []string) {
+func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri string) (string, []string) {
 	result := []string{}
 	errorPath := fmt.Sprintf("/data/entities/%s/%d/source", key, i)
 
@@ -87,7 +87,7 @@ func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri
 	if err != nil {
 		result = append(
 			result,
-			fmt.Sprintf("error while resolving %s", err.Error()),
+			"error while resolving "+err.Error(),
 		)
 	}
 	if !found {
@@ -105,7 +105,7 @@ func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri
 		} else {
 			result = append(
 				result,
-				fmt.Sprintf("could not find deployment of %s", uri),
+				"could not find deployment of "+uri,
 			)
 		}
 	}

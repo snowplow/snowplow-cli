@@ -13,6 +13,7 @@ package validation
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -288,39 +289,39 @@ func (m *MockDataProductSuccessTransport) RoundTrip(req *http.Request) (*http.Re
 	case strings.Contains(req.URL.Host, "iglu.snplow.net") && strings.Contains(req.URL.Path, "/api/schemas"):
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == http.MethodGet:
 		body := `{"data": [], "includes": {"eventSpecs": []}}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == http.MethodGet:
 		body := `{"data": []}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == http.MethodGet:
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == "POST":
+	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == http.MethodPost:
 		body := `{"status": "compatible", "sources": [], "message": ""}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -328,7 +329,7 @@ func (m *MockDataProductSuccessTransport) RoundTrip(req *http.Request) (*http.Re
 	default:
 		body := `{"success": true}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -338,7 +339,7 @@ func (m *MockDataProductSuccessTransport) RoundTrip(req *http.Request) (*http.Re
 type MockDataProductNetworkFailureTransport struct{}
 
 func (m *MockDataProductNetworkFailureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("network connection failed")
+	return nil, errors.New("network connection failed")
 }
 
 type MockDataProductCompatFailureTransport struct{}
@@ -350,39 +351,39 @@ func (m *MockDataProductCompatFailureTransport) RoundTrip(req *http.Request) (*h
 	case strings.Contains(req.URL.Host, "iglu.snplow.net") && strings.Contains(req.URL.Path, "/api/schemas"):
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == http.MethodGet:
 		body := `{"data": [], "includes": {"eventSpecs": []}}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == http.MethodGet:
 		body := `{"data": []}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == http.MethodGet:
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == "POST":
+	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == http.MethodPost:
 		body := `{"status": "incompatible", "sources": [{"source": "iglu:com.example/test_event/jsonschema/1-0-0", "status": "incompatible", "properties": {}}], "message": "Schema compatibility error"}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -390,7 +391,7 @@ func (m *MockDataProductCompatFailureTransport) RoundTrip(req *http.Request) (*h
 	default:
 		body := `{"success": true}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -405,39 +406,39 @@ func (m *MockDataProductWarningTransport) RoundTrip(req *http.Request) (*http.Re
 		// Mock Iglu Central listing - return empty array
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == http.MethodGet:
 		body := `{"data": [], "includes": {"eventSpecs": []}}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/source-apps/v1") && req.Method == http.MethodGet:
 		body := `{"data": []}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == http.MethodGet:
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == "POST":
+	case strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") && req.Method == http.MethodPost:
 		body := `{"status": "compatible", "sources": [{"source": "test", "status": "compatible", "properties": {"warning": "Minor compatibility warning"}}], "message": ""}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -446,7 +447,7 @@ func (m *MockDataProductWarningTransport) RoundTrip(req *http.Request) (*http.Re
 		// Return success for any other endpoints
 		body := `{"success": true}`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
@@ -504,9 +505,9 @@ type MockDataProductRemoteTransport struct {
 }
 
 func (m *MockDataProductRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == "GET" {
+	if strings.Contains(req.URL.Path, "/data-products/v2") && req.Method == http.MethodGet {
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(m.dataProducts)),
 			Request:    req,
 		}, nil
@@ -794,7 +795,7 @@ type MockDataProductRecordingTransport struct {
 }
 
 func (m *MockDataProductRecordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Method != "GET" && !strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") {
+	if req.Method != http.MethodGet && !strings.Contains(req.URL.Path, "/event-specs/v1/compatibility") {
 		m.writes = append(m.writes, req.Method+" "+req.URL.Path)
 	}
 	return m.MockDataProductRemoteTransport.RoundTrip(req)

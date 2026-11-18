@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func getStatusOrganizations(ctx context.Context, client *console.ApiClient) ([]c
 		err = resp.Body.Close()
 	}()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API error: %d", resp.StatusCode)
 	}
 

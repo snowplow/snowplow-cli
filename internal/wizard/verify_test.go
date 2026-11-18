@@ -20,10 +20,10 @@ import (
 	"testing"
 )
 
-func fakeConsoleAndSignals(t *testing.T, signalsStatus int, signalsBody string) (consoleURL, signalsURL string) {
+func fakeConsoleAndSignals(t *testing.T, signalsStatus int, signalsBody string) (string, string) {
 	t.Helper()
 	consoleSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/msc/v1/organizations/org/credentials/v3/token" || r.Header.Get("X-API-KEY") != "secret" {
+		if r.URL.Path != "/api/msc/v1/organizations/org/credentials/v3/token" || r.Header.Get("X-Api-Key") != "secret" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}

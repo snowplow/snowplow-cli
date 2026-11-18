@@ -13,8 +13,8 @@ package model
 import (
 	"bytes"
 	"crypto"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -22,16 +22,16 @@ import (
 type SchemaType string
 
 type DataStructureMeta struct {
-	Hidden     bool              `yaml:"hidden" json:"hidden"`
-	SchemaType string            `yaml:"schemaType" json:"schemaType" validate:"required,oneof=event entity"`
-	CustomData map[string]string `yaml:"customData" json:"customData" validate:"required"`
+	Hidden     bool              `json:"hidden"     yaml:"hidden"`
+	SchemaType string            `json:"schemaType" validate:"required,oneof=event entity" yaml:"schemaType"`
+	CustomData map[string]string `json:"customData" validate:"required"                    yaml:"customData"`
 }
 
 type DataStructure struct {
-	ApiVersion   string            `yaml:"apiVersion" json:"apiVersion" validate:"required,oneof=v1"`
-	ResourceType string            `yaml:"resourceType" json:"resourceType" validate:"required,oneof=data-structure"`
-	Meta         DataStructureMeta `yaml:"meta" json:"meta" validate:"required"`
-	Data         map[string]any    `yaml:"data" json:"data" validate:"required"`
+	ApiVersion   string            `json:"apiVersion"   validate:"required,oneof=v1"             yaml:"apiVersion"`
+	ResourceType string            `json:"resourceType" validate:"required,oneof=data-structure" yaml:"resourceType"`
+	Meta         DataStructureMeta `json:"meta"         validate:"required"                      yaml:"meta"`
+	Data         map[string]any    `json:"data"         validate:"required"                      yaml:"data"`
 }
 
 func (ds DataStructure) GetContentHash() (string, error) {
@@ -48,7 +48,7 @@ func (ds DataStructure) GetContentHash() (string, error) {
 	hasher.Write(b)
 	hash := hasher.Sum(nil)
 	// render bytes as base-16
-	return fmt.Sprintf("%x", hash), nil
+	return hex.EncodeToString(hash), nil
 }
 
 func (d DataStructure) ParseData() (DataStructureData, error) {
@@ -58,15 +58,15 @@ func (d DataStructure) ParseData() (DataStructureData, error) {
 }
 
 type DataStructureSelf struct {
-	Vendor  string `mapstructure:"vendor" json:"vendor" validate:"required"`
-	Name    string `mapstructure:"name" json:"name" validate:"required"`
-	Format  string `mapstructure:"format" json:"format" validate:"required,oneof=jsonschema"`
-	Version string `mapstructure:"version" json:"version" validate:"required"`
+	Vendor  string `json:"vendor"  mapstructure:"vendor"  validate:"required"`
+	Name    string `json:"name"    mapstructure:"name"    validate:"required"`
+	Format  string `json:"format"  mapstructure:"format"  validate:"required,oneof=jsonschema"`
+	Version string `json:"version" mapstructure:"version" validate:"required"`
 }
 
 type DataStructureData struct {
-	Self   DataStructureSelf `mapstructure:"self" json:"self" validate:"required"`
-	Schema string            `mapstructure:"$schema" json:"$schema" validate:"required"`
+	Self   DataStructureSelf `json:"self"            mapstructure:"self"    validate:"required"`
+	Schema string            `json:"$schema"         mapstructure:"$schema" validate:"required"`
 	Other  map[string]any    `mapstructure:",remain"`
 }
 

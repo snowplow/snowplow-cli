@@ -55,7 +55,7 @@ func NewSchemaDeployChecker(cnx context.Context, c *ApiClient) (*SchemaDeployChe
 	return &SchemaDeployCheckProvider{igluCentral, dsList, lookup}, nil
 }
 
-func (sdc *SchemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, deployedVersions []string, err error) {
+func (sdc *SchemaDeployCheckProvider) IsDSDeployed(uri string) (bool, []string, error) {
 	splut := strings.Split(strings.TrimPrefix(uri, "iglu:"), "/")
 
 	if len(splut) != 4 {
@@ -63,18 +63,17 @@ func (sdc *SchemaDeployCheckProvider) IsDSDeployed(uri string) (found bool, depl
 	}
 
 	if slices.Contains(sdc.igluCentralList, uri) {
-		slog.Debug("validation", "msg", fmt.Sprintf("iglu central resolved %s", uri))
+		slog.Debug("validation", "msg", "iglu central resolved "+uri)
 		return true, nil, nil
 	}
 
 	if slices.Contains(builtInSchema, uri) {
-		slog.Debug("validation", "msg", fmt.Sprintf("built in resolved %s", uri))
+		slog.Debug("validation", "msg", "built in resolved "+uri)
 		return true, nil, nil
 	}
 
 	for _, ds := range sdc.dsList {
 		if ds.Vendor == splut[0] && ds.Name == splut[1] && ds.Format == splut[2] {
-
 			for _, deployment := range ds.Deployments {
 				if deployment.Version == splut[3] {
 					switch deployment.Env {

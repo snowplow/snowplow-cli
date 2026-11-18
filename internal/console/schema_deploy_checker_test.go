@@ -18,7 +18,6 @@ import (
 )
 
 func Test_IsDeployed_Iglu(t *testing.T) {
-
 	uri := "iglu:vendor/name/format/version"
 
 	mock := &SchemaDeployCheckProvider{
@@ -37,7 +36,6 @@ func Test_IsDeployed_Iglu(t *testing.T) {
 }
 
 func Test_IsDeployed_BuiltIn(t *testing.T) {
-
 	uri := "iglu:com.snowplowanalytics.snowplow/page_view/jsonschema/1-0-0"
 
 	mock := &SchemaDeployCheckProvider{

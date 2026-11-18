@@ -13,7 +13,6 @@ package console
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -87,8 +86,8 @@ var sampleRemoteDp = RemoteDataProduct{
 func Test_GetDataProductsEventSpecs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{
@@ -201,8 +200,8 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
 			return
 		}
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{
@@ -241,7 +240,7 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	res, err := GetDataProductsAndRelatedResources(cnx, client)
 
@@ -260,14 +259,13 @@ func Test_GetDataProductsEventSpecs(t *testing.T) {
 	if len(res.SourceApplication) != 1 {
 		t.Errorf("Unexpected number of source apps, expected 1, got: %d", len(res.SourceApplication))
 	}
-
 }
 
 func Test_CreateSourceApp(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1" && r.Method == "POST" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1" && r.Method == http.MethodPost {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{}`
@@ -281,21 +279,20 @@ func Test_CreateSourceApp(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := CreateSourceApp(cnx, client, sampleSa1)
 
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func Test_UpdateSourceApp(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/source-apps/v1/%s", sampleSa1.Id) && r.Method == "PUT" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/source-apps/v1/"+sampleSa1.Id && r.Method == http.MethodPut {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{}`
@@ -309,21 +306,20 @@ func Test_UpdateSourceApp(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := UpdateSourceApp(cnx, client, sampleSa1)
 
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func Test_CreateDataProduct(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2" && r.Method == "POST" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2" && r.Method == http.MethodPost {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{}`
@@ -337,21 +333,20 @@ func Test_CreateDataProduct(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := CreateDataProduct(cnx, client, sampleRemoteDp)
 
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func Test_UpdateDataProduct(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/data-products/v2/%s", sampleRemoteDp.Id) && r.Method == "PUT" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-products/v2/"+sampleRemoteDp.Id && r.Method == http.MethodPut {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `{}`
@@ -365,22 +360,21 @@ func Test_UpdateDataProduct(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := UpdateDataProduct(cnx, client, sampleRemoteDp)
 
 	if err != nil {
 		t.Error(err)
 	}
-
 }
 
 func Test_CreateEventSpec(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == "POST" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == http.MethodPost {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
@@ -397,7 +391,7 @@ func Test_CreateEventSpec(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := CreateEventSpec(cnx, client, sampleRemoteEs, nil)
 
@@ -411,13 +405,12 @@ func Test_CreateEventSpec(t *testing.T) {
 	if _, ok := spec["version"]; ok {
 		t.Errorf("the cli should not send a version, got: %v", spec["version"])
 	}
-
 }
 
 func Test_CreateEventSpecWithExpectedVersion(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1" && r.Method == http.MethodPost {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
@@ -431,7 +424,7 @@ func Test_CreateEventSpecWithExpectedVersion(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := CreateEventSpec(cnx, client, sampleRemoteEs, intPtr(0))
 
@@ -445,15 +438,14 @@ func Test_CreateEventSpecWithExpectedVersion(t *testing.T) {
 	if _, ok := spec["expectedVersion"]; ok {
 		t.Errorf("expectedVersion should not be inside spec, got: %v", spec)
 	}
-
 }
 
 func Test_UpdateEventSpec(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/"+sampleRemoteEs.Id && r.Method == http.MethodPut {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
@@ -470,7 +462,7 @@ func Test_UpdateEventSpec(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := UpdateEventSpec(cnx, client, sampleRemoteEs, nil)
 
@@ -487,13 +479,12 @@ func Test_UpdateEventSpec(t *testing.T) {
 	if spec["status"] != "draft" {
 		t.Errorf("status should be draft, got: %v", spec["status"])
 	}
-
 }
 
 func Test_UpdateEventSpecWithExpectedVersion(t *testing.T) {
 	var body map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "PUT" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/"+sampleRemoteEs.Id && r.Method == http.MethodPut {
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
 			}
@@ -507,7 +498,7 @@ func Test_UpdateEventSpecWithExpectedVersion(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := UpdateEventSpec(cnx, client, sampleRemoteEs, intPtr(4))
 
@@ -517,13 +508,12 @@ func Test_UpdateEventSpecWithExpectedVersion(t *testing.T) {
 	if body["expectedVersion"] != float64(4) {
 		t.Errorf("expectedVersion should be 4, got: %v", body["expectedVersion"])
 	}
-
 }
 
 func Test_BatchPublishEventSpecs(t *testing.T) {
 	var body string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/publish" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/publish" && r.Method == http.MethodPost {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Error(err)
@@ -538,7 +528,7 @@ func Test_BatchPublishEventSpecs(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := BatchPublishEventSpecs(cnx, client, []string{"a", "b"}, nil)
 	if err != nil {
@@ -555,14 +545,13 @@ func Test_BatchPublishEventSpecs(t *testing.T) {
 	if body != `{"eventSpecIds":["a","b"],"expectedVersions":[{"id":"b","version":3}]}` {
 		t.Errorf("unexpected body with declared versions, got: %s", body)
 	}
-
 }
 
 func Test_DeleteEventSpec(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == fmt.Sprintf("/api/msc/v1/organizations/orgid/event-specs/v1/%s", sampleRemoteEs.Id) && r.Method == "DELETE" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations/orgid/event-specs/v1/"+sampleRemoteEs.Id && r.Method == http.MethodDelete {
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			w.WriteHeader(http.StatusNoContent)
@@ -573,12 +562,11 @@ func Test_DeleteEventSpec(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	err := DeleteEventSpec(cnx, client, sampleRemoteEs.Id)
 
 	if err != nil {
 		t.Error(err)
 	}
-
 }

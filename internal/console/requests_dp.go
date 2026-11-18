@@ -26,8 +26,8 @@ import (
 )
 
 type DataProductsAndRelatedResources struct {
-	DataProducts      []RemoteDataProduct       `json:"dataProducts" yaml:"dataProducts"`
-	EventSpecs        []RemoteEventSpec         `json:"eventSpecs" yaml:"eventSpecs"`
+	DataProducts      []RemoteDataProduct       `json:"dataProducts"      yaml:"dataProducts"`
+	EventSpecs        []RemoteEventSpec         `json:"eventSpecs"        yaml:"eventSpecs"`
 	SourceApplication []RemoteSourceApplication `json:"sourceApplication" yaml:"sourceApplication"`
 }
 
@@ -132,8 +132,7 @@ type saData struct {
 }
 
 func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) (*DataProductsAndRelatedResources, error) {
-
-	resp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/data-products/v2", client.BaseUrl), client, cnx, nil)
+	resp, err := DoConsoleRequest("GET", client.BaseUrl+"/data-products/v2", client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +152,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, fmt.Errorf("not expected response code %d", resp.StatusCode)
 	}
 
-	saResp, err := DoConsoleRequest("GET", fmt.Sprintf("%s/source-apps/v1", client.BaseUrl), client, cnx, nil)
+	saResp, err := DoConsoleRequest("GET", client.BaseUrl+"/source-apps/v1", client, cnx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -190,13 +189,13 @@ const (
 )
 
 type CompatSource struct {
-	Source     string            `json:"source" yaml:"source"`
-	Status     CompatStatus      `json:"status" yaml:"status"`
+	Source     string            `json:"source"     yaml:"source"`
+	Status     CompatStatus      `json:"status"     yaml:"status"`
 	Properties map[string]string `json:"properties" yaml:"properties"`
 }
 
 type CompatResult struct {
-	Status  string         `json:"status" yaml:"status"`
+	Status  string         `json:"status"  yaml:"status"`
 	Sources []CompatSource `json:"sources" yaml:"sources"`
 	Message string         `json:"message" yaml:"message"`
 }
@@ -227,7 +226,7 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 	if err != nil {
 		return nil, err
 	}
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1/compatibility", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/event-specs/v1/compatibility", client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +254,7 @@ func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 	if err != nil {
 		return err
 	}
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/source-apps/v1", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/source-apps/v1", client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -274,7 +273,6 @@ func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		return fmt.Errorf("bad response: %s", dresp.Message)
-
 	}
 	return nil
 }
@@ -303,7 +301,6 @@ func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		return fmt.Errorf("bad response: %s", dresp.Message)
-
 	}
 	return nil
 }
@@ -328,7 +325,6 @@ func DeleteSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 		}
 
 		return fmt.Errorf("bad response: %s", dresp.Message)
-
 	}
 	return nil
 }
@@ -338,7 +334,7 @@ func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	if err != nil {
 		return err
 	}
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/data-products/v2", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/data-products/v2", client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -357,7 +353,6 @@ func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		return fmt.Errorf("bad response: %s", dresp.Message)
-
 	}
 	return nil
 }
@@ -387,7 +382,6 @@ func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		return fmt.Errorf("bad response: %s", dresp)
-
 	}
 	return nil
 }
@@ -412,20 +406,18 @@ func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 		}
 
 		return fmt.Errorf("bad response: %s", dresp)
-
 	}
 	return nil
 }
 
 func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec, expectedVersion *int) error {
-
 	esForm := remoteEventSpecPost{Spec: es, Message: "", ExpectedVersion: expectedVersion}
 
 	body, err := json.Marshal(esForm)
 	if err != nil {
 		return err
 	}
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/event-specs/v1", client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -444,7 +436,6 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec,
 		}
 
 		return fmt.Errorf("bad response: %s", dresp)
-
 	}
 	return nil
 }
@@ -477,7 +468,6 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec,
 		}
 
 		return fmt.Errorf("bad response: %s", dresp)
-
 	}
 	return nil
 }
@@ -502,7 +492,6 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 		}
 
 		return fmt.Errorf("bad response: %s", dresp)
-
 	}
 	return nil
 }
@@ -528,7 +517,7 @@ func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds
 		return err
 	}
 
-	resp, err := DoConsoleRequest("POST", fmt.Sprintf("%s/event-specs/v1/publish", client.BaseUrl), client, cnx, bytes.NewBuffer(body))
+	resp, err := DoConsoleRequest("POST", client.BaseUrl+"/event-specs/v1/publish", client, cnx, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}

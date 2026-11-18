@@ -35,7 +35,6 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 }
 
 func InitLogging(cmd *cobra.Command) error {
-
 	debug, err := cmd.Flags().GetBool("debug")
 	if err != nil {
 		return err
@@ -86,7 +85,6 @@ func InitLogging(cmd *cobra.Command) error {
 	}
 
 	return nil
-
 }
 
 func LogFatal(err error) {

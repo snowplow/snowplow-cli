@@ -110,7 +110,6 @@ func InitConsoleConfigWithBaseDir(cmd *cobra.Command, baseDir string) error {
 }
 
 func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, baseDir string) error {
-
 	if err := loadEnvFiles(cmd, baseDir); err != nil {
 		return fmt.Errorf("failed to load .env file: %w", err)
 	}

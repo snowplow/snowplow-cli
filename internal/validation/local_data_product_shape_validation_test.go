@@ -101,7 +101,6 @@ var dpRulesTests = []struct {
 }
 
 func Test_ValidateDPShape_Rules(t *testing.T) {
-
 	for _, tt := range dpRulesTests {
 		inputRaw := fmt.Sprintf(inputValidRuleBase, tt.in)
 		t.Run(tt.in, func(t *testing.T) {
@@ -117,7 +116,6 @@ func Test_ValidateDPShape_Rules(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 var inputVersionBase = `
@@ -145,7 +143,6 @@ var dpVersionTests = []struct {
 }
 
 func Test_ValidateDPShape_Version(t *testing.T) {
-
 	for _, tt := range dpVersionTests {
 		inputRaw := fmt.Sprintf(inputVersionBase, tt.in)
 		t.Run(tt.in, func(t *testing.T) {
@@ -161,5 +158,4 @@ func Test_ValidateDPShape_Version(t *testing.T) {
 			}
 		})
 	}
-
 }

@@ -261,7 +261,6 @@ func init() {
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
-
 	if dumpContext, _ := cmd.Flags().GetBool("dump-context"); dumpContext {
 		out, err := getSnowplowContext(cmd.Context())
 		if err != nil {
@@ -344,7 +343,6 @@ func pathsFromArguments(base string, args map[string]any) ([]string, error) {
 }
 
 func validateDataProductsHandler(cmd *cobra.Command) server.ToolHandlerFunc {
-
 	logLevel := slog.LevelInfo
 
 	if debug, _ := cmd.Flags().GetBool("debug"); debug {
@@ -381,12 +379,10 @@ func validateDataProductsHandler(cmd *cobra.Command) server.ToolHandlerFunc {
 		}
 
 		return mcp.NewToolResultText(output.String()), nil
-
 	}
 }
 
 func validateDataStructuresHandler(cmd *cobra.Command) server.ToolHandlerFunc {
-
 	logLevel := slog.LevelInfo
 
 	if debug, _ := cmd.Flags().GetBool("debug"); debug {

@@ -11,7 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package cmd
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/config"
@@ -55,7 +55,7 @@ configured, and Snowtype shares the same login.`,
 		}
 
 		if clientID == "" {
-			return fmt.Errorf("client-id is required. Use --client-id flag")
+			return errors.New("client-id is required. Use --client-id flag")
 		}
 
 		apiKeyID, _ := cmd.Flags().GetString("api-key-id")

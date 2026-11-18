@@ -113,7 +113,7 @@ func VerifySignals(ctx context.Context, consoleHost, envPath string) VerifyResul
 // Using /attribute_keys for simplicity (health is public)
 // The Console client's HTTP client logs the request under --debug.
 func signalsStatus(ctx context.Context, client *console.ApiClient, apiURL string) (int, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(apiURL, "/")+"/api/v1/registry/attribute_keys/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(apiURL, "/")+"/api/v1/registry/attribute_keys/", nil)
 	if err != nil {
 		return 0, err
 	}

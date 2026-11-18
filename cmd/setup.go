@@ -12,7 +12,7 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/snowplow/snowplow-cli/internal/auth/device"
 	"github.com/snowplow/snowplow-cli/internal/config"
@@ -65,7 +65,7 @@ var SetupCmd = &cobra.Command{
 		}
 
 		if clientID == "" {
-			return fmt.Errorf("client-id is required. Use --client-id flag")
+			return errors.New("client-id is required. Use --client-id flag")
 		}
 
 		return setup.SetupConfig(clientID, auth0Domain, consoleHost, readOnly, isDotenv, ctx)

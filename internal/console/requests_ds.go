@@ -35,10 +35,10 @@ type msgResponse struct {
 type pubResponse struct {
 	msgResponse
 
-	Success  bool     `json:"success" yaml:"success"`
-	Errors   []string `json:"errors" yaml:"errors"`
+	Success  bool     `json:"success"  yaml:"success"`
+	Errors   []string `json:"errors"   yaml:"errors"`
 	Warnings []string `json:"warnings" yaml:"warnings"`
-	Info     []string `json:"info" yaml:"info"`
+	Info     []string `json:"info"     yaml:"info"`
 }
 
 type pubError struct {
@@ -85,12 +85,11 @@ type fullMeta struct {
 }
 
 func Validate(cnx context.Context, client *ApiClient, ds model.DataStructure) (*ValidateResponse, error) {
-
 	body, err := json.Marshal(ds)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/validation-requests", client.BaseUrl), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(cnx, http.MethodPost, client.BaseUrl+"/data-structures/v1/validation-requests", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +142,6 @@ func PublishProd(cnx context.Context, client *ApiClient, ds model.DataStructure,
 }
 
 func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to DataStructureEnv, ds model.DataStructure, isPatch bool) (*PublishResponse, error) {
-
 	dsData, err := ds.ParseData()
 	if err != nil {
 		return nil, err
@@ -163,7 +161,7 @@ func publish(cnx context.Context, client *ApiClient, from DataStructureEnv, to D
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(cnx, "POST", fmt.Sprintf("%s/data-structures/v1/deployment-requests", client.BaseUrl), bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(cnx, http.MethodPost, client.BaseUrl+"/data-structures/v1/deployment-requests", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +216,7 @@ type ListResponse struct {
 }
 
 func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", "https://com-iglucentral-eu1-prod.iglu.snplow.net/api/schemas", nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, "https://com-iglucentral-eu1-prod.iglu.snplow.net/api/schemas", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +245,7 @@ func GetIgluCentralListing(cnx context.Context, client *ApiClient) ([]string, er
 }
 
 func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResponse, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1", client.BaseUrl), nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, client.BaseUrl+"/data-structures/v1", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +274,7 @@ func GetDataStructureListing(cnx context.Context, client *ApiClient) ([]ListResp
 }
 
 func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash string) ([]Deployment, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, fmt.Sprintf("%s/data-structures/v1/%s/deployments?from=0&size=1000000000", client.BaseUrl, dsHash), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +305,6 @@ func GetDataStructureDeployments(cnx context.Context, client *ApiClient, dsHash 
 }
 
 func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string, includeLegacy bool) ([]model.DataStructure, error) {
-
 	listResp, err := GetDataStructureListing(cnx, client)
 	if err != nil {
 		return nil, err
@@ -318,7 +315,7 @@ func GetAllDataStructures(cnx context.Context, client *ApiClient, match []string
 	var skippedCount int
 	var includedLegacyCount int
 
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structures/v1/schemas/versions?latest=true", client.BaseUrl), nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, client.BaseUrl+"/data-structures/v1/schemas/versions?latest=true", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +395,7 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 	var res []model.DataStructure
 	var dsData []map[string]any
 
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/data-structure-drafts/v1/schemas", client.BaseUrl), nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, client.BaseUrl+"/data-structure-drafts/v1/schemas", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -453,7 +450,6 @@ func GetAllDataStructuresDrafts(cnx context.Context, client *ApiClient, match []
 }
 
 func MetadateUpdate(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {
-
 	data, err := ds.ParseData()
 	if err != nil {
 		return err
@@ -471,7 +467,6 @@ func MetadateUpdate(cnx context.Context, client *ApiClient, ds *model.DataStruct
 }
 
 func metadataLock(cnx context.Context, client *ApiClient, ds *model.DataStructure, managedFrom string) error {
-
 	data, err := ds.ParseData()
 	if err != nil {
 		return err
@@ -483,7 +478,6 @@ func metadataLock(cnx context.Context, client *ApiClient, ds *model.DataStructur
 }
 
 func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSelf, fullMeta fullMeta) error {
-
 	toHash := fmt.Sprintf("%s-%s-%s-%s", client.OrgId, ds.Vendor, ds.Name, ds.Format)
 	dsHash := sha256.Sum256([]byte(toHash))
 
@@ -492,7 +486,7 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 		return err
 	}
 	url := fmt.Sprintf("%s/data-structures/v1/%x/meta", client.BaseUrl, dsHash)
-	req, err := http.NewRequestWithContext(cnx, "PATCH", url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(cnx, http.MethodPatch, url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -505,7 +499,6 @@ func patchMeta(cnx context.Context, client *ApiClient, ds *model.DataStructureSe
 	}
 
 	if resp.StatusCode != http.StatusOK {
-
 		rbody, err := io.ReadAll(resp.Body)
 		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {

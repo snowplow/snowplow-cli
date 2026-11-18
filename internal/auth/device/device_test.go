@@ -447,7 +447,6 @@ func Test_displayAvailableOrgs_WithDefault(t *testing.T) {
 	defaultIndex := 1
 
 	displayAvailableOrgs(organizations, defaultIndex)
-
 }
 
 func Test_displayAvailableOrgs_NoDefault(t *testing.T) {
@@ -458,7 +457,6 @@ func Test_displayAvailableOrgs_NoDefault(t *testing.T) {
 	defaultIndex := -1
 
 	displayAvailableOrgs(organizations, defaultIndex)
-
 }
 
 func Test_displayAvailableOrgs_EmptyOrganizations(t *testing.T) {
@@ -466,7 +464,6 @@ func Test_displayAvailableOrgs_EmptyOrganizations(t *testing.T) {
 	defaultIndex := -1
 
 	displayAvailableOrgs(organizations, defaultIndex)
-
 }
 
 func Test_displayAvailableOrgs_SingleOrganization(t *testing.T) {
@@ -476,7 +473,6 @@ func Test_displayAvailableOrgs_SingleOrganization(t *testing.T) {
 	defaultIndex := 0
 
 	displayAvailableOrgs(organizations, defaultIndex)
-
 }
 
 func Test_selectOrganizationForInput_EmptyInputWithDefault(t *testing.T) {

@@ -15,7 +15,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -45,18 +44,17 @@ type migrationResponse struct {
 
 type migration struct {
 	MigrationType string `json:"migrationType" yaml:"migrationType"`
-	ChangeType    string `json:"changeType" yaml:"changeType"`
-	Path          string `json:"path" yaml:"path"`
-	Message       string `json:"message" yaml:"message"`
+	ChangeType    string `json:"changeType"    yaml:"changeType"`
+	Path          string `json:"path"          yaml:"path"`
+	Message       string `json:"message"       yaml:"message"`
 }
 
 type MigrationReport struct {
 	SuggestedVersion string   `json:"suggestedVersion" yaml:"suggestedVersion"`
-	Messages         []string `json:"messages" yaml:"messages"`
+	Messages         []string `json:"messages"         yaml:"messages"`
 }
 
 func fetchMigration(cnx context.Context, client *ApiClient, destination string, from model.DataStructureSelf, to map[string]any) (*migrationResponse, error) {
-
 	mreq := migrationRequest{destination, from, to}
 
 	body, err := json.Marshal(mreq)
@@ -64,8 +62,8 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/data-structures/v1/schema-migrations", client.BaseUrl)
-	req, err := http.NewRequestWithContext(cnx, "POST", url, bytes.NewBuffer(body))
+	url := client.BaseUrl + "/data-structures/v1/schema-migrations"
+	req, err := http.NewRequestWithContext(cnx, http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +99,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 }
 
 func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, error) {
-	req, err := http.NewRequestWithContext(cnx, "GET", fmt.Sprintf("%s/destinations/v3", client.BaseUrl), nil)
+	req, err := http.NewRequestWithContext(cnx, http.MethodGet, client.BaseUrl+"/destinations/v3", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +131,9 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 	}
 
 	return destinations, err
-
 }
 
 func ValidateMigrations(cnx context.Context, client *ApiClient, ds model.DSChangeContext) (map[string]MigrationReport, error) {
-
 	destinations, err := fetchDestinations(cnx, client)
 	if err != nil {
 		return nil, err

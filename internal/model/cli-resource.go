@@ -11,8 +11,8 @@
 package model
 
 type CliResource[A any] struct {
-	ApiVersion   string `yaml:"apiVersion" json:"apiVersion"`
-	ResourceType string `yaml:"resourceType" json:"resourceType"`
-	ResourceName string `yaml:"resourceName" json:"resourceName"`
-	Data         A      `yaml:"data" json:"data"`
+	ApiVersion   string `json:"apiVersion"   yaml:"apiVersion"`
+	ResourceType string `json:"resourceType" yaml:"resourceType"`
+	ResourceName string `json:"resourceName" yaml:"resourceName"`
+	Data         A      `json:"data"         yaml:"data"`
 }

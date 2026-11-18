@@ -62,7 +62,6 @@ func TestDataStructureJsonParseSuccess(t *testing.T) {
 	if !reflect.DeepEqual(expected, res) || err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n expected %#v", err, res, expected)
 	}
-
 }
 
 func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
@@ -91,7 +90,6 @@ func TestDataStructureJsonParseFailureWrongFormat(t *testing.T) {
 	if err == nil {
 		t.Fatal("Parsed data structure without schema")
 	}
-
 }
 
 func TestDataStructureYamlParseSuccess(t *testing.T) {
@@ -133,7 +131,6 @@ data:
 	if !reflect.DeepEqual(expected, res) || err != nil {
 		t.Fatalf("Cant' parse yaml %s\n parsed %#v\n expected %#v", err, res, expected)
 	}
-
 }
 
 func TestParseDataParses(t *testing.T) {
@@ -268,5 +265,4 @@ func TestDefaultApiVersion(t *testing.T) {
 	if !reflect.DeepEqual(expected, res) || err != nil {
 		t.Fatalf("Cant' parse json %s\n parsed %#v\n expected %#v", err, res, expected)
 	}
-
 }

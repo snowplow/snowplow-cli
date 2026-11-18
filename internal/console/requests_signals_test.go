@@ -19,7 +19,7 @@ import (
 
 func Test_GetSignalsEnvironments(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/msc/v1/organizations/org/signals/v1" || r.Method != "GET" {
+		if r.URL.Path != "/api/msc/v1/organizations/org/signals/v1" || r.Method != http.MethodGet {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		if r.Header.Get("Authorization") != "Bearer token" {

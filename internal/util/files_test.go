@@ -82,7 +82,6 @@ func TestCreatesDataStructuresFolderWithFiles(t *testing.T) {
 	if _, err := os.Stat(filePath2); os.IsNotExist(err) {
 		t.Fatalf("%s does not exists", filePath2)
 	}
-
 }
 
 func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
@@ -144,7 +143,6 @@ func TestCreatesDataStructuresFolderWithFilesJson(t *testing.T) {
 	if _, err := os.Stat(filePath2); os.IsNotExist(err) {
 		t.Fatalf("%s does not exists", filePath2)
 	}
-
 }
 
 func Test_createUniqueNames_OK(t *testing.T) {
@@ -325,7 +323,6 @@ func TestRespectsNoLsp(t *testing.T) {
 	if strings.Contains(string(fileContent), RepoRawFileURL) {
 		t.Fatalf("Expected file to not contain LSP schema URL with %s, but it did", RepoRawFileURL)
 	}
-
 }
 
 func TestCreateSourceAppsPathHandling(t *testing.T) {
