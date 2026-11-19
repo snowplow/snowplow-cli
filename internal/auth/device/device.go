@@ -127,7 +127,7 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeO
 	}
 
 	if len(organizations) == 0 {
-		return nil, fmt.Errorf("no organizations found for your account")
+		return nil, errors.New("no organizations found for your account")
 	}
 
 	var selectedOrg *console.Organization
@@ -283,7 +283,7 @@ func getOrgIDFromJWT(token string) (string, error) {
 	slog.Debug("Extracting organization ID from JWT token")
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid JWT token format")
+		return "", errors.New("invalid JWT token format")
 	}
 
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -298,22 +298,22 @@ func getOrgIDFromJWT(token string) (string, error) {
 
 	roles, ok := claims["https://snowplowanalytics.com/roles"].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf("missing Snowplow roles in JWT")
+		return "", errors.New("missing Snowplow roles in JWT")
 	}
 
 	user, ok := roles["user"].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf("missing user info in JWT")
+		return "", errors.New("missing user info in JWT")
 	}
 
 	organization, ok := user["organization"].(map[string]any)
 	if !ok {
-		return "", fmt.Errorf("missing organization info in JWT")
+		return "", errors.New("missing organization info in JWT")
 	}
 
 	orgID, ok := organization["id"].(string)
 	if !ok {
-		return "", fmt.Errorf("missing organization ID in JWT")
+		return "", errors.New("missing organization ID in JWT")
 	}
 
 	return orgID, nil

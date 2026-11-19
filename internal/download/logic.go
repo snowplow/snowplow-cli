@@ -109,7 +109,6 @@ func downloadTriggerImages(remoteEss []console.RemoteEventSpec, cnx context.Cont
 					return nil, err
 				}
 				triggerIdToFilePath[id] = path
-
 			}
 		}
 		slog.Debug("download", "msg", "wrote trigger images", "count", len(triggerIdToFilePath))

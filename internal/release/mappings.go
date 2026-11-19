@@ -61,7 +61,6 @@ func localSaToRemote(local model.SourceApp) console.RemoteSourceApplication {
 }
 
 func LocalDpToRemote(local model.DataProduct) console.RemoteDataProduct {
-
 	sourceAppIds := []string{}
 	for _, sa := range local.Data.SourceApplications {
 		sourceAppIds = append(sourceAppIds, sa["id"])
@@ -157,7 +156,6 @@ type EntitiesDiff struct {
 }
 
 func esToDiff(es console.RemoteEventSpec) (*RemoteEventSpecDiff, error) {
-
 	tracked := []string{}
 	for _, te := range es.Entities.Tracked {
 		te.Comment = nil

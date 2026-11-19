@@ -20,7 +20,6 @@ import (
 )
 
 func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, validateAll bool, changedIdToFile map[string]string, versionMismatches []model.EventSpecVersionMismatch, concurrency int) error {
-
 	logger := logging.LoggerFromContext(ctx)
 
 	possibleFiles := []string{}
@@ -78,7 +77,6 @@ func Validate(ctx context.Context, c *console.ApiClient, files map[string]map[st
 }
 
 func ValidateLocal(ctx context.Context, files map[string]map[string]any, searchPaths []string, basePath string, ghOut bool, baseRef string, versionMismatches []model.EventSpecVersionMismatch) error {
-
 	logger := logging.LoggerFromContext(ctx)
 
 	possibleFiles := []string{}

@@ -13,7 +13,7 @@ package validation
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -246,25 +246,25 @@ type MockSuccessfulTransport struct{}
 
 func (m *MockSuccessfulTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
-	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == http.MethodGet:
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/validation-requests") && req.Method == "POST":
+	case strings.Contains(req.URL.Path, "/validation-requests") && req.Method == http.MethodPost:
 		body := `{"success": true, "valid": true, "errors": [], "warnings": [], "info": []}`
 		return &http.Response{
-			StatusCode: 201,
+			StatusCode: http.StatusCreated,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
 	default:
 		return &http.Response{
-			StatusCode: 404,
+			StatusCode: http.StatusNotFound,
 			Body:       io.NopCloser(strings.NewReader(`{"message": "not found"}`)),
 			Request:    req,
 		}, nil
@@ -274,7 +274,7 @@ func (m *MockSuccessfulTransport) RoundTrip(req *http.Request) (*http.Response, 
 type MockNetworkFailureTransport struct{}
 
 func (m *MockNetworkFailureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("network connection failed")
+	return nil, errors.New("network connection failed")
 }
 
 type MockClientThatShouldNotBeCalledTransport struct {
@@ -283,32 +283,32 @@ type MockClientThatShouldNotBeCalledTransport struct {
 
 func (m *MockClientThatShouldNotBeCalledTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.t.Error("HTTP client should not be called when local validation fails")
-	return nil, fmt.Errorf("should not be called")
+	return nil, errors.New("should not be called")
 }
 
 type MockRemoteValidationFailureTransport struct{}
 
 func (m *MockRemoteValidationFailureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
-	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == "GET":
+	case strings.Contains(req.URL.Path, "/data-structures/v1") && req.Method == http.MethodGet:
 		body := `[]`
 		return &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
-	case strings.Contains(req.URL.Path, "/validation-requests") && req.Method == "POST":
+	case strings.Contains(req.URL.Path, "/validation-requests") && req.Method == http.MethodPost:
 		body := `{"success": false, "valid": false, "errors": ["Remote validation failed"], "warnings": [], "info": []}`
 		return &http.Response{
-			StatusCode: 201,
+			StatusCode: http.StatusCreated,
 			Body:       io.NopCloser(strings.NewReader(body)),
 			Request:    req,
 		}, nil
 
 	default:
 		return &http.Response{
-			StatusCode: 404,
+			StatusCode: http.StatusNotFound,
 			Body:       io.NopCloser(strings.NewReader(`{"message": "not found"}`)),
 			Request:    req,
 		}, nil

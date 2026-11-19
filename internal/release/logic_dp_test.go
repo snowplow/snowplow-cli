@@ -589,7 +589,6 @@ func Test_findTriggerChanges_ImageDiff(t *testing.T) {
 	if diff := cmp.Diff(expected, res.imagesToUpload, cmpopts.EquateEmpty(), cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
 		t.Errorf("findTriggerChanges().imagesToUpload mismatch (-want +got):\n%s", diff)
 	}
-
 }
 
 func Test_findTriggerChanges_MissingOriginal(t *testing.T) {
@@ -635,7 +634,6 @@ func Test_findTriggerChanges_MissingOriginal(t *testing.T) {
 	if diff := cmp.Diff(expected, res.imagesToUpload, cmpopts.EquateEmpty(), cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
 		t.Errorf("findTriggerChanges().imagesToUpload mismatch (-want +got):\n%s", diff)
 	}
-
 }
 
 func Test_LockChanged(t *testing.T) {
@@ -685,14 +683,14 @@ func newTestClientAndServerWithPublishCounter(t *testing.T, eventSpecsJSON strin
 	var publishCalls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/data-products/v2" && r.Method == "GET":
+		case r.URL.Path == "/data-products/v2" && r.Method == http.MethodGet:
 			resp := fmt.Sprintf(`{"data": [], "includes": {"eventSpecs": %s}}`, eventSpecsJSON)
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, resp)
-		case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
+		case r.URL.Path == "/source-apps/v1" && r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `{"data": []}`)
-		case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+		case r.URL.Path == "/event-specs/v1/publish" && r.Method == http.MethodPost:
 			publishCalls.Add(1)
 			w.WriteHeader(http.StatusAccepted)
 		default:
@@ -1249,10 +1247,10 @@ func newEventSpecWriteServer(t *testing.T, bodies map[string]map[string]any) *ht
 		}
 		bodies[r.Method+" "+r.URL.Path] = body
 		switch {
-		case r.URL.Path == "/event-specs/v1" && r.Method == "POST":
+		case r.URL.Path == "/event-specs/v1" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `{}`)
-		case strings.HasPrefix(r.URL.Path, "/event-specs/v1/") && r.Method == "PUT":
+		case strings.HasPrefix(r.URL.Path, "/event-specs/v1/") && r.Method == http.MethodPut:
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `{}`)
 		default:
@@ -1345,13 +1343,13 @@ func Test_Release_ExpectedVersionsOnlyForDeclared(t *testing.T) {
 			var publishBody string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch {
-				case r.URL.Path == "/data-products/v2" && r.Method == "GET":
+				case r.URL.Path == "/data-products/v2" && r.Method == http.MethodGet:
 					w.WriteHeader(http.StatusOK)
 					_, _ = io.WriteString(w, fmt.Sprintf(`{"data": [], "includes": {"eventSpecs": %s}}`, eventSpecsJSON))
-				case r.URL.Path == "/source-apps/v1" && r.Method == "GET":
+				case r.URL.Path == "/source-apps/v1" && r.Method == http.MethodGet:
 					w.WriteHeader(http.StatusOK)
 					_, _ = io.WriteString(w, `{"data": []}`)
-				case r.URL.Path == "/event-specs/v1/publish" && r.Method == "POST":
+				case r.URL.Path == "/event-specs/v1/publish" && r.Method == http.MethodPost:
 					b, _ := io.ReadAll(r.Body)
 					publishBody = string(b)
 					w.WriteHeader(http.StatusAccepted)
@@ -1620,7 +1618,7 @@ func Test_ReadLocalDataProducts_SortsDataProductsByFileName(t *testing.T) {
 	input := map[string]map[string]any{}
 	var want []string
 	for _, name := range []string{"e", "c", "a", "d", "b"} {
-		resourceName := fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name)
+		resourceName := name + "0000000-0000-4000-8000-000000000000"
 		input[fmt.Sprintf("/base/%s.yaml", name)] = map[string]any{
 			"apiVersion":   "v1",
 			"resourceType": "data-product",
@@ -1629,7 +1627,7 @@ func Test_ReadLocalDataProducts_SortsDataProductsByFileName(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"a", "b", "c", "d", "e"} {
-		want = append(want, fmt.Sprintf("%s0000000-0000-4000-8000-000000000000", name))
+		want = append(want, name+"0000000-0000-4000-8000-000000000000")
 	}
 
 	result, err := ReadLocalDataProducts(context.Background(), input)

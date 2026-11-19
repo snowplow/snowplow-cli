@@ -205,8 +205,8 @@ func loadAny() (*Login, error) {
 	return &login, nil
 }
 
-func check(host string) (login *Login, expired bool, err error) {
-	login, err = Load(host)
+func check(host string) (*Login, bool, error) {
+	login, err := Load(host)
 	if err != nil || login == nil {
 		return nil, false, err
 	}

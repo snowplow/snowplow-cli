@@ -19,7 +19,7 @@ import (
 //go:embed schema/data-product.json
 var dpSchema string
 
-func ValidateDPShape(dp map[string]any) (validations DPValidations, ok bool) {
+func ValidateDPShape(dp map[string]any) (DPValidations, bool) {
 	sch := jsonschema.MustCompileString("data://data-product.json", dpSchema)
 	return validateWithSchema(sch, dp)
 }

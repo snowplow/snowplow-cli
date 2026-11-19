@@ -38,7 +38,6 @@ func Test_GetChangesCreate(t *testing.T) {
 	if len(res.ToCreate) != 1 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting one data structre to be created, got %+v", res)
 	}
-
 }
 
 func Test_GetChangesUpdateAndMeta(t *testing.T) {
@@ -77,7 +76,6 @@ func Test_GetChangesUpdateAndMeta(t *testing.T) {
 	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 1 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 1 {
 		t.Fatalf("Unexpected result, expecting one data structre to update metadata and new version, got %+v", res)
 	}
-
 }
 
 func Test_GetChangesPatch(t *testing.T) {
@@ -116,7 +114,6 @@ func Test_GetChangesPatch(t *testing.T) {
 	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 1 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting one data structre to update patch, got %+v", res)
 	}
-
 }
 
 func Test_GetChangesNoChange(t *testing.T) {
@@ -155,7 +152,6 @@ func Test_GetChangesNoChange(t *testing.T) {
 	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 0 {
 		t.Fatalf("Unexpected result, expecting no changes, got %+v", res)
 	}
-
 }
 
 func Test_GetChangesProdDeploy(t *testing.T) {
@@ -194,5 +190,4 @@ func Test_GetChangesProdDeploy(t *testing.T) {
 	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 0 || len(res.ToUpdateNewVersion) != 1 {
 		t.Fatalf("Unexpected result, expecting one data structre to update, got %+v", res)
 	}
-
 }

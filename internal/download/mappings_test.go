@@ -11,7 +11,6 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package download
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -150,21 +149,19 @@ func Test_remoteSasToLocalResources_OK(t *testing.T) {
 	if !reflect.DeepEqual(SaResource, res) {
 		t.Errorf("Unexpected local source apps expected:%+v got:%+v", SaResource, res)
 	}
-
 }
 
 func Test_localSasToRefs_OK(t *testing.T) {
 	dpLocation := "my-folder"
 
 	fileNamesToLocalSas := map[string]model.CliResource[model.SourceAppData]{
-		fmt.Sprintf("%s/source-apps/test.yaml", dpLocation): SaResource[0],
+		dpLocation + "/source-apps/test.yaml": SaResource[0],
 	}
 	res, err := localSasToRefs(fileNamesToLocalSas, dpLocation)
 
 	if !reflect.DeepEqual(sampleSaRefs, res) || err != nil {
 		t.Errorf("Unexpected source app references expected:%+v got:%+v, \nerr:%s", sampleSaRefs, res, err)
 	}
-
 }
 
 func Test_localSasToRefs_AbsolutePath(t *testing.T) {
@@ -228,7 +225,6 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 	if !reflect.DeepEqual(expected, res) {
 		t.Errorf("Unexpected local data products expected:%+v got:%+v", expected, res)
 	}
-
 }
 
 func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
@@ -285,7 +281,6 @@ func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
 	if !reflect.DeepEqual(expected, res) {
 		t.Errorf("Unexpected trigger urls expected:%+v got:%+v", expected, res)
 	}
-
 }
 
 func Test_remoteDpToLocal_SourceAppOrderingConsistency(t *testing.T) {

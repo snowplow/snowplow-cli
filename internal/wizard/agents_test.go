@@ -18,7 +18,7 @@ import (
 	"testing"
 )
 
-func stubEnv(t *testing.T, onPath ...string) (home, work string) {
+func stubEnv(t *testing.T, onPath ...string) (string, string) {
 	t.Helper()
 	home, work, bin := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, name := range onPath {

@@ -12,6 +12,7 @@ package release
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -78,7 +79,6 @@ func (cs DataProductChangeSet) isEmpty() bool {
 }
 
 func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*LocalFilesRefsResolved, error) {
-
 	probablyDps := []model.DataProduct{}
 	probablySas := []model.SourceApp{}
 	filenameToSa := make(map[string]model.SourceApp)
@@ -171,7 +171,7 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 						return nil, err
 					}
 
-					hash := fmt.Sprintf("%x", h.Sum(nil))
+					hash := hex.EncodeToString(h.Sum(nil))
 
 					triggerImageRefs[t.Id] = TriggerImageReference{
 						eventSpecId: es.ResourceName,
@@ -325,7 +325,6 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 					if exists {
 						imageCreate = append(imageCreate, triggerImage)
 					}
-
 				}
 			}
 
@@ -440,12 +439,11 @@ func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTr
 		imagesToUpload:                  imagesToUpload,
 		triggersWithOriginalVariantUrls: triggersWithOriginalVariantUrls,
 	}
-
 }
 
 func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remoteHashesById map[string]string) string {
 	variant := "original"
-	uri := strings.TrimSuffix(remote.VariantUrls[variant], fmt.Sprintf("/%s", variant))
+	uri := strings.TrimSuffix(remote.VariantUrls[variant], "/"+variant)
 	if uri != "" {
 		imageId := uri[len(uri)-36:]
 		return remoteHashesById[imageId]

@@ -69,7 +69,6 @@ func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecret string, orgid string) (*ApiClient, error) {
-
 	h := &http.Client{
 		Transport: &loggingRoundTripper{
 			Transport: http.DefaultTransport,
@@ -89,17 +88,17 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 		return &ApiClient{Http: h, Jwt: login.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
 	}
 
-	url := fmt.Sprintf("%s/credentials/v3/token", baseUrl)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	url := baseUrl + "/credentials/v3/token"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("X-API-KEY-ID", apiKeyId)
-	req.Header.Add("X-API-KEY", apiKeySecret)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	req.Header.Add("X-Api-Key-Id", apiKeyId)
+	req.Header.Add("X-Api-Key", apiKeySecret)
+	req.Header.Add("X-Snowplow-Cli", util.VersionInfo)
 
 	if fromMCP, ok := ctx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
-		req.Header.Add("X-SNOWPLOW-CLI-SOURCE", "mcp")
+		req.Header.Add("X-Snowplow-Cli-Source", "mcp")
 	}
 	resp, err := h.Do(req)
 	if err != nil {
@@ -147,11 +146,11 @@ func addStandardHeaders(req *http.Request, cnx context.Context, client *ApiClien
 }
 
 func addStandardHeadersWithJwt(req *http.Request, cnx context.Context, jwt string) {
-	auth := fmt.Sprintf("Bearer %s", jwt)
-	req.Header.Add("authorization", auth)
-	req.Header.Add("X-SNOWPLOW-CLI", util.VersionInfo)
+	auth := "Bearer " + jwt
+	req.Header.Add("Authorization", auth)
+	req.Header.Add("X-Snowplow-Cli", util.VersionInfo)
 
 	if fromMCP, ok := cnx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
-		req.Header.Add("X-SNOWPLOW-CLI-SOURCE", "mcp")
+		req.Header.Add("X-Snowplow-Cli-Source", "mcp")
 	}
 }

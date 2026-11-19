@@ -163,7 +163,7 @@ func localSasToRefs(fileNameToLocalSa map[string]model.CliResource[model.SourceA
 		if err != nil {
 			return nil, err
 		}
-		saIdToRef[sa.ResourceName] = model.Ref{Ref: fmt.Sprintf("./%s", rel)}
+		saIdToRef[sa.ResourceName] = model.Ref{Ref: "./" + rel}
 	}
 	return saIdToRef, nil
 }

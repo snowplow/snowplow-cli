@@ -64,7 +64,6 @@ func (v *DPValidations) concat(r DPValidations) {
 }
 
 func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any, changedIdToFile map[string]string, validateAll bool, concurrency int) (*DPLookup, error) {
-
 	probablyDps := map[string]model.DataProduct{}
 	probablySap := map[string]model.SourceApp{}
 	validation := map[string]DPValidations{}
@@ -169,7 +168,6 @@ func (lookup *DPLookup) SlogValidations(ctx context.Context, basePath string) er
 }
 
 func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
-
 	for f, v := range lookup.Validations {
 		rp, err := filepath.Rel(basePath, f)
 		if err != nil {
@@ -207,7 +205,7 @@ func (lookup *DPLookup) AddVersionMismatches(versionMismatches []model.EventSpec
 		if m.IsNew {
 			messages = append(messages, "new event specification")
 		} else if len(m.Changed) > 0 {
-			messages = append(messages, fmt.Sprintf("changed: %s", strings.Join(m.Changed, ", ")))
+			messages = append(messages, "changed: "+strings.Join(m.Changed, ", "))
 		}
 		if m.EntityCommentsRemoved {
 			messages = append(messages, "entities: a comment set in Console will be removed")
@@ -242,12 +240,10 @@ func (lookup *DPLookup) allSourceAppsRelativeTo(filename string) ([]string, erro
 	}
 
 	return relativeSas, nil
-
 }
 
 func (lookup *DPLookup) resolveRefs() error {
 	for dpFile, dp := range lookup.DataProducts {
-
 		resolvedSas := []string{}
 
 		v, ok := lookup.Validations[dpFile]
@@ -284,7 +280,6 @@ func (lookup *DPLookup) resolveRefs() error {
 					ref["$ref"] = absPath
 
 					if !slices.Contains(resolvedSas, absPath) {
-
 						relativeSas := []string{}
 						for _, absSaPath := range resolvedSas {
 							relPath, err := filepath.Rel(filepath.Dir(dpFile), absSaPath)

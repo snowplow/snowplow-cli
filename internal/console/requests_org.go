@@ -26,12 +26,11 @@ type Organization struct {
 }
 
 func GetOrganizations(ctx context.Context, accessToken, consoleHost string) ([]Organization, error) {
-
-	apiURL := fmt.Sprintf("%s/api/msc/v1/organizations", consoleHost)
+	apiURL := consoleHost + "/api/msc/v1/organizations"
 
 	slog.Debug("Fetching organizations", "url", apiURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err
 	}

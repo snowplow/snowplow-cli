@@ -85,7 +85,6 @@ func Test_MaybeResourcesfromPaths(t *testing.T) {
 			t.Fatal("missing path", p)
 		}
 	}
-
 }
 
 func Test_ResourceNameToFileName(t *testing.T) {
@@ -135,5 +134,4 @@ func Test_setMinus_OK(t *testing.T) {
 	if !reflect.DeepEqual(res3, expected2) {
 		t.Fatalf("result not as expected, expected: %s, actual: %s", expected2, res3)
 	}
-
 }

@@ -126,7 +126,7 @@ func MaybeResourcesAtMergeBase(ctx context.Context, dir string, ref string, sear
 	return files, nil
 }
 
-func parseLsTreeEntry(entry string) (mode string, objectType string, gitPath string, ok bool) {
+func parseLsTreeEntry(entry string) (string, string, string, bool) {
 	meta, gitPath, found := strings.Cut(entry, "\t")
 	if !found {
 		return "", "", "", false

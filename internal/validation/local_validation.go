@@ -21,7 +21,6 @@ import (
 )
 
 func validateDs(validate *validator.Validate, ds model.DataStructure) error {
-
 	type validation struct {
 		field          string
 		path           string
@@ -90,7 +89,6 @@ func validateDs(validate *validator.Validate, ds model.DataStructure) error {
 	}
 
 	return nil
-
 }
 
 func ValidateLocalDs(dss map[string]model.DataStructure) []error {

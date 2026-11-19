@@ -13,7 +13,6 @@ package console
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -49,8 +48,8 @@ func Test_NewClient_Ok(t *testing.T) {
 func Test_Validate_Ok(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/orgid/data-structures/v1/validation-requests" {
-			if r.Header.Get("authorization") != "Bearer token" {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+			if r.Header.Get("Authorization") != "Bearer token" {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			b, err := io.ReadAll(r.Body)
@@ -75,7 +74,7 @@ func Test_Validate_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	ds := DataStructure{
 		Meta: DataStructureMeta{Hidden: true, SchemaType: "entity", CustomData: map[string]string{}},
@@ -105,7 +104,7 @@ func Test_Validate_Fail(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	vr, err := Validate(cnx, client, DataStructure{})
 
@@ -127,7 +126,7 @@ func Test_Validate_FailCompletely(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := Validate(cnx, client, DataStructure{})
 
@@ -153,7 +152,7 @@ func Test_publish_Ok(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 	if err != nil {
@@ -178,7 +177,7 @@ func Test_publish_Fail(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 
@@ -204,7 +203,7 @@ func Test_publish_FailCompletely(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, false)
 
@@ -222,8 +221,8 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/msc/v1/organizations/orgid/data-structures/v1":
 			{
-				if r.Header.Get("authorization") != "Bearer token" {
-					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				if r.Header.Get("Authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 				}
 
 				resp := `[
@@ -283,8 +282,8 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 			}
 		case "/api/msc/v1/organizations/orgid/data-structures/v1/schemas/versions":
 			{
-				if r.Header.Get("authorization") != "Bearer token" {
-					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				if r.Header.Get("Authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 				}
 
 				resp := `
@@ -503,7 +502,7 @@ func Test_GetAllDataStructuresOk(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := GetAllDataStructures(cnx, client, []string{}, false)
 	if err != nil {
@@ -520,8 +519,8 @@ func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
 			{
-				if r.Header.Get("authorization") != "Bearer token" {
-					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				if r.Header.Get("Authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 				}
 
 				resp := `[
@@ -565,7 +564,7 @@ func Test_GetAllDataStructuresDraftsOk(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := GetAllDataStructuresDrafts(cnx, client, []string{})
 	if err != nil {
@@ -596,7 +595,7 @@ func Test_MetadataUpdate_Ok(t *testing.T) {
 	}`), &ds)
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid", OrgId: orgId}
 
 	err := MetadateUpdate(cnx, client, &ds, "")
 	if err != nil {
@@ -619,7 +618,7 @@ func Test_MetadataUpdate_Fail(t *testing.T) {
 	}`), &ds)
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL), OrgId: orgId}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid", OrgId: orgId}
 
 	err := MetadateUpdate(cnx, client, &ds, "")
 
@@ -640,7 +639,7 @@ func Test_Patch(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	result, err := publish(cnx, client, VALIDATED, DEV, DataStructure{}, true)
 	if err != nil {
@@ -727,8 +726,8 @@ func TestGetAllDataStructuresDrafts_Matching(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/msc/v1/organizations/orgid/data-structure-drafts/v1/schemas":
 			{
-				if r.Header.Get("authorization") != "Bearer token" {
-					t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+				if r.Header.Get("Authorization") != "Bearer token" {
+					t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 				}
 
 				resp := `[
@@ -785,7 +784,7 @@ func TestGetAllDataStructuresDrafts_Matching(t *testing.T) {
 	defer server.Close()
 
 	cnx := context.Background()
-	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: fmt.Sprintf("%s/api/msc/v1/organizations/orgid", server.URL)}
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
 	// Test with single match filter - should match 1 draft with specific name prefix
 	match := []string{"com.acme/draft_event"}

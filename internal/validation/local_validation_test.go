@@ -50,7 +50,6 @@ func Test_Correct(t *testing.T) {
 	if len(errs) > 0 {
 		t.Fatalf("Errors raised for correct data structure %s", errors.Join(errs...).Error())
 	}
-
 }
 
 func Test_FailWithoutMeta(t *testing.T) {
@@ -81,7 +80,6 @@ func Test_FailWithoutMeta(t *testing.T) {
 	if !strings.Contains(e, "dataStructure.meta") {
 		t.Fatalf("Error message does not complain about metadata %s", e)
 	}
-
 }
 
 func Test_FailWithoutFullMeta(t *testing.T) {
@@ -120,7 +118,6 @@ func Test_FailWithoutFullMeta(t *testing.T) {
 	if !strings.Contains(e, "dataStructure.meta.schemaType") {
 		t.Fatalf("Error message does not complain about missing schemaType %s", e)
 	}
-
 }
 
 func Test_FailWithWrongSchemaType(t *testing.T) {
@@ -199,7 +196,6 @@ func Test_FailWithWrongApiVersion(t *testing.T) {
 	if !strings.Contains(e, "dataStructure.apiVersion") || !strings.Contains(e, "v1") {
 		t.Fatalf("Error message does not complain about incorrect apiVersion %s", e)
 	}
-
 }
 
 func Test_WithoutFullSelf(t *testing.T) {
@@ -237,7 +233,6 @@ func Test_WithoutFullSelf(t *testing.T) {
 	if !strings.Contains(e, "dataStructure.data.self.version") {
 		t.Fatalf("Error message does not complain about missing version %s", e)
 	}
-
 }
 
 func Test_DuplicateFile(t *testing.T) {
@@ -276,5 +271,4 @@ func Test_DuplicateFile(t *testing.T) {
 	if !strings.Contains(e, "unique") {
 		t.Fatalf("Error message does not complain about duplicate files %s", e)
 	}
-
 }

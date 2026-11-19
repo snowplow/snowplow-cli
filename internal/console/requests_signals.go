@@ -60,7 +60,7 @@ func userClient(consoleHost, orgID, accessToken string) *ApiClient {
 
 func GetSignalsEnvironments(ctx context.Context, accessToken, consoleHost, orgID string) ([]SignalsEnvironment, error) {
 	client := userClient(consoleHost, orgID, accessToken)
-	url := fmt.Sprintf("%s/signals/v1", client.BaseUrl)
+	url := client.BaseUrl + "/signals/v1"
 	slog.Debug("Fetching Signals environments", "url", url)
 
 	resp, err := DoConsoleRequest("GET", url, client, ctx, nil)

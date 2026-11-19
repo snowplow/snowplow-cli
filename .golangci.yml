@@ -11,7 +11,6 @@ linters:
     - wsl
     - wsl_v5
     - bodyclose
-    - canonicalheader
     - cyclop
     - depguard
     - dupl
@@ -31,19 +30,14 @@ linters:
     - nilnil
     - noctx
     - noinlineerr
-    - nonamedreturns
     - paralleltest
-    - perfsprint
     - prealloc
     - revive
     - sloglint
-    - tagalign
     - tagliatelle
     - testpackage
     - thelper
-    - usestdlibvars
     - usetesting
-    - whitespace
     - wrapcheck
   settings:
     misspell:

@@ -58,12 +58,12 @@ func Test_GetOrganizations_Success(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
-			if r.Header.Get("authorization") != "Bearer "+accessToken {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
+			if r.Header.Get("Authorization") != "Bearer "+accessToken {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
-			if r.Header.Get("X-SNOWPLOW-CLI") != util.VersionInfo {
-				t.Errorf("bad version header, got: %s", r.Header.Get("X-SNOWPLOW-CLI"))
+			if r.Header.Get("X-Snowplow-Cli") != util.VersionInfo {
+				t.Errorf("bad version header, got: %s", r.Header.Get("X-Snowplow-Cli"))
 			}
 
 			resp := `[
@@ -115,9 +115,9 @@ func Test_GetOrganizations_EmptyResponse(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
-			if r.Header.Get("authorization") != "Bearer "+accessToken {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
+			if r.Header.Get("Authorization") != "Bearer "+accessToken {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `[]`
@@ -146,9 +146,9 @@ func Test_GetOrganizations_SingleOrganization(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
-			if r.Header.Get("authorization") != "Bearer "+accessToken {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("authorization"))
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
+			if r.Header.Get("Authorization") != "Bearer "+accessToken {
+				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 
 			resp := `[
@@ -189,7 +189,7 @@ func Test_GetOrganizations_ServerError(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = io.WriteString(w, `{"error": "Internal server error"}`)
 			return
@@ -213,7 +213,7 @@ func Test_GetOrganizations_Unauthorized(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"error": "Unauthorized"}`)
 			return
@@ -237,7 +237,7 @@ func Test_GetOrganizations_Forbidden(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = io.WriteString(w, `{"error": "Forbidden"}`)
 			return
@@ -261,7 +261,7 @@ func Test_GetOrganizations_InvalidResponseJSON(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `invalid json response`)
 			return
@@ -285,7 +285,7 @@ func Test_GetOrganizations_MalformedJSONArray(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, `[{"id": "org-1", "name": "Test"}`) // Missing closing bracket
 			return
@@ -341,7 +341,7 @@ func Test_GetOrganizations_PartialOrganizationData(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			resp := `[
 				{
 					"id": "org-1"
@@ -392,7 +392,7 @@ func Test_GetOrganizations_ExtraJSONFields(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			// Response with extra fields that should be ignored
 			resp := `[
 				{
@@ -436,7 +436,7 @@ func Test_GetOrganizations_EmptyFieldValues(t *testing.T) {
 	accessToken := createTestJWTForOrg()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == "GET" {
+		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
 			// Response with empty field values
 			resp := `[
 				{

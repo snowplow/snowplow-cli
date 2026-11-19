@@ -115,7 +115,7 @@ func TestTrackSelfDescribingEventGood(t *testing.T) {
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -141,7 +141,7 @@ func TestTrackSelfDescribingEventBad(t *testing.T) {
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
-		w.WriteHeader(404)
+		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
 
@@ -213,7 +213,7 @@ func TestTrackValidationError(t *testing.T) {
 
 func TestTrackSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -236,7 +236,7 @@ func TestTrackSuccess(t *testing.T) {
 
 func TestTrackHttpError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
@@ -290,7 +290,7 @@ func TestTrackInvalidProtocol(t *testing.T) {
 
 func TestTrackNormalizesMethodAndProtocolCase(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -315,7 +315,7 @@ func TestTrackRedirectSuccess(t *testing.T) {
 	var requests int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
-		w.WriteHeader(301)
+		w.WriteHeader(http.StatusMovedPermanently)
 	}))
 	defer server.Close()
 
@@ -344,7 +344,7 @@ func TestTrackSendsEntitiesAndIpAddress(t *testing.T) {
 	var query url.Values
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query = r.URL.Query()
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -388,7 +388,7 @@ func TestTrackOmitsContextsWhenNoEntities(t *testing.T) {
 	var query url.Values
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query = r.URL.Query()
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 

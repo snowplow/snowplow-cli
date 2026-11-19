@@ -58,15 +58,15 @@ func Test_CreateAPIKey_FullAccess(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
 			if r.Header.Get("Authorization") != "Bearer "+accessToken {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
 			if r.Header.Get("Content-Type") != "application/json" {
 				t.Errorf("bad content type, got: %s", r.Header.Get("Content-Type"))
 			}
-			if r.Header.Get("X-SNOWPLOW-CLI") != util.VersionInfo {
-				t.Errorf("bad version header, got: %s", r.Header.Get("X-SNOWPLOW-CLI"))
+			if r.Header.Get("X-Snowplow-Cli") != util.VersionInfo {
+				t.Errorf("bad version header, got: %s", r.Header.Get("X-Snowplow-Cli"))
 			}
 
 			body, err := io.ReadAll(r.Body)
@@ -120,7 +120,7 @@ func Test_CreateAPIKey_ReadOnly(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
 			if r.Header.Get("Authorization") != "Bearer "+accessToken {
 				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
 			}
@@ -176,7 +176,7 @@ func Test_CreateAPIKey_ServerError(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = io.WriteString(w, `{"error": "Internal server error"}`)
 			return
@@ -197,7 +197,7 @@ func Test_CreateAPIKey_Unauthorized(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"error": "Unauthorized"}`)
 			return
@@ -251,7 +251,7 @@ func Test_CreateAPIKey_InvalidResponseJSON(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == "POST" {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `invalid json response`)
 			return
@@ -477,7 +477,7 @@ func Test_GetUserInfo_UserInfoNotMap(t *testing.T) {
 
 func Test_CreateScopedAPIKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/msc/v1/organizations/org/credentials/v3/api-keys" || r.Method != "POST" {
+		if r.URL.Path != "/api/msc/v1/organizations/org/credentials/v3/api-keys" || r.Method != http.MethodPost {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		body, _ := io.ReadAll(r.Body)
