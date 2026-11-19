@@ -86,26 +86,22 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 	idToFileName := make(map[string]string)
 
 	for f, maybeDp := range dp {
-		if resourceType, ok := maybeDp["resourceType"]; ok {
-			switch resourceType {
-			case "data-product":
-				var dp model.DataProduct
-				if err := mapstructure.Decode(maybeDp, &dp); err == nil {
-					filenameToDp[f] = dp
-					idToFileName[dp.ResourceName] = f
-				} else {
-					return nil, err
-				}
-			case "source-application":
-				var sa model.SourceApp
-				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
-					filenameToSa[f] = sa
-					idToFileName[sa.ResourceName] = f
-					probablySas = append(probablySas, sa)
-				} else {
-					return nil, err
-				}
+		switch maybeDp["resourceType"] {
+		case "data-product":
+			var dp model.DataProduct
+			if err := mapstructure.Decode(maybeDp, &dp); err != nil {
+				return nil, err
 			}
+			filenameToDp[f] = dp
+			idToFileName[dp.ResourceName] = f
+		case "source-application":
+			var sa model.SourceApp
+			if err := mapstructure.Decode(maybeDp, &sa); err != nil {
+				return nil, err
+			}
+			filenameToSa[f] = sa
+			idToFileName[sa.ResourceName] = f
+			probablySas = append(probablySas, sa)
 		}
 	}
 
@@ -117,71 +113,18 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 
 	for _, dpFile := range dpFiles {
 		dp := filenameToDp[dpFile]
-		var sourceApps []map[string]string
-		for _, sa := range dp.Data.SourceApplications {
-			ids := map[string]string{}
-			for _, fileName := range sa {
-				absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), fileName))
-				if err != nil {
-					return nil, err
-				}
-				id := filenameToSa[absPath].ResourceName
-				ids["id"] = id
-			}
-			sourceApps = append(sourceApps, ids)
+		if err := replaceSourceAppRefsWithIds(&dp, dpFile, filenameToSa); err != nil {
+			return nil, err
 		}
-		dp.Data.SourceApplications = sourceApps
-		for idx, es := range dp.Data.EventSpecifications {
-			var excludedSourceApps []map[string]string
-			for _, esSa := range es.ExcludedSourceApplications {
-				ids := map[string]string{}
-				fileName := esSa["$ref"]
-				absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), fileName))
-				if err != nil {
-					return nil, err
-				}
-				id := filenameToSa[absPath].ResourceName
-				ids["id"] = id
-				excludedSourceApps = append(excludedSourceApps, ids)
-			}
-			dp.Data.EventSpecifications[idx].ExcludedSourceApplications = excludedSourceApps
+		for _, es := range dp.Data.EventSpecifications {
 			idToFileName[es.ResourceName] = dpFile
 		}
 		probablyDps = append(probablyDps, dp)
 	}
 
-	triggerImageRefs := make(map[string]TriggerImageReference)
-	for dpFile, dp := range filenameToDp {
-		for _, es := range dp.Data.EventSpecifications {
-			for _, t := range es.Triggers {
-				if t.Image != nil && len(t.Image.Ref) != 0 {
-					dppath, err := filepath.Abs(dpFile)
-					if err != nil {
-						return nil, err
-					}
-					fname := filepath.Clean(filepath.Join(filepath.Dir(dppath), t.Image.Ref))
-					f, err := os.Open(fname)
-					if err != nil {
-						return nil, err
-					}
-					defer util.LoggingCloser(ctx, f)
-
-					h := sha256.New()
-					if _, err := io.Copy(h, f); err != nil {
-						return nil, err
-					}
-
-					hash := hex.EncodeToString(h.Sum(nil))
-
-					triggerImageRefs[t.Id] = TriggerImageReference{
-						eventSpecId: es.ResourceName,
-						triggerId:   t.Id,
-						fname:       fname,
-						hash:        hash,
-					}
-				}
-			}
-		}
+	triggerImageRefs, err := hashTriggerImages(ctx, filenameToDp)
+	if err != nil {
+		return nil, err
 	}
 
 	res := LocalFilesRefsResolved{
@@ -191,6 +134,85 @@ func ReadLocalDataProducts(ctx context.Context, dp map[string]map[string]any) (*
 		TriggerImageRefsById: triggerImageRefs,
 	}
 	return &res, nil
+}
+
+func replaceSourceAppRefsWithIds(dp *model.DataProduct, dpFile string, filenameToSa map[string]model.SourceApp) error {
+	var sourceApps []map[string]string
+	for _, sa := range dp.Data.SourceApplications {
+		ids := map[string]string{}
+		for _, fileName := range sa {
+			absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), fileName))
+			if err != nil {
+				return err
+			}
+			id := filenameToSa[absPath].ResourceName
+			ids["id"] = id
+		}
+		sourceApps = append(sourceApps, ids)
+	}
+	dp.Data.SourceApplications = sourceApps
+	for idx, es := range dp.Data.EventSpecifications {
+		var excludedSourceApps []map[string]string
+		for _, esSa := range es.ExcludedSourceApplications {
+			ids := map[string]string{}
+			fileName := esSa["$ref"]
+			absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), fileName))
+			if err != nil {
+				return err
+			}
+			id := filenameToSa[absPath].ResourceName
+			ids["id"] = id
+			excludedSourceApps = append(excludedSourceApps, ids)
+		}
+		dp.Data.EventSpecifications[idx].ExcludedSourceApplications = excludedSourceApps
+	}
+	return nil
+}
+
+func hashTriggerImages(ctx context.Context, filenameToDp map[string]model.DataProduct) (map[string]TriggerImageReference, error) {
+	triggerImageRefs := make(map[string]TriggerImageReference)
+	for dpFile, dp := range filenameToDp {
+		for _, es := range dp.Data.EventSpecifications {
+			for _, t := range es.Triggers {
+				if t.Image == nil || len(t.Image.Ref) == 0 {
+					continue
+				}
+				triggerImageRef, err := hashTriggerImage(ctx, dpFile, es.ResourceName, t)
+				if err != nil {
+					return nil, err
+				}
+				triggerImageRefs[t.Id] = triggerImageRef
+			}
+		}
+	}
+	return triggerImageRefs, nil
+}
+
+func hashTriggerImage(ctx context.Context, dpFile string, eventSpecId string, t model.Trigger) (TriggerImageReference, error) {
+	dppath, err := filepath.Abs(dpFile)
+	if err != nil {
+		return TriggerImageReference{}, err
+	}
+	fname := filepath.Clean(filepath.Join(filepath.Dir(dppath), t.Image.Ref))
+	f, err := os.Open(fname)
+	if err != nil {
+		return TriggerImageReference{}, err
+	}
+	defer util.LoggingCloser(ctx, f)
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return TriggerImageReference{}, err
+	}
+
+	hash := hex.EncodeToString(h.Sum(nil))
+
+	return TriggerImageReference{
+		eventSpecId: eventSpecId,
+		triggerId:   t.Id,
+		fname:       fname,
+		hash:        hash,
+	}, nil
 }
 
 type changeFinder struct {
@@ -507,6 +529,28 @@ func getRemoteImageHashFromTriggerAndHashes(remote console.RemoteTrigger, remote
 
 func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *console.ApiClient) error {
 	slog.Info("sync", "msg", "applying changes")
+	if err := createAndUpdateSourceApps(cnx, client, changes); err != nil {
+		return err
+	}
+	if err := createAndUpdateDataProducts(cnx, client, changes); err != nil {
+		return err
+	}
+	triggerIdToVariantUrl, err := publishTriggerImages(cnx, client, changes.imageCreate)
+	if err != nil {
+		return err
+	}
+	setUploadedVariantUrls(changes.esCreate, triggerIdToVariantUrl)
+	if err := createEventSpecs(cnx, client, changes); err != nil {
+		return err
+	}
+	setUploadedVariantUrls(changes.esUpdate, triggerIdToVariantUrl)
+	if err := updateEventSpecs(cnx, client, changes); err != nil {
+		return err
+	}
+	return deleteEventSpecs(cnx, client, changes.esDelete)
+}
+
+func createAndUpdateSourceApps(cnx context.Context, client *console.ApiClient, changes DataProductChangeSet) error {
 	for _, saC := range changes.saCreate {
 		err := console.CreateSourceApp(cnx, client, saC)
 		if err != nil {
@@ -519,6 +563,10 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 			return err
 		}
 	}
+	return nil
+}
+
+func createAndUpdateDataProducts(cnx context.Context, client *console.ApiClient, changes DataProductChangeSet) error {
 	for _, dpC := range changes.dpCreate {
 		err := console.CreateDataProduct(cnx, client, dpC)
 		if err != nil {
@@ -531,43 +579,54 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 			return err
 		}
 	}
+	return nil
+}
+
+func publishTriggerImages(cnx context.Context, client *console.ApiClient, images []TriggerImageReference) (map[string]console.VariantUrls, error) {
 	triggerIdToVariantUrl := make(map[string]console.VariantUrls)
-	for _, img := range changes.imageCreate {
+	for _, img := range images {
 		variants, err := console.PublishImage(cnx, client, img.fname, img.hash)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		triggerIdToVariantUrl[img.triggerId] = variants
 	}
-	for esI, es := range changes.esCreate {
+	return triggerIdToVariantUrl, nil
+}
+
+func setUploadedVariantUrls(eventSpecs []console.RemoteEventSpec, triggerIdToVariantUrl map[string]console.VariantUrls) {
+	for esI, es := range eventSpecs {
 		for tI, t := range es.Triggers {
 			uploadedVariants, exists := triggerIdToVariantUrl[t.Id]
 			if exists {
-				changes.esCreate[esI].Triggers[tI].VariantUrls = uploadedVariants
+				eventSpecs[esI].Triggers[tI].VariantUrls = uploadedVariants
 			}
 		}
 	}
+}
+
+func createEventSpecs(cnx context.Context, client *console.ApiClient, changes DataProductChangeSet) error {
 	for _, esC := range changes.esCreate {
 		err := console.CreateEventSpec(cnx, client, esC, changes.declaredVersion(esC.Id))
 		if err != nil {
 			return err
 		}
 	}
-	for esI, es := range changes.esUpdate {
-		for tI, t := range es.Triggers {
-			uploadedVariants, exists := triggerIdToVariantUrl[t.Id]
-			if exists {
-				changes.esUpdate[esI].Triggers[tI].VariantUrls = uploadedVariants
-			}
-		}
-	}
+	return nil
+}
+
+func updateEventSpecs(cnx context.Context, client *console.ApiClient, changes DataProductChangeSet) error {
 	for _, esU := range changes.esUpdate {
 		err := console.UpdateEventSpec(cnx, client, esU, changes.declaredVersion(esU.Id))
 		if err != nil {
 			return err
 		}
 	}
-	for _, esD := range changes.esDelete {
+	return nil
+}
+
+func deleteEventSpecs(cnx context.Context, client *console.ApiClient, eventSpecs []console.RemoteEventSpec) error {
+	for _, esD := range eventSpecs {
 		err := console.DeleteEventSpec(cnx, client, esD.Id)
 		if err != nil {
 			return err
@@ -579,60 +638,54 @@ func ApplyDpChanges(changes DataProductChangeSet, cnx context.Context, client *c
 func PrintChangeset(changes DataProductChangeSet, idToFile map[string]string, isRelease bool) {
 	if changes.isEmpty() {
 		slog.Info("sync", "msg", "no changes detected, nothing to apply")
-	} else {
-		if len(changes.saCreate) != 0 {
-			for _, sa := range changes.saCreate {
-				slog.Info("sync", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
-			}
+		return
+	}
+	for _, sa := range changes.saCreate {
+		slog.Info("sync", "msg", "will create source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
+	}
+	for _, sa := range changes.saUpdate {
+		slog.Info("sync", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
+	}
+	for _, dp := range changes.dpCreate {
+		slog.Info("sync", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
+	}
+	for _, dp := range changes.dpUpdate {
+		slog.Info("sync", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
+	}
+	for _, es := range changes.esCreate {
+		slog.Info("sync", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id)
+	}
+	for _, es := range changes.esUpdate {
+		slog.Info("sync", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId)
+	}
+	for _, es := range changes.esDelete {
+		slog.Info("sync", "msg", "will delete event specifications", "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId, "data product name", idToFile[es.Id])
+	}
+	logImagesToPublish(changes.imageCreate)
+	slog.Info("sync", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
+	if isRelease {
+		logEventSpecsToRelease(changes)
+	}
+}
+
+func logImagesToPublish(images []TriggerImageReference) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	for _, img := range images {
+		if relp, err := filepath.Rel(cwd, img.fname); err == nil {
+			slog.Info("sync", "msg", "will publish image", "file", relp)
 		}
-		if len(changes.saUpdate) != 0 {
-			for _, sa := range changes.saUpdate {
-				slog.Info("sync", "msg", "will update source apps", "file", idToFile[sa.Id], "name", sa.Name, "resource name", sa.Id)
-			}
-		}
-		if len(changes.dpCreate) != 0 {
-			for _, dp := range changes.dpCreate {
-				slog.Info("sync", "msg", "will create data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
-			}
-		}
-		if len(changes.dpUpdate) != 0 {
-			for _, dp := range changes.dpUpdate {
-				slog.Info("sync", "msg", "will update data product", "file", idToFile[dp.Id], "name", dp.Name, "resource name", dp.Id)
-			}
-		}
-		if len(changes.esCreate) != 0 {
-			for _, es := range changes.esCreate {
-				slog.Info("sync", "msg", "will create event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id)
-			}
-		}
-		if len(changes.esUpdate) != 0 {
-			for _, es := range changes.esUpdate {
-				slog.Info("sync", "msg", "will update event specifications", "file", idToFile[es.Id], "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId)
-			}
-		}
-		if len(changes.esDelete) != 0 {
-			for _, es := range changes.esDelete {
-				slog.Info("sync", "msg", "will delete event specifications", "name", es.Name, "resource name", es.Id, "in data product", es.DataProductId, "data product name", idToFile[es.Id])
-			}
-		}
-		if len(changes.imageCreate) != 0 {
-			if cwd, err := os.Getwd(); err == nil {
-				for _, img := range changes.imageCreate {
-					if relp, err := filepath.Rel(cwd, img.fname); err == nil {
-						slog.Info("sync", "msg", "will publish image", "file", relp)
-					}
-				}
-			}
-		}
-		slog.Info("sync", "msg", "total entities to update", "data products", len(changes.dpCreate)+len(changes.dpUpdate), "event specs", len(changes.esCreate)+len(changes.esUpdate)+len(changes.esDelete), "source apps", len(changes.saCreate)+len(changes.saUpdate), "images", len(changes.imageCreate))
-		if isRelease {
-			for _, es := range slices.Concat(changes.esCreate, changes.esDelete) {
-				slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
-			}
-			for _, es := range changes.esUpdate {
-				slog.Info("release", "msg", "might release event spec if the changes are structural(name, data structure, rules)", "name", es.Name, "resource name", es.Id)
-			}
-		}
+	}
+}
+
+func logEventSpecsToRelease(changes DataProductChangeSet) {
+	for _, es := range slices.Concat(changes.esCreate, changes.esDelete) {
+		slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
+	}
+	for _, es := range changes.esUpdate {
+		slog.Info("release", "msg", "might release event spec if the changes are structural(name, data structure, rules)", "name", es.Name, "resource name", es.Id)
 	}
 }
 
@@ -757,29 +810,32 @@ func Release(cnx context.Context, client *console.ApiClient, changeSet *DataProd
 		slog.Warn("release", "msg", "some event specs were not released due to absent event", "count", skipped)
 	}
 
-	if len(toRelease) > 0 {
-		for _, es := range toRelease {
-			slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
-		}
-
-		if !dryRun {
-			ids := make([]string, len(toRelease))
-			var expectedVersions []console.EventSpecVersionRef
-			for i, es := range toRelease {
-				ids[i] = es.Id
-				if v := changeSet.declaredVersion(es.Id); v != nil {
-					expectedVersions = append(expectedVersions, console.EventSpecVersionRef{Id: es.Id, Version: *v})
-				}
-			}
-			err = console.BatchPublishEventSpecs(cnx, client, ids, expectedVersions)
-			if err != nil {
-				return err
-			}
-			slog.Info("release", "msg", "successfully released event specs", "count", len(toRelease))
-		}
-	} else {
+	if len(toRelease) == 0 {
 		slog.Info("release", "msg", "no event specs to release")
+		return nil
 	}
+
+	for _, es := range toRelease {
+		slog.Info("release", "msg", "will release event spec", "name", es.Name, "resource name", es.Id)
+	}
+
+	if dryRun {
+		return nil
+	}
+
+	ids := make([]string, len(toRelease))
+	var expectedVersions []console.EventSpecVersionRef
+	for i, es := range toRelease {
+		ids[i] = es.Id
+		if v := changeSet.declaredVersion(es.Id); v != nil {
+			expectedVersions = append(expectedVersions, console.EventSpecVersionRef{Id: es.Id, Version: *v})
+		}
+	}
+	err = console.BatchPublishEventSpecs(cnx, client, ids, expectedVersions)
+	if err != nil {
+		return err
+	}
+	slog.Info("release", "msg", "successfully released event specs", "count", len(toRelease))
 
 	return nil
 }

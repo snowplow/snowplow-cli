@@ -11,12 +11,18 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package release
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -1796,5 +1802,216 @@ func Test_findChanges_NewEventSpecPublishesTriggerImage(t *testing.T) {
 	}
 	if !reflect.DeepEqual(changes.imageCreate, []TriggerImageReference{image}) {
 		t.Errorf("expected the image of the new event spec to be published, got %+v", changes.imageCreate)
+	}
+}
+
+func Test_ReadLocalDataProducts_ResolvesSourceAppRefsAndHashesTriggerImages(t *testing.T) {
+	dir := t.TempDir()
+	saFile := filepath.Join(dir, "source-apps", "sa.yml")
+	dpFile := filepath.Join(dir, "data-products", "dp.yml")
+	imageFile := filepath.Join(dir, "data-products", "images", "trigger.png")
+	if err := os.MkdirAll(filepath.Dir(imageFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(imageFile, []byte("image"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	imageHash := sha256.Sum256([]byte("image"))
+
+	input := map[string]map[string]any{
+		saFile: {"resourceType": "source-application", "resourceName": "sa-1"},
+		dpFile: {
+			"resourceType": "data-product",
+			"resourceName": "dp-1",
+			"data": map[string]any{
+				"sourceApplications": []map[string]string{{"$ref": "../source-apps/sa.yml"}},
+				"eventSpecifications": []map[string]any{{
+					"resourceName":               "es-1",
+					"excludedSourceApplications": []map[string]string{{"$ref": "../source-apps/sa.yml"}},
+					"triggers": []map[string]any{
+						{"id": "trigger-1", "image": map[string]string{"$ref": "./images/trigger.png"}},
+						{"id": "trigger-without-image"},
+					},
+				}},
+			},
+		},
+		filepath.Join(dir, "other.yml"): {"some": "file"},
+	}
+
+	result, err := ReadLocalDataProducts(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	wantIds := []map[string]string{{"id": "sa-1"}}
+	dp := result.DataProudcts[0]
+	if diff := cmp.Diff(wantIds, dp.Data.SourceApplications); diff != "" {
+		t.Errorf("unexpected source apps (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantIds, dp.Data.EventSpecifications[0].ExcludedSourceApplications); diff != "" {
+		t.Errorf("unexpected excluded source apps (-want +got):\n%s", diff)
+	}
+	if len(result.SourceApps) != 1 || result.SourceApps[0].ResourceName != "sa-1" {
+		t.Errorf("unexpected source apps: %+v", result.SourceApps)
+	}
+	wantFiles := map[string]string{"sa-1": saFile, "dp-1": dpFile, "es-1": dpFile}
+	if diff := cmp.Diff(wantFiles, result.IdToFileName); diff != "" {
+		t.Errorf("unexpected file names (-want +got):\n%s", diff)
+	}
+	wantImages := map[string]TriggerImageReference{"trigger-1": {
+		eventSpecId: "es-1",
+		triggerId:   "trigger-1",
+		fname:       imageFile,
+		hash:        hex.EncodeToString(imageHash[:]),
+	}}
+	if !reflect.DeepEqual(wantImages, result.TriggerImageRefsById) {
+		t.Errorf("unexpected trigger images: %+v, want %+v", result.TriggerImageRefsById, wantImages)
+	}
+}
+
+func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
+	imageFile := filepath.Join(t.TempDir(), "trigger.png")
+	if err := os.WriteFile(imageFile, []byte("image"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("unexpected body: %v", err)
+		}
+		call := r.Method + " " + r.URL.Path
+		if strings.Contains(string(body), `"variantUrls":{"original":"uploaded"}`) {
+			call += " with uploaded image"
+		}
+		calls = append(calls, call)
+		switch {
+		case r.URL.Path == "/images/v1":
+			_, _ = fmt.Fprintf(w, `{"uploadURL":"%s/upload","id":"image-1"}`, server.URL)
+		case r.URL.Path == "/upload":
+			_, _ = io.WriteString(w, `{"success":true}`)
+		case r.URL.Path == "/images/v1/image-1/confirm-upload":
+			_, _ = io.WriteString(w, `{"variantUrls":{"original":"uploaded"}}`)
+		case r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{}`)
+		case r.Method == http.MethodDelete:
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			_, _ = io.WriteString(w, `{}`)
+		}
+	}))
+	defer server.Close()
+	client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+	changes := DataProductChangeSet{
+		saCreate: []console.RemoteSourceApplication{{Id: "sa-create"}},
+		saUpdate: []console.RemoteSourceApplication{{Id: "sa-update"}},
+		dpCreate: []console.RemoteDataProduct{{Id: "dp-create"}},
+		dpUpdate: []console.RemoteDataProduct{{Id: "dp-update"}},
+		esCreate: []console.RemoteEventSpec{{Id: "es-create", Triggers: []console.RemoteTrigger{{Id: "trigger-create"}}}},
+		esUpdate: []console.RemoteEventSpec{{Id: "es-update", Triggers: []console.RemoteTrigger{{Id: "trigger-update"}}}},
+		esDelete: []console.RemoteEventSpec{{Id: "es-delete"}},
+		imageCreate: []TriggerImageReference{
+			{triggerId: "trigger-create", fname: imageFile, hash: "hash"},
+			{triggerId: "trigger-update", fname: imageFile, hash: "hash"},
+		},
+	}
+
+	err := ApplyDpChanges(changes, context.Background(), client)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []string{
+		"POST /source-apps/v1",
+		"PUT /source-apps/v1/sa-update",
+		"POST /data-products/v2",
+		"PUT /data-products/v2/dp-update",
+		"POST /images/v1",
+		"POST /upload",
+		"POST /images/v1/image-1/confirm-upload",
+		"POST /images/v1",
+		"POST /upload",
+		"POST /images/v1/image-1/confirm-upload",
+		"POST /event-specs/v1 with uploaded image",
+		"PUT /event-specs/v1/es-update with uploaded image",
+		"DELETE /event-specs/v1/es-delete",
+	}
+	if diff := cmp.Diff(want, calls); diff != "" {
+		t.Errorf("unexpected calls (-want +got):\n%s", diff)
+	}
+}
+
+func capturePrintChangeset(t *testing.T, changes DataProductChangeSet, isRelease bool) string {
+	t.Helper()
+	var out bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&out, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
+	defer slog.SetDefault(previous)
+
+	PrintChangeset(changes, changes.IdToFileName, isRelease)
+
+	return out.String()
+}
+
+func Test_PrintChangeset(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	changes := DataProductChangeSet{
+		saCreate:    []console.RemoteSourceApplication{{Id: "sa-create", Name: "SA create"}},
+		saUpdate:    []console.RemoteSourceApplication{{Id: "sa-update", Name: "SA update"}},
+		dpCreate:    []console.RemoteDataProduct{{Id: "dp-create", Name: "DP create"}},
+		dpUpdate:    []console.RemoteDataProduct{{Id: "dp-update", Name: "DP update"}},
+		esCreate:    []console.RemoteEventSpec{{Id: "es-create", Name: "ES create", DataProductId: "dp-create"}},
+		esUpdate:    []console.RemoteEventSpec{{Id: "es-update", Name: "ES update", DataProductId: "dp-update"}},
+		esDelete:    []console.RemoteEventSpec{{Id: "es-delete", Name: "ES delete", DataProductId: "dp-update"}},
+		imageCreate: []TriggerImageReference{{fname: filepath.Join(cwd, "images", "trigger.png")}},
+		IdToFileName: map[string]string{
+			"sa-create": "sa-create.yml",
+			"sa-update": "sa-update.yml",
+			"dp-create": "dp-create.yml",
+			"dp-update": "dp-update.yml",
+			"es-create": "dp-create.yml",
+			"es-update": "dp-update.yml",
+			"es-delete": "DP update",
+		},
+	}
+
+	wantSync := `level=INFO msg=sync msg="will create source apps" file=sa-create.yml name="SA create" "resource name"=sa-create
+level=INFO msg=sync msg="will update source apps" file=sa-update.yml name="SA update" "resource name"=sa-update
+level=INFO msg=sync msg="will create data product" file=dp-create.yml name="DP create" "resource name"=dp-create
+level=INFO msg=sync msg="will update data product" file=dp-update.yml name="DP update" "resource name"=dp-update
+level=INFO msg=sync msg="will create event specifications" file=dp-create.yml name="ES create" "resource name"=es-create
+level=INFO msg=sync msg="will update event specifications" file=dp-update.yml name="ES update" "resource name"=es-update "in data product"=dp-update
+level=INFO msg=sync msg="will delete event specifications" name="ES delete" "resource name"=es-delete "in data product"=dp-update "data product name"="DP update"
+level=INFO msg=sync msg="will publish image" file=images/trigger.png
+level=INFO msg=sync msg="total entities to update" "data products"=2 "event specs"=3 "source apps"=2 images=1
+`
+	wantRelease := `level=INFO msg=release msg="will release event spec" name="ES create" "resource name"=es-create
+level=INFO msg=release msg="will release event spec" name="ES delete" "resource name"=es-delete
+level=INFO msg=release msg="might release event spec if the changes are structural(name, data structure, rules)" name="ES update" "resource name"=es-update
+`
+
+	if diff := cmp.Diff(wantSync, capturePrintChangeset(t, changes, false)); diff != "" {
+		t.Errorf("unexpected output (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantSync+wantRelease, capturePrintChangeset(t, changes, true)); diff != "" {
+		t.Errorf("unexpected release output (-want +got):\n%s", diff)
+	}
+	wantEmpty := "level=INFO msg=sync msg=\"no changes detected, nothing to apply\"\n"
+	if diff := cmp.Diff(wantEmpty, capturePrintChangeset(t, DataProductChangeSet{}, true)); diff != "" {
+		t.Errorf("unexpected empty output (-want +got):\n%s", diff)
 	}
 }
