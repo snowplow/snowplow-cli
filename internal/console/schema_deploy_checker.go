@@ -74,50 +74,48 @@ func (sdc *SchemaDeployCheckProvider) IsDSDeployed(uri string) (bool, []string, 
 
 	for _, ds := range sdc.dsList {
 		if ds.Vendor == splut[0] && ds.Name == splut[1] && ds.Format == splut[2] {
-			for _, deployment := range ds.Deployments {
-				if deployment.Version == splut[3] {
-					switch deployment.Env {
-					case DEV:
-						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deployment.Env))
-						return true, nil, nil
-					case PROD:
-						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deployment.Env))
-						return true, nil, nil
-					case VALIDATED:
-					}
-				}
-			}
-
-			deploys, err := sdc.getDsDeployments(ds.Hash)
-			if err != nil {
-				return false, nil, err
-			}
-
-			alternativeVersions := map[string]bool{}
-			for _, deploy := range deploys {
-				if deploy.Version == splut[3] {
-					switch deploy.Env {
-					case DEV:
-						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deploy.Env))
-						return true, nil, nil
-					case PROD:
-						slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deploy.Env))
-						return true, nil, nil
-					case VALIDATED:
-					}
-				} else {
-					alternativeVersions[deploy.Version] = true
-				}
-			}
-
-			foundVersions := []string{}
-			for v := range alternativeVersions {
-				foundVersions = append(foundVersions, v)
-			}
-
-			return false, foundVersions, nil
+			return sdc.isVersionDeployed(ds, uri, splut[3])
 		}
 	}
 
 	return false, nil, nil
+}
+
+func (sdc *SchemaDeployCheckProvider) isVersionDeployed(ds ListResponse, uri string, version string) (bool, []string, error) {
+	if resolvedInConsole(ds.Deployments, uri, version) {
+		return true, nil, nil
+	}
+
+	deploys, err := sdc.getDsDeployments(ds.Hash)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if resolvedInConsole(deploys, uri, version) {
+		return true, nil, nil
+	}
+
+	alternativeVersions := map[string]bool{}
+	for _, deploy := range deploys {
+		if deploy.Version != version {
+			alternativeVersions[deploy.Version] = true
+		}
+	}
+
+	foundVersions := []string{}
+	for v := range alternativeVersions {
+		foundVersions = append(foundVersions, v)
+	}
+
+	return false, foundVersions, nil
+}
+
+func resolvedInConsole(deployments []Deployment, uri string, version string) bool {
+	for _, deployment := range deployments {
+		if deployment.Version == version && (deployment.Env == DEV || deployment.Env == PROD) {
+			slog.Debug("validation", "msg", fmt.Sprintf("console resolved %s in %s", uri, deployment.Env))
+			return true
+		}
+	}
+	return false
 }
