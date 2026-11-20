@@ -190,44 +190,36 @@ func PerformChangesProd(cnx context.Context, c *console.ApiClient, changes Chang
 func PrintChangeset(ctx context.Context, changes Changes) error {
 	logger := logging.LoggerFromContext(ctx)
 
-	if len(changes.ToUpdateMeta) != 0 {
-		for _, ds := range changes.ToUpdateMeta {
-			data, err := ds.DS.ParseData()
-			if err != nil {
-				return err
-			}
-			logger.Info("will update metadata of", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name)
+	for _, ds := range changes.ToUpdateMeta {
+		data, err := ds.DS.ParseData()
+		if err != nil {
+			return err
 		}
+		logger.Info("will update metadata of", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name)
 	}
-	if len(changes.ToCreate) != 0 {
-		for _, ds := range changes.ToCreate {
-			data, err := ds.DS.ParseData()
-			if err != nil {
-				return err
-			}
-			logger.Info("will create", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name, "version", data.Self.Version)
+	for _, ds := range changes.ToCreate {
+		data, err := ds.DS.ParseData()
+		if err != nil {
+			return err
 		}
+		logger.Info("will create", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name, "version", data.Self.Version)
 	}
-	if len(changes.ToUpdateNewVersion) != 0 {
-		for _, ds := range changes.ToUpdateNewVersion {
-			data, err := ds.DS.ParseData()
-			if err != nil {
-				return err
-			}
-			logger.Info("will update", "file", ds.FileName, "local", data.Self.Version, "remote", ds.RemoteVersion)
+	for _, ds := range changes.ToUpdateNewVersion {
+		data, err := ds.DS.ParseData()
+		if err != nil {
+			return err
 		}
+		logger.Info("will update", "file", ds.FileName, "local", data.Self.Version, "remote", ds.RemoteVersion)
 	}
-	if len(changes.ToUpdatePatch) != 0 {
-		for _, ds := range changes.ToUpdatePatch {
-			data, err := ds.DS.ParseData()
-			if err != nil {
-				return err
-			}
-			logger.Info(
-				"will patch", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name,
-				"version", data.Self.Version, "local", ds.LocalContentHash, "remote", ds.RemoteContentHash,
-			)
+	for _, ds := range changes.ToUpdatePatch {
+		data, err := ds.DS.ParseData()
+		if err != nil {
+			return err
 		}
+		logger.Info(
+			"will patch", "file", ds.FileName, "vendor", data.Self.Vendor, "name", data.Self.Name,
+			"version", data.Self.Version, "local", ds.LocalContentHash, "remote", ds.RemoteContentHash,
+		)
 	}
 	return nil
 }

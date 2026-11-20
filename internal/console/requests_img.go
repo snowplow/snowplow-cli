@@ -114,45 +114,22 @@ func createImageUploadLink(cnx context.Context, client *ApiClient) (*imageUpload
 }
 
 func uploadImage(cnx context.Context, client *ApiClient, fname string, uploadLink *imageUploadLinkResponse) error {
-	upBuf := bytes.Buffer{}
-	writer := multipart.NewWriter(&upBuf)
 	cfFilename := fmt.Sprintf(
 		"%s_%s_%s",
 		client.OrgId,
 		uploadLink.Id,
 		util.ResourceNameToFileName(filepath.Base(fname)),
 	)
-	part, err := writer.CreateFormFile("file", cfFilename)
+	form, contentType, err := readFileIntoUploadForm(cnx, fname, cfFilename)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Open(fname)
+	req, err := http.NewRequestWithContext(cnx, http.MethodPost, uploadLink.UploadURL, form)
 	if err != nil {
 		return err
 	}
-	defer util.LoggingCloser(cnx, f)
-
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-
-	_, err = part.Write(b)
-	if err != nil {
-		return err
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequestWithContext(cnx, http.MethodPost, uploadLink.UploadURL, &upBuf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Content-Type", contentType)
 
 	// Note: This is uploading to an external service (Cloudflare), not our API,
 	// so we don't add standard console headers here
@@ -234,4 +211,36 @@ func PublishImage(cnx context.Context, client *ApiClient, fname string, hash str
 	}
 
 	return confirmImage(cnx, client, upload.Id, hash)
+}
+
+func readFileIntoUploadForm(cnx context.Context, fname string, cfFilename string) (*bytes.Buffer, string, error) {
+	upBuf := &bytes.Buffer{}
+	writer := multipart.NewWriter(upBuf)
+	part, err := writer.CreateFormFile("file", cfFilename)
+	if err != nil {
+		return nil, "", err
+	}
+
+	f, err := os.Open(fname)
+	if err != nil {
+		return nil, "", err
+	}
+	defer util.LoggingCloser(cnx, f)
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, "", err
+	}
+
+	_, err = part.Write(b)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, "", err
+	}
+
+	return upBuf, writer.FormDataContentType(), nil
 }

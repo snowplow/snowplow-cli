@@ -138,6 +138,25 @@ func Test_pickSignalsEnvironment(t *testing.T) {
 	}
 }
 
+func Test_pickSignalsEnvironment_OffersOnlyReadyEnvironments(t *testing.T) {
+	body := `[{"status":"ready","pipeline":{"id":"p1","name":"Prod"},"config":{"personalizationApiHost":"prod.signals.example"}},` +
+		`{"status":"ready","pipeline":{"id":"p2","name":"QA"},"config":{"personalizationApiHost":"qa.signals.example"}},` +
+		`{"status":"creating","pipeline":{"id":"p3","name":"New"}}]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	s := &device.Session{AccessToken: "token", Org: console.Organization{ID: "org", Name: "Acme"}}
+	_, err := pickSignalsEnvironment(context.Background(), SignalsOptions{ConsoleHost: srv.URL}, s)
+	if err == nil {
+		t.Fatal("expected an error, several environments can't be picked without a terminal")
+	}
+	if !strings.Contains(err.Error(), "Prod (p1), QA (p2)") || strings.Contains(err.Error(), "New") {
+		t.Errorf("expected only the ready environments to be listed, got %v", err)
+	}
+}
+
 func TestInstallPlugin(t *testing.T) {
 	home, work := stubEnv(t)
 	// Claude Code already has the plugin, and Codex has the MCP from the docs.

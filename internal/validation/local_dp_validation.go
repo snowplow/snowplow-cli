@@ -70,11 +70,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 		Validations:  map[string]DPValidations{},
 	}
 
-	changedFiles := make(map[string]bool)
-
-	for _, file := range changedIdToFile {
-		changedFiles[file] = true
-	}
+	changedFiles := fileSet(changedIdToFile)
 
 	for f, maybeDp := range dp {
 		if apiV, ok := maybeDp["apiVersion"]; !ok || apiV != "v1" {
@@ -89,15 +85,7 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 
 		switch resourceType {
 		case "data-product":
-			dataProduct, v, shapeOk := result.addDataProductAndValidateShape(f, maybeDp)
-			if shapeOk && cc != nil {
-				if validateAll || changedFiles[f] {
-					v.concat(ValidateDPEventSpecCompat(cc, concurrency, dataProduct))
-				} else {
-					v.Debug = append(v.Debug, fmt.Sprintf("skipping compatibility check for %s, since it was not changed, use --full to include it in validation", f))
-				}
-			}
-			result.Validations[f] = v
+			result.Validations[f] = result.addDataProductAndValidateShapeAndCompat(cc, concurrency, f, maybeDp, validateAll || changedFiles[f])
 		case "source-application":
 			result.Validations[f] = result.addSourceAppAndValidate(sdc, f, maybeDp)
 		default:
@@ -111,6 +99,14 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 	}
 
 	return result, nil
+}
+
+func fileSet(idToFile map[string]string) map[string]bool {
+	files := make(map[string]bool)
+	for _, file := range idToFile {
+		files[file] = true
+	}
+	return files
 }
 
 func (lookup *DPLookup) SlogValidations(ctx context.Context, basePath string) error {
@@ -203,6 +199,19 @@ func (lookup *DPLookup) ValidationErrorCount() int {
 		count += len(v.Errors) + len(v.ErrorsWithPaths)
 	}
 	return count
+}
+
+func (lookup *DPLookup) addDataProductAndValidateShapeAndCompat(cc console.CompatChecker, concurrency int, f string, maybeDp map[string]any, checkCompat bool) DPValidations {
+	dataProduct, v, shapeOk := lookup.addDataProductAndValidateShape(f, maybeDp)
+	if !shapeOk || cc == nil {
+		return v
+	}
+	if !checkCompat {
+		v.Debug = append(v.Debug, fmt.Sprintf("skipping compatibility check for %s, since it was not changed, use --full to include it in validation", f))
+		return v
+	}
+	v.concat(ValidateDPEventSpecCompat(cc, concurrency, dataProduct))
+	return v
 }
 
 func (lookup *DPLookup) addDataProductAndValidateShape(f string, maybeDp map[string]any) (model.DataProduct, DPValidations, bool) {

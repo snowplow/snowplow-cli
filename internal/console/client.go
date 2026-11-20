@@ -88,17 +88,9 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 		return &ApiClient{Http: h, Jwt: login.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
 	}
 
-	url := baseUrl + "/credentials/v3/token"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := apiKeyTokenRequest(ctx, baseUrl, apiKeyId, apiKeySecret)
 	if err != nil {
 		return nil, err
-	}
-	req.Header.Add("X-Api-Key-Id", apiKeyId)
-	req.Header.Add("X-Api-Key", apiKeySecret)
-	req.Header.Add("X-Snowplow-Cli", util.VersionInfo)
-
-	if fromMCP, ok := ctx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
-		req.Header.Add("X-Snowplow-Cli-Source", "mcp")
 	}
 	resp, err := h.Do(req)
 	if err != nil {
@@ -120,6 +112,22 @@ func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecre
 	}
 
 	return &ApiClient{Http: h, Jwt: token.AccessToken, BaseUrl: baseUrl, OrgId: orgid}, nil
+}
+
+func apiKeyTokenRequest(ctx context.Context, baseUrl string, apiKeyId string, apiKeySecret string) (*http.Request, error) {
+	url := baseUrl + "/credentials/v3/token"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("X-Api-Key-Id", apiKeyId)
+	req.Header.Add("X-Api-Key", apiKeySecret)
+	req.Header.Add("X-Snowplow-Cli", util.VersionInfo)
+
+	if fromMCP, ok := ctx.Value(util.MCPSourceContextKey{}).(bool); ok && fromMCP {
+		req.Header.Add("X-Snowplow-Cli-Source", "mcp")
+	}
+	return req, nil
 }
 
 func ConsoleRequest(method string, path string, client *ApiClient, cnx context.Context, body io.Reader) (*http.Request, error) {

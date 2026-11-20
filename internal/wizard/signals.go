@@ -83,12 +83,7 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *device.
 	if err != nil {
 		return console.SignalsEnvironment{}, err
 	}
-	var ready []console.SignalsEnvironment
-	for _, e := range all {
-		if isReady(e) {
-			ready = append(ready, e)
-		}
-	}
+	ready := readyEnvironments(all)
 
 	switch {
 	case len(ready) == 0 && len(all) > 0:
@@ -107,9 +102,23 @@ func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *device.
 		return ready[0], nil
 	}
 
+	return promptForEnvironmentAndPrint(ready, s.Org.Name)
+}
+
+func readyEnvironments(all []console.SignalsEnvironment) []console.SignalsEnvironment {
+	var ready []console.SignalsEnvironment
+	for _, e := range all {
+		if isReady(e) {
+			ready = append(ready, e)
+		}
+	}
+	return ready
+}
+
+func promptForEnvironmentAndPrint(ready []console.SignalsEnvironment, org string) (console.SignalsEnvironment, error) {
 	if !interactive() {
 		return console.SignalsEnvironment{}, fmt.Errorf("%s has %d Signals environments; pick one with --pipeline and its name or ID: %s",
-			s.Org.Name, len(ready), pipelineList(ready))
+			org, len(ready), pipelineList(ready))
 	}
 	labels := make([]string, len(ready))
 	for i, e := range ready {

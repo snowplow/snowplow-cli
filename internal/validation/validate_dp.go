@@ -153,18 +153,7 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 		missingByFile[m.FileName] = append(missingByFile[m.FileName], m)
 	}
 
-	fileNames := make([]string, 0, len(mismatchesByFile)+len(missingByFile))
-	for f := range mismatchesByFile {
-		fileNames = append(fileNames, f)
-	}
-	for f := range missingByFile {
-		if _, ok := mismatchesByFile[f]; !ok {
-			fileNames = append(fileNames, f)
-		}
-	}
-	slices.Sort(fileNames)
-
-	for _, f := range fileNames {
+	for _, f := range sortedFilesToFix(mismatchesByFile, missingByFile) {
 		err := setEventSpecVersionsInFileAndLog(logger, f, mismatchesByFile[f])
 		if err != nil {
 			return err
@@ -187,6 +176,20 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 	}
 
 	return nil
+}
+
+func sortedFilesToFix(mismatchesByFile map[string][]model.EventSpecVersionMismatch, missingByFile map[string][]model.EventSpecMissingVersion) []string {
+	fileNames := make([]string, 0, len(mismatchesByFile)+len(missingByFile))
+	for f := range mismatchesByFile {
+		fileNames = append(fileNames, f)
+	}
+	for f := range missingByFile {
+		if _, ok := mismatchesByFile[f]; !ok {
+			fileNames = append(fileNames, f)
+		}
+	}
+	slices.Sort(fileNames)
+	return fileNames
 }
 
 func setEventSpecVersionsInFileAndLog(logger *slog.Logger, f string, mismatches []model.EventSpecVersionMismatch) error {
