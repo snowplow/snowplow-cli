@@ -36,24 +36,8 @@ func runDpWorkflow(cmd *cobra.Command, args []string, action dpAction) {
 	managedFrom, _ := cmd.Flags().GetString("managed-from")
 	concurrentReq, _ := cmd.Flags().GetInt("concurrency")
 
-	if concurrentReq > 10 {
-		concurrentReq = 10
-		slog.Debug("validation", "msg", "concurrency set to > 10, limited to 10")
-	}
-
-	if concurrentReq < 1 {
-		concurrentReq = 1
-		slog.Debug("validation", "msg", "concurrency set to < 1, increased to 1")
-	}
-
-	searchPaths := []string{}
-
-	if len(args) == 0 {
-		searchPaths = append(searchPaths, util.DataProductsFolder)
-		slog.Debug("validation", "msg", fmt.Sprintf("no path provided, using default (./%s)", util.DataProductsFolder))
-	}
-
-	searchPaths = append(searchPaths, args...)
+	concurrentReq = limitConcurrencyAndLogChange(concurrentReq)
+	searchPaths := searchPathsOrDefaultAndLogIt(args)
 
 	files, err := util.MaybeResourcesfromPaths(searchPaths)
 	if err != nil {
@@ -88,6 +72,29 @@ func runDpWorkflow(cmd *cobra.Command, args []string, action dpAction) {
 	if err != nil {
 		snplog.LogFatal(err)
 	}
+}
+
+func limitConcurrencyAndLogChange(concurrentReq int) int {
+	if concurrentReq > 10 {
+		slog.Debug("validation", "msg", "concurrency set to > 10, limited to 10")
+		return 10
+	}
+
+	if concurrentReq < 1 {
+		slog.Debug("validation", "msg", "concurrency set to < 1, increased to 1")
+		return 1
+	}
+
+	return concurrentReq
+}
+
+func searchPathsOrDefaultAndLogIt(args []string) []string {
+	if len(args) > 0 {
+		return args
+	}
+
+	slog.Debug("validation", "msg", fmt.Sprintf("no path provided, using default (./%s)", util.DataProductsFolder))
+	return []string{util.DataProductsFolder}
 }
 
 func addCommonDpFlags(cmd *cobra.Command) {

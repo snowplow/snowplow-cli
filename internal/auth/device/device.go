@@ -45,41 +45,12 @@ type Session struct {
 func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeOrgOnly bool) (*Session, error) {
 	slog.Debug("Initiating device authentication flow")
 
-	oauthConfig := &oauth2.Config{
-		ClientID: clientID,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:       fmt.Sprintf("https://%s/oauth/authorize", auth0Domain),
-			TokenURL:      fmt.Sprintf("https://%s/oauth/token", auth0Domain),
-			DeviceAuthURL: fmt.Sprintf("https://%s/oauth/device/code", auth0Domain),
-		},
-		Scopes: []string{"openid", "profile", "email", "offline_access"},
-	}
-
-	deviceAuth, err := oauthConfig.DeviceAuth(ctx,
-		oauth2.SetAuthURLParam("audience", Audience))
+	token, err := askToSignInAndWaitForToken(ctx, clientID, auth0Domain)
 	if err != nil {
-		handleAuthError(err, clientID, auth0Domain)
-		return nil, fmt.Errorf("failed to initiate device authentication flow: %w", err)
+		return nil, err
 	}
 
-	green := color.New(color.FgGreen)
-
-	authURL := deviceAuth.VerificationURIComplete
-	if authURL == "" {
-		authURL = deviceAuth.VerificationURI
-	}
-
-	browserOpened := askAndOpenSignInPage(authURL)
-	printSignInInstructions(deviceAuth, authURL, browserOpened)
-
-	fmt.Printf("\n⠋ Waiting for authentication...")
-
-	token, err := pollForTokenWithSpinner(ctx, oauthConfig, deviceAuth)
-	if err != nil {
-		return nil, fmt.Errorf("authentication failed: %w", err)
-	}
-
-	green.Printf("\n✓ Authentication complete.\n")
+	color.New(color.FgGreen).Printf("\n✓ Authentication complete.\n")
 	slog.Debug("Authentication successful, proceeding to organization selection")
 
 	jwtOrgID, err := getOrgIDFromJWT(token.AccessToken)
@@ -109,6 +80,46 @@ func Login(ctx context.Context, clientID, auth0Domain, consoleHost string, homeO
 	slog.Debug("Organization selected", "org-id", selectedOrg.ID, "org-name", selectedOrg.Name)
 
 	return &Session{AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, Expiry: token.Expiry, Email: userInfo.Email, Org: *selectedOrg, HomeOrgID: jwtOrgID}, nil
+}
+
+func deviceOAuthConfig(clientID, auth0Domain string) *oauth2.Config {
+	return &oauth2.Config{
+		ClientID: clientID,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:       fmt.Sprintf("https://%s/oauth/authorize", auth0Domain),
+			TokenURL:      fmt.Sprintf("https://%s/oauth/token", auth0Domain),
+			DeviceAuthURL: fmt.Sprintf("https://%s/oauth/device/code", auth0Domain),
+		},
+		Scopes: []string{"openid", "profile", "email", "offline_access"},
+	}
+}
+
+func askToSignInAndWaitForToken(ctx context.Context, clientID, auth0Domain string) (*oauth2.Token, error) {
+	oauthConfig := deviceOAuthConfig(clientID, auth0Domain)
+
+	deviceAuth, err := oauthConfig.DeviceAuth(ctx,
+		oauth2.SetAuthURLParam("audience", Audience))
+	if err != nil {
+		handleAuthError(err, clientID, auth0Domain)
+		return nil, fmt.Errorf("failed to initiate device authentication flow: %w", err)
+	}
+
+	authURL := deviceAuth.VerificationURIComplete
+	if authURL == "" {
+		authURL = deviceAuth.VerificationURI
+	}
+
+	browserOpened := askAndOpenSignInPage(authURL)
+	printSignInInstructions(deviceAuth, authURL, browserOpened)
+
+	fmt.Printf("\n⠋ Waiting for authentication...")
+
+	token, err := pollForTokenWithSpinner(ctx, oauthConfig, deviceAuth)
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+
+	return token, nil
 }
 
 func askAndOpenSignInPage(authURL string) bool {

@@ -11,10 +11,13 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package device
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -975,4 +978,93 @@ func Test_printSignInInstructions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func startAuthServer(t *testing.T, deviceCodeStatus int, tokenStatus int, tokenBody string) (context.Context, string, *[]string) {
+	t.Helper()
+	requests := []string{}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		requests = append(requests, fmt.Sprintf("%s client_id=%s audience=%s", r.URL.Path, r.Form.Get("client_id"), r.Form.Get("audience")))
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/oauth/device/code" {
+			w.WriteHeader(deviceCodeStatus)
+			_, _ = w.Write([]byte(`{"device_code":"device-code","user_code":"ABCD-EFGH","verification_uri":"https://example.com/activate","expires_in":60,"interval":1}`))
+			return
+		}
+		w.WriteHeader(tokenStatus)
+		_, _ = w.Write([]byte(tokenBody))
+	}))
+	t.Cleanup(server.Close)
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, server.Client())
+	return ctx, server.Listener.Addr().String(), &requests
+}
+
+func Test_askToSignInAndWaitForToken_ReturnsTheToken(t *testing.T) {
+	ctx, auth0Domain, requests := startAuthServer(t, http.StatusOK, http.StatusOK, `{"access_token":"access","refresh_token":"refresh","token_type":"Bearer","expires_in":3600}`)
+	replaceStdin(t, "n\n")
+
+	out := captureStdout(t, func() {
+		token, err := askToSignInAndWaitForToken(ctx, "client-1", auth0Domain)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if token.AccessToken != "access" || token.RefreshToken != "refresh" {
+			t.Errorf("unexpected token: %+v", token)
+		}
+	})
+
+	expectedRequests := []string{
+		"/oauth/device/code client_id=client-1 audience=" + Audience,
+		"/oauth/token client_id=client-1 audience=",
+	}
+	if strings.Join(*requests, "\n") != strings.Join(expectedRequests, "\n") {
+		t.Errorf("unexpected requests: %q", *requests)
+	}
+
+	expectedOutput := "You must sign in to continue. Would you like to sign in (Y/n)?" +
+		"\n! Please manually open this URL in your browser:\n  https://example.com/activate\nThen enter the code: ABCD-EFGH\n" +
+		"\n⠋ Waiting for authentication..."
+	if !strings.HasPrefix(out, expectedOutput) {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func Test_askToSignInAndWaitForToken_DeviceCodeRequestFails(t *testing.T) {
+	ctx, auth0Domain, requests := startAuthServer(t, http.StatusForbidden, http.StatusOK, `{}`)
+
+	out := captureStdout(t, func() {
+		token, err := askToSignInAndWaitForToken(ctx, "client-1", auth0Domain)
+
+		if err == nil || !strings.HasPrefix(err.Error(), "failed to initiate device authentication flow: ") {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if token != nil {
+			t.Errorf("expected no token, got %+v", token)
+		}
+	})
+
+	if len(*requests) != 1 {
+		t.Errorf("expected only the device code request, got %q", *requests)
+	}
+	if out != "" {
+		t.Errorf("expected no output, got %q", out)
+	}
+}
+
+func Test_askToSignInAndWaitForToken_SignInDenied(t *testing.T) {
+	ctx, auth0Domain, _ := startAuthServer(t, http.StatusOK, http.StatusForbidden, `{"error":"access_denied"}`)
+	replaceStdin(t, "n\n")
+
+	captureStdout(t, func() {
+		token, err := askToSignInAndWaitForToken(ctx, "client-1", auth0Domain)
+
+		if err == nil || !strings.HasPrefix(err.Error(), "authentication failed: ") {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if token != nil {
+			t.Errorf("expected no token, got %+v", token)
+		}
+	})
 }
