@@ -31,20 +31,20 @@ func ValidateSAShape(sa map[string]any) (DPValidations, bool) {
 
 func cardinalityCheck(key string, i int, s model.SchemaRef) DPValidations {
 	errors := map[string][]string{}
-	if s.MinCardinality != nil {
-		if *s.MinCardinality < 0 {
-			path := fmt.Sprintf("/data/entities/%s/%d/minCardinality", key, i)
-			errors[path] = append(errors[path], "must be > 0")
-		}
+	if s.MinCardinality == nil {
 		if s.MaxCardinality != nil {
-			if *s.MaxCardinality < *s.MinCardinality {
-				path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
-				errors[path] = append(errors[path], fmt.Sprintf("must be > minCardinality: %d", *s.MinCardinality))
-			}
+			path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
+			errors[path] = append(errors[path], "without minCardinality")
 		}
-	} else if s.MaxCardinality != nil {
+		return DPValidations{ErrorsWithPaths: errors}
+	}
+	if *s.MinCardinality < 0 {
+		path := fmt.Sprintf("/data/entities/%s/%d/minCardinality", key, i)
+		errors[path] = append(errors[path], "must be > 0")
+	}
+	if s.MaxCardinality != nil && *s.MaxCardinality < *s.MinCardinality {
 		path := fmt.Sprintf("/data/entities/%s/%d/maxCardinality", key, i)
-		errors[path] = append(errors[path], "without minCardinality")
+		errors[path] = append(errors[path], fmt.Sprintf("must be > minCardinality: %d", *s.MinCardinality))
 	}
 	return DPValidations{ErrorsWithPaths: errors}
 }
@@ -90,27 +90,26 @@ func checkSchemaDeployed(sdc console.SchemaDeployChecker, i int, key string, uri
 			"error while resolving "+err.Error(),
 		)
 	}
-	if !found {
-		if len(alternatives) > 0 {
-			var available string
-			if len(alternatives) > 5 {
-				available = fmt.Sprintf("%s, ...%d more", strings.Join(alternatives[0:5], ", "), len(alternatives)-5)
-			} else {
-				available = strings.Join(alternatives, ", ")
-			}
-			result = append(
-				result,
-				fmt.Sprintf("could not find deployment of %s, available versions (%s)", uri, available),
-			)
-		} else {
-			result = append(
-				result,
-				"could not find deployment of "+uri,
-			)
-		}
+	if found {
+		return errorPath, result
+	}
+	if len(alternatives) == 0 {
+		return errorPath, append(
+			result,
+			"could not find deployment of "+uri,
+		)
 	}
 
-	return errorPath, result
+	var available string
+	if len(alternatives) > 5 {
+		available = fmt.Sprintf("%s, ...%d more", strings.Join(alternatives[0:5], ", "), len(alternatives)-5)
+	} else {
+		available = strings.Join(alternatives, ", ")
+	}
+	return errorPath, append(
+		result,
+		fmt.Sprintf("could not find deployment of %s, available versions (%s)", uri, available),
+	)
 }
 
 func ValidateSAEntitiesSchemaDeployed(sdc console.SchemaDeployChecker, sa model.SourceApp) DPValidations {

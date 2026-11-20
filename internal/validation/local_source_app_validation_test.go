@@ -11,6 +11,7 @@
 package validation
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -205,5 +206,59 @@ func Test_ValidateSAEntitiesSchemaDeployed(t *testing.T) {
 		if _, ok := result[p]; !ok {
 			t.Fatalf("expected errors at %s", p)
 		}
+	}
+}
+
+type mockSdcWithAlternatives struct {
+	found        bool
+	alternatives []string
+	err          error
+}
+
+func (m *mockSdcWithAlternatives) IsDSDeployed(uri string) (bool, []string, error) {
+	return m.found, m.alternatives, m.err
+}
+
+func Test_checkSchemaDeployed(t *testing.T) {
+	uri := "iglu:vendor/name/format/2-0-0"
+	cases := []struct {
+		name     string
+		sdc      *mockSdcWithAlternatives
+		expected []string
+	}{
+		{"deployed", &mockSdcWithAlternatives{found: true}, []string{}},
+		{"not deployed", &mockSdcWithAlternatives{}, []string{"could not find deployment of " + uri}},
+		{
+			"other versions deployed",
+			&mockSdcWithAlternatives{alternatives: []string{"a", "b"}},
+			[]string{"could not find deployment of " + uri + ", available versions (a, b)"},
+		},
+		{
+			"many other versions deployed",
+			&mockSdcWithAlternatives{alternatives: []string{"a", "b", "c", "d", "e", "f", "g"}},
+			[]string{"could not find deployment of " + uri + ", available versions (a, b, c, d, e, ...2 more)"},
+		},
+		{
+			"lookup failed",
+			&mockSdcWithAlternatives{err: errors.New("boom")},
+			[]string{"error while resolving boom", "could not find deployment of " + uri},
+		},
+		{
+			"lookup failed but deployed",
+			&mockSdcWithAlternatives{found: true, err: errors.New("boom")},
+			[]string{"error while resolving boom"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path, result := checkSchemaDeployed(c.sdc, 3, "tracked", uri)
+			if path != "/data/entities/tracked/3/source" {
+				t.Fatalf("unexpected path: %s", path)
+			}
+			if !slices.Equal(result, c.expected) {
+				t.Fatalf("unexpected got: %#v want %#v", result, c.expected)
+			}
+		})
 	}
 }

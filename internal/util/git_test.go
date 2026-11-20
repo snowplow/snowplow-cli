@@ -225,3 +225,49 @@ func Test_MaybeResourcesAtMergeBase_SymbolicLinks(t *testing.T) {
 		t.Errorf("got %v, want %v", names, want)
 	}
 }
+
+func Test_MaybeResourcesAtMergeBase_SeveralPathsAndOtherFiles(t *testing.T) {
+	isolateGitInTest(t)
+	repo := t.TempDir()
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	writeInTest(t, filepath.Join(repo, "one", "README.md"), "not a resource\n")
+	writeInTest(t, filepath.Join(repo, "one", "dp.yaml"), "resourceType: data-product\n")
+	writeInTest(t, filepath.Join(repo, "two", "sa.json"), `{"resourceType": "source-application"}`)
+	writeInTest(t, filepath.Join(repo, "three", "ignored.yaml"), "resourceType: data-product\n")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	res, err := MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Join(repo, "one"), filepath.Join(repo, "two")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	realRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]map[string]any{
+		filepath.Join(realRepo, "one", "dp.yaml"): {"resourceType": "data-product"},
+		filepath.Join(realRepo, "two", "sa.json"): {"resourceType": "source-application"},
+	}
+	if !reflect.DeepEqual(res, want) {
+		t.Errorf("got %v, want %v", res, want)
+	}
+}
+
+func Test_MaybeResourcesAtMergeBase_UnreadableFile(t *testing.T) {
+	isolateGitInTest(t)
+	repo := t.TempDir()
+	gitInTest(t, repo, "init", "-q", "-b", "main")
+	writeInTest(t, filepath.Join(repo, "tracking", "broken.json"), "{not json")
+	gitInTest(t, repo, "add", ".")
+	gitInTest(t, repo, "commit", "-q", "-m", "base")
+
+	res, err := MaybeResourcesAtMergeBase(context.Background(), repo, "main", []string{filepath.Join(repo, "tracking")})
+	if err == nil || !strings.Contains(err.Error(), "failed to read tracking/broken.json at ") {
+		t.Errorf("expected the broken file to be named in the error, got: %v", err)
+	}
+	if res != nil {
+		t.Errorf("expected no resources next to an error, got: %v", res)
+	}
+}

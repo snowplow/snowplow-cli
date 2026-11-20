@@ -19,23 +19,23 @@ import (
 
 func validateWithSchema(sch *jsonschema.Schema, dp map[string]any) (DPValidations, bool) {
 	errorOut := map[string][]string{}
-	if err := sch.Validate(dp); err != nil {
-		var e *jsonschema.ValidationError
-		if errors.As(err, &e) {
-			aggr := map[string][]string{}
-			for _, ie := range e.BasicOutput().Errors {
-				path := ie.InstanceLocation
-				if path == "" {
-					path = "/"
-				}
-				if ie.Error != "" {
-					aggr[path] = append(aggr[path], ie.Error)
-				}
-			}
-			for path, msgs := range aggr {
-				errorOut[path] = append(errorOut[path], msgs...)
-			}
+	var e *jsonschema.ValidationError
+	if err := sch.Validate(dp); !errors.As(err, &e) {
+		return DPValidations{ErrorsWithPaths: errorOut}, true
+	}
+
+	aggr := map[string][]string{}
+	for _, ie := range e.BasicOutput().Errors {
+		path := ie.InstanceLocation
+		if path == "" {
+			path = "/"
 		}
+		if ie.Error != "" {
+			aggr[path] = append(aggr[path], ie.Error)
+		}
+	}
+	for path, msgs := range aggr {
+		errorOut[path] = append(errorOut[path], msgs...)
 	}
 
 	return DPValidations{ErrorsWithPaths: errorOut}, len(errorOut) == 0
