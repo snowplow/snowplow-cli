@@ -811,3 +811,121 @@ func Test_ConfigForSetupIgnoresSavedLogin(t *testing.T) {
 		t.Fatalf("a setup command must not fail on an unreadable login file: %v", err)
 	}
 }
+
+func Test_ConfigUnparsableValueOrMissingValue(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-a", "id", "-S", "key", "-o", "org"}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	err := testCmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "notabool") || !strings.Contains(err.Error(), "dry-run") {
+		t.Errorf("expected the unparsable value to be reported, got: %v", err)
+	}
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-a", "id", "-S", "key"}
+	testCmd = build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	if err := testCmd.Execute(); err == nil {
+		t.Error("expected an error for an unparsable value with a missing value")
+	}
+}
+
+func Test_ConfigUnparsableFileValueWithEnvReturnsError(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "")
+	t.Setenv("SNOWPLOW_CONSOLE_ORG_ID", "env-org")
+
+	configFile := filepath.Join(t.TempDir(), "snowplow.yml")
+	config := "console:\n  api-key-id: id\n  api-key: key\n  dry-run: maybe\n"
+	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", configFile}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	if err := testCmd.Execute(); err == nil {
+		t.Error("expected an error for a config file value that fails to parse")
+	}
+}
+
+func Test_ConfigUnparsableValueWithSavedLoginReturnsError(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, &auth.Login{AccessToken: "token", OrgID: "login-org", Host: "the-host"})
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	os.Args = []string{"xxx", "--config", "/nonexistent.yml", "-H", "the-host"}
+	testCmd := build()
+	testCmd.PersistentFlags().Bool("dry-run", false, "")
+	if err := testCmd.Execute(); err == nil {
+		t.Error("expected an error for a value that fails to parse")
+	}
+}
+
+func Test_ConfigForSetupReportsUnparsableValue(t *testing.T) {
+	useLogin(t, nil)
+	t.Setenv("SNOWPLOW_CONSOLE_DRY_RUN", "notabool")
+
+	setup := &cobra.Command{Run: func(cmd *cobra.Command, args []string) {}}
+	setup.Flags().String("host", "the-host", "")
+	setup.Flags().String("config", "/nonexistent.yml", "")
+	setup.Flags().String("env-file", "", "")
+	setup.Flags().Bool("dry-run", false, "")
+
+	err := InitConsoleConfigForSetup(setup)
+	if err == nil || !strings.Contains(err.Error(), "notabool") || !strings.Contains(err.Error(), "dry-run") {
+		t.Errorf("expected the unparsable value to be reported, got: %v", err)
+	}
+}
+
+func Test_ConfigInvalidYamlFile(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+
+	configFile := filepath.Join(t.TempDir(), "snowplow.yml")
+	if err := os.WriteFile(configFile, []byte("console: ["), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", configFile, "-a", "id", "-S", "key", "-o", "org"}
+	if err := build().Execute(); err == nil {
+		t.Error("expected an error for an invalid config file")
+	}
+}
+
+func Test_ConfigFlagBeatsConfigFile(t *testing.T) {
+	defer func(old []string) { os.Args = old }(os.Args)
+	useLogin(t, nil)
+
+	configFile := filepath.Join(t.TempDir(), "snowplow.yml")
+	config := "console:\n  api-key-id: file-id\n  api-key: file-key\n  org-id: file-org\n"
+	if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Args = []string{"xxx", "--config", configFile, "-a", "cli-id"}
+	testCmd := build()
+	if err := testCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	table := []struct {
+		flag string
+		want string
+	}{
+		{"api-key-id", "cli-id"},
+		{"api-key", "file-key"},
+		{"org-id", "file-org"},
+	}
+
+	for _, row := range table {
+		value, _ := testCmd.Flags().GetString(row.flag)
+		if value != row.want {
+			t.Errorf("%s got %s want %s", row.flag, value, row.want)
+		}
+	}
+}

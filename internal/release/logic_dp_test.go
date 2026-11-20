@@ -924,6 +924,66 @@ func Test_Release_DryRunNothingToRelease(t *testing.T) {
 	}
 }
 
+func captureRelease(t *testing.T, client *console.ApiClient, changeSet *DataProductChangeSet, dryRun bool) string {
+	t.Helper()
+	var out bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&out, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
+	defer slog.SetDefault(previous)
+
+	if err := Release(context.Background(), client, changeSet, dryRun); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	return out.String()
+}
+
+func Test_Release_Logs(t *testing.T) {
+	draft := `{"id": "es-1", "status": "draft", "name": "ES 1", "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}`
+	published := `{"id": "es-1", "status": "published", "name": "ES 1", "event": {"source": "iglu:com.example/event/jsonschema/1-0-0"}, "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}`
+	draftWithoutEvent := `{"id": "es-2", "status": "draft", "name": "ES 2", "entities": {"tracked": [], "enriched": []}, "sourceApplications": []}`
+
+	noChanges := "level=INFO msg=sync msg=\"no changes detected, nothing to apply\"\n"
+	willRelease := "level=INFO msg=release msg=\"will release event spec\" name=\"ES 1\" \"resource name\"=es-1\n"
+	released := "level=INFO msg=release msg=\"successfully released event specs\" count=1\n"
+	skipped := "level=WARN msg=release msg=\"some event specs were not released due to absent event\" count=1\n"
+	nothing := "level=INFO msg=release msg=\"no event specs to release\"\n"
+
+	for _, tt := range []struct {
+		name           string
+		eventSpecsJSON string
+		dryRun         bool
+		want           string
+	}{
+		{name: "dry run", eventSpecsJSON: "[" + draft + "]", dryRun: true, want: noChanges + willRelease},
+		{name: "release", eventSpecsJSON: "[" + draft + "]", dryRun: false, want: noChanges + willRelease + released},
+		{name: "nothing to release", eventSpecsJSON: "[" + published + "]", dryRun: false, want: noChanges + nothing},
+		{name: "one skipped", eventSpecsJSON: "[" + draftWithoutEvent + "]", dryRun: false, want: noChanges + skipped + nothing},
+		{name: "one skipped and one released", eventSpecsJSON: "[" + draft + "," + draftWithoutEvent + "]", dryRun: false, want: noChanges + skipped + willRelease + released},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client, server := newTestClientAndServer(t, tt.eventSpecsJSON)
+			defer server.Close()
+
+			changeSet := &DataProductChangeSet{
+				IdToFileName:      map[string]string{},
+				localEventSpecIds: []string{"es-1", "es-2"},
+			}
+
+			if diff := cmp.Diff(tt.want, captureRelease(t, client, changeSet, tt.dryRun)); diff != "" {
+				t.Errorf("unexpected output (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func strPtr(s string) *string {
 	return &s
 }
@@ -1741,27 +1801,40 @@ func Test_findChanges_MissingVersionOfDuplicateIsNotAdded(t *testing.T) {
 
 func Test_findChanges_FileNamesOfChanges(t *testing.T) {
 	local := LocalFilesRefsResolved{
-		SourceApps: []model.SourceApp{{ResourceName: "sa-new", Data: model.SourceAppData{Name: "Source App 1"}}},
-		DataProudcts: []model.DataProduct{{
-			ResourceName: "dp-changed",
-			Data: model.DataProductData{
-				Name:                "Data Product 1 Updated",
-				EventSpecifications: []model.EventSpec{{ResourceName: "es-new", Name: "Event Spec 1"}},
+		SourceApps: []model.SourceApp{
+			{ResourceName: "sa-new", Data: model.SourceAppData{Name: "Source App 1"}},
+			{ResourceName: "sa-changed", Data: model.SourceAppData{Name: "Source App 2 Updated"}},
+		},
+		DataProudcts: []model.DataProduct{
+			{
+				ResourceName: "dp-changed",
+				Data: model.DataProductData{
+					Name: "Data Product 1 Updated",
+					EventSpecifications: []model.EventSpec{
+						{ResourceName: "es-new", Name: "Event Spec 1"},
+						{ResourceName: "es-changed", Name: "Event Spec 3 Updated"},
+					},
+				},
 			},
-		}},
+			{ResourceName: "dp-new", Data: model.DataProductData{Name: "Data Product 2"}},
+		},
 		IdToFileName: map[string]string{
 			"sa-new":     "/base/sa.yaml",
+			"sa-changed": "/base/sa-changed.yaml",
 			"dp-changed": "/base/dp.yaml",
+			"dp-new":     "/base/dp-new.yaml",
 			"es-new":     "/base/dp.yaml",
+			"es-changed": "/base/dp.yaml",
 		},
 	}
 	remote := console.DataProductsAndRelatedResources{
+		SourceApplication: []console.RemoteSourceApplication{{Id: "sa-changed", Name: "Source App 2"}},
 		DataProducts: []console.RemoteDataProduct{{
 			Id:         "dp-changed",
 			Name:       "Data Product 1",
-			EventSpecs: []console.EventSpecReference{{Id: "es-gone"}},
+			EventSpecs: []console.EventSpecReference{{Id: "es-gone"}, {Id: "es-changed"}},
 		}},
-		EventSpecs: []console.RemoteEventSpec{{Id: "es-gone", Name: "Event Spec 2"}},
+		EventSpecs: []console.RemoteEventSpec{{Id: "es-gone", Name: "Event Spec 2"}, {Id: "es-changed", Name: "Event Spec 3"}},
 	}
 
 	changes, err := findChanges(local, remote, map[string]string{})
@@ -1770,8 +1843,11 @@ func Test_findChanges_FileNamesOfChanges(t *testing.T) {
 	}
 	want := map[string]string{
 		"sa-new":     "/base/sa.yaml",
+		"sa-changed": "/base/sa-changed.yaml",
 		"dp-changed": "/base/dp.yaml",
+		"dp-new":     "/base/dp-new.yaml",
 		"es-new":     "/base/dp.yaml",
+		"es-changed": "/base/dp.yaml",
 		"es-gone":    "Data Product 1",
 	}
 	if diff := cmp.Diff(want, changes.IdToFileName); diff != "" {
@@ -1829,8 +1905,8 @@ func Test_ReadLocalDataProducts_ResolvesSourceAppRefsAndHashesTriggerImages(t *t
 					"resourceName":               "es-1",
 					"excludedSourceApplications": []map[string]string{{"$ref": "../source-apps/sa.yml"}},
 					"triggers": []map[string]any{
-						{"id": "trigger-1", "image": map[string]string{"$ref": "./images/trigger.png"}},
 						{"id": "trigger-without-image"},
+						{"id": "trigger-1", "image": map[string]string{"$ref": "./images/trigger.png"}},
 					},
 				}},
 			},
@@ -1876,6 +1952,7 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 	}
 
 	var calls []string
+	var images int
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -1883,17 +1960,21 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 			t.Errorf("unexpected body: %v", err)
 		}
 		call := r.Method + " " + r.URL.Path
-		if strings.Contains(string(body), `"variantUrls":{"original":"uploaded"}`) {
-			call += " with uploaded image"
+		if _, image, found := strings.Cut(string(body), `"variantUrls":{"original":"uploaded-`); found {
+			call += " with uploaded " + image[:len("image-1")]
+		}
+		if strings.HasSuffix(r.URL.Path, "/confirm-upload") {
+			call += " " + string(body)
 		}
 		calls = append(calls, call)
 		switch {
 		case r.URL.Path == "/images/v1":
-			_, _ = fmt.Fprintf(w, `{"uploadURL":"%s/upload","id":"image-1"}`, server.URL)
+			images++
+			_, _ = fmt.Fprintf(w, `{"uploadURL":"%s/upload","id":"image-%d"}`, server.URL, images)
 		case r.URL.Path == "/upload":
 			_, _ = io.WriteString(w, `{"success":true}`)
-		case r.URL.Path == "/images/v1/image-1/confirm-upload":
-			_, _ = io.WriteString(w, `{"variantUrls":{"original":"uploaded"}}`)
+		case strings.HasSuffix(r.URL.Path, "/confirm-upload"):
+			_, _ = fmt.Fprintf(w, `{"variantUrls":{"original":"uploaded-%s"}}`, strings.Split(r.URL.Path, "/")[3])
 		case r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `{}`)
@@ -1915,8 +1996,8 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 		esUpdate: []console.RemoteEventSpec{{Id: "es-update", Triggers: []console.RemoteTrigger{{Id: "trigger-update"}}}},
 		esDelete: []console.RemoteEventSpec{{Id: "es-delete"}},
 		imageCreate: []TriggerImageReference{
-			{triggerId: "trigger-create", fname: imageFile, hash: "hash"},
-			{triggerId: "trigger-update", fname: imageFile, hash: "hash"},
+			{triggerId: "trigger-create", fname: imageFile, hash: "hash-create"},
+			{triggerId: "trigger-update", fname: imageFile, hash: "hash-update"},
 		},
 	}
 
@@ -1932,16 +2013,104 @@ func Test_ApplyDpChanges_CallsConsoleInOrder(t *testing.T) {
 		"PUT /data-products/v2/dp-update",
 		"POST /images/v1",
 		"POST /upload",
-		"POST /images/v1/image-1/confirm-upload",
+		"POST /images/v1/image-1/confirm-upload {\"hash\":\"hash-create\"}",
 		"POST /images/v1",
 		"POST /upload",
-		"POST /images/v1/image-1/confirm-upload",
-		"POST /event-specs/v1 with uploaded image",
-		"PUT /event-specs/v1/es-update with uploaded image",
+		"POST /images/v1/image-2/confirm-upload {\"hash\":\"hash-update\"}",
+		"POST /event-specs/v1 with uploaded image-1",
+		"PUT /event-specs/v1/es-update with uploaded image-2",
 		"DELETE /event-specs/v1/es-delete",
 	}
 	if diff := cmp.Diff(want, calls); diff != "" {
 		t.Errorf("unexpected calls (-want +got):\n%s", diff)
+	}
+}
+
+func Test_ApplyDpChanges_StopsAtFirstFailure(t *testing.T) {
+	imageFile := filepath.Join(t.TempDir(), "trigger.png")
+	if err := os.WriteFile(imageFile, []byte("image"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	allCalls := []string{
+		"POST /source-apps/v1",
+		"PUT /source-apps/v1/sa-update",
+		"POST /data-products/v2",
+		"PUT /data-products/v2/dp-update",
+		"POST /images/v1",
+		"POST /upload",
+		"POST /images/v1/image-1/confirm-upload",
+		"POST /images/v1",
+		"POST /upload",
+		"POST /images/v1/image-1/confirm-upload",
+		"POST /event-specs/v1",
+		"PUT /event-specs/v1/es-update",
+		"DELETE /event-specs/v1/es-delete",
+	}
+
+	for _, failOn := range []string{
+		"POST /source-apps/v1",
+		"PUT /source-apps/v1/sa-update",
+		"POST /data-products/v2",
+		"PUT /data-products/v2/dp-update",
+		"POST /images/v1",
+		"POST /upload",
+		"POST /event-specs/v1",
+		"PUT /event-specs/v1/es-update",
+		"DELETE /event-specs/v1/es-delete",
+	} {
+		t.Run(failOn, func(t *testing.T) {
+			var calls []string
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				call := r.Method + " " + r.URL.Path
+				calls = append(calls, call)
+				switch {
+				case call == failOn:
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = io.WriteString(w, `{}`)
+				case r.URL.Path == "/images/v1":
+					_, _ = fmt.Fprintf(w, `{"uploadURL":"%s/upload","id":"image-1"}`, server.URL)
+				case r.URL.Path == "/upload":
+					_, _ = io.WriteString(w, `{"success":true}`)
+				case r.URL.Path == "/images/v1/image-1/confirm-upload":
+					_, _ = io.WriteString(w, `{"variantUrls":{"original":"uploaded"}}`)
+				case r.Method == http.MethodPost:
+					w.WriteHeader(http.StatusCreated)
+					_, _ = io.WriteString(w, `{}`)
+				case r.Method == http.MethodDelete:
+					w.WriteHeader(http.StatusNoContent)
+				default:
+					_, _ = io.WriteString(w, `{}`)
+				}
+			}))
+			defer server.Close()
+			client := &console.ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+
+			changes := DataProductChangeSet{
+				saCreate: []console.RemoteSourceApplication{{Id: "sa-create"}},
+				saUpdate: []console.RemoteSourceApplication{{Id: "sa-update"}},
+				dpCreate: []console.RemoteDataProduct{{Id: "dp-create"}},
+				dpUpdate: []console.RemoteDataProduct{{Id: "dp-update"}},
+				esCreate: []console.RemoteEventSpec{{Id: "es-create", Triggers: []console.RemoteTrigger{{Id: "trigger-create"}}}},
+				esUpdate: []console.RemoteEventSpec{{Id: "es-update", Triggers: []console.RemoteTrigger{{Id: "trigger-update"}}}},
+				esDelete: []console.RemoteEventSpec{{Id: "es-delete"}},
+				imageCreate: []TriggerImageReference{
+					{triggerId: "trigger-create", fname: imageFile, hash: "hash"},
+					{triggerId: "trigger-update", fname: imageFile, hash: "hash"},
+				},
+			}
+
+			err := ApplyDpChanges(changes, context.Background(), client)
+			if err == nil {
+				t.Error("expected the failed request to be reported")
+			}
+
+			want := allCalls[:slices.Index(allCalls, failOn)+1]
+			if diff := cmp.Diff(want, calls); diff != "" {
+				t.Errorf("unexpected calls (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
