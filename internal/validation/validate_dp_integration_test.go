@@ -1008,6 +1008,139 @@ func TestFixEventSpecVersions_LogsFilesInOrder(t *testing.T) {
 	}
 }
 
+const dataProductWithAndWithoutVersion = `apiVersion: v1
+resourceType: data-product
+resourceName: dbc68917-3bcb-4640-a165-483de5fc033c
+data:
+  name: checkout
+  sourceApplications: []
+  eventSpecifications:
+    - resourceName: b57f712e-ee43-4e10-8b36-48a0f6f2e628
+      name: Checkout Started
+      version: 3
+    - resourceName: 0c3b1d5e-6a0f-4c6b-9b63-7f2a4a3a4f11
+      name: Checkout Finished
+`
+
+func TestFixEventSpecVersions_SetsThenAddsInOneFile(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "a.yaml")
+	if err := os.WriteFile(f, []byte(dataProductWithAndWithoutVersion), 0644); err != nil {
+		t.Fatal(err)
+	}
+	one := 1
+	mismatches := []model.EventSpecVersionMismatch{{FileName: f, Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4}}
+	missing := []model.EventSpecMissingVersion{{FileName: f, Index: 1, Name: "Checkout Finished", Expected: &one}}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	if err := fixEventSpecVersions(ctx, mismatches, missing); err != nil {
+		t.Fatal(err)
+	}
+
+	updated := strings.Index(logOutput.String(), `msg="updated event specification version" file=`)
+	added := strings.Index(logOutput.String(), `msg="added event specification version" file=`)
+	if updated < 0 || updated >= added {
+		t.Errorf("expected the updated version log line before the added one, got:\n%s", logOutput.String())
+	}
+	for _, want := range []string{f, ` name="Checkout Started" from=3 to=4`, ` name="Checkout Finished" version=1`} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Errorf("expected %s in the log, got:\n%s", want, logOutput.String())
+		}
+	}
+
+	want := strings.Replace(dataProductWithAndWithoutVersion, "version: 3", "version: 4", 1) + "      version: 1\n"
+	got, err := os.ReadFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFixEventSpecVersions_SetFailureLogsNothingAndStops(t *testing.T) {
+	tmpDir := t.TempDir()
+	notAFile := filepath.Join(tmpDir, "a.yaml")
+	if err := os.Mkdir(notAFile, 0755); err != nil {
+		t.Fatal(err)
+	}
+	later := filepath.Join(tmpDir, "b.yaml")
+	if err := os.WriteFile(later, []byte(dataProductWithAndWithoutVersion), 0644); err != nil {
+		t.Fatal(err)
+	}
+	one := 1
+	mismatches := []model.EventSpecVersionMismatch{
+		{FileName: later, Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4},
+		{FileName: notAFile, Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4},
+	}
+	missing := []model.EventSpecMissingVersion{{FileName: later, Index: 1, Name: "Checkout Finished", Expected: &one}}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	if err := fixEventSpecVersions(ctx, mismatches, missing); err == nil {
+		t.Fatal("expected an error for a file that can't be amended")
+	}
+
+	if logOutput.Len() != 0 {
+		t.Errorf("expected no log lines, got:\n%s", logOutput.String())
+	}
+
+	got, err := os.ReadFile(later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != dataProductWithAndWithoutVersion {
+		t.Errorf("expected the file after the failing one untouched, got:\n%s", got)
+	}
+}
+
+func TestFixEventSpecVersions_AddFailureKeepsSetLogAndStops(t *testing.T) {
+	tmpDir := t.TempDir()
+	failing := filepath.Join(tmpDir, "a.yaml")
+	later := filepath.Join(tmpDir, "b.yaml")
+	for _, f := range []string{failing, later} {
+		if err := os.WriteFile(f, []byte(dataProductWithAndWithoutVersion), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	one := 1
+	mismatches := []model.EventSpecVersionMismatch{
+		{FileName: later, Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4},
+		{FileName: failing, Index: 0, Name: "Checkout Started", Declared: 3, Expected: 4},
+	}
+	missing := []model.EventSpecMissingVersion{
+		{FileName: later, Index: 1, Name: "Checkout Finished", Expected: &one},
+		{FileName: failing, Index: 7, Name: "Not In The File", Expected: &one},
+	}
+
+	var logOutput bytes.Buffer
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewTextHandler(&logOutput, nil)))
+
+	err := fixEventSpecVersions(ctx, mismatches, missing)
+	if err == nil || !strings.Contains(err.Error(), "event specification 7 not found") {
+		t.Fatalf("expected the error of the added version, got: %v", err)
+	}
+
+	if strings.Count(logOutput.String(), "\n") != 1 || strings.Contains(logOutput.String(), "added event specification version") {
+		t.Errorf("expected only the updated version log line of the failing file, got:\n%s", logOutput.String())
+	}
+	for _, want := range []string{`msg="updated event specification version" file=`, failing, ` name="Checkout Started" from=3 to=4`} {
+		if !strings.Contains(logOutput.String(), want) {
+			t.Errorf("expected %s in the log, got:\n%s", want, logOutput.String())
+		}
+	}
+
+	got, err := os.ReadFile(later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != dataProductWithAndWithoutVersion {
+		t.Errorf("expected the file after the failing one untouched, got:\n%s", got)
+	}
+}
+
 func TestDownload_UnreadableFileKeepsOtherVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 1, "1-0-0")), 0644); err != nil {
