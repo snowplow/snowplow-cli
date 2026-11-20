@@ -227,29 +227,30 @@ func LoadAndRefresh(ctx context.Context, host string) (*Login, error) {
 
 	var result *Login
 	err = withLock(func(path string) error {
-		current, currentExpired, err := check(host)
-		if err != nil || current == nil {
-			return err
-		}
-		if !currentExpired {
-			result = current
-			return nil
-		}
-		refreshed, err := refresh(ctx, current)
-		if err != nil || refreshed == nil {
-			return err
-		}
-		result = refreshed
-		if err := write(refreshed, path); err != nil {
-			slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
-		}
-		return nil
+		var err error
+		result, err = refreshUnderLock(ctx, host, path)
+		return err
 	})
 	if errors.Is(err, errLock) {
 		slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
 		return refresh(ctx, login)
 	}
 	return result, err
+}
+
+func refreshUnderLock(ctx context.Context, host string, path string) (*Login, error) {
+	current, expired, err := check(host)
+	if err != nil || current == nil || !expired {
+		return current, err
+	}
+	refreshed, err := refresh(ctx, current)
+	if err != nil || refreshed == nil {
+		return nil, err
+	}
+	if err := write(refreshed, path); err != nil {
+		slog.Warn("Refreshed login could not be saved, so the next command may need 'snowplow-cli login'", "error", err)
+	}
+	return refreshed, nil
 }
 
 func (l Login) fresh() bool {

@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -183,5 +184,67 @@ func Test_ValidateMigrationsMinor_Ok(t *testing.T) {
 		if r.SuggestedVersion != "1-0-2" {
 			t.Error(result)
 		}
+	}
+}
+
+func Test_ValidateMigrations_Reports(t *testing.T) {
+	tests := []struct {
+		name          string
+		changeType    string
+		remoteVersion string
+		localVersion  string
+		want          map[string]MigrationReport
+	}{
+		{
+			name:          "suggests the next version for every destination",
+			changeType:    "major",
+			remoteVersion: "1-0-1",
+			localVersion:  "1-0-1",
+			want: map[string]MigrationReport{
+				"something": {SuggestedVersion: "2-0-0", Messages: []string{"major just because"}},
+				"otherone":  {SuggestedVersion: "2-0-0", Messages: []string{"major just because"}},
+			},
+		},
+		{
+			name:          "no change needs no report, even without a deployed version",
+			changeType:    "no-change",
+			remoteVersion: "",
+			localVersion:  "1-0-1",
+			want:          map[string]MigrationReport{},
+		},
+		{
+			name:          "local version already at the suggested one needs no report",
+			changeType:    "major",
+			remoteVersion: "1-0-1",
+			localVersion:  "2-0-0",
+			want:          map[string]MigrationReport{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := migrationServer(t, tt.changeType)
+			defer server.Close()
+			client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
+
+			result, err := ValidateMigrations(context.Background(), client, DSChangeContext{
+				RemoteVersion: tt.remoteVersion,
+				DS: DataStructure{
+					Data: map[string]any{
+						"self": map[string]any{
+							"vendor":  "test.test",
+							"name":    "test",
+							"format":  "jsonschema",
+							"version": tt.localVersion,
+						},
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tt.want) {
+				t.Errorf("result = %+v, want %+v", result, tt.want)
+			}
+		})
 	}
 }

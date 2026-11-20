@@ -282,3 +282,18 @@ func Test_saToDiff_IgnoresEntityComments(t *testing.T) {
 		t.Errorf("saToDiff should not change its input")
 	}
 }
+
+func Test_structuralEntity_LeavesCommentOutOfWhatIsSent(t *testing.T) {
+	comment := "a note"
+	entity := console.Entity{Source: "iglu:com.example/a/jsonschema/1-0-0", Comment: &comment}
+
+	remote := structuralEntity(entity, false)
+	if remote["comment"] != comment {
+		t.Errorf("comment = %v, want %q for an entity read from Console", remote["comment"], comment)
+	}
+
+	sent := structuralEntity(entity, true)
+	if _, ok := sent["comment"]; ok {
+		t.Errorf("comment = %v, want none for an entity sent to Console", sent["comment"])
+	}
+}

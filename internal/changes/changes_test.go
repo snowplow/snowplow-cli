@@ -11,10 +11,21 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package changes
 
 import (
-	. "github.com/snowplow/snowplow-cli/internal/console"
-	. "github.com/snowplow/snowplow-cli/internal/model"
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log/slog"
 	"math"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
 	"testing"
+
+	. "github.com/snowplow/snowplow-cli/internal/console"
+	"github.com/snowplow/snowplow-cli/internal/logging"
+	. "github.com/snowplow/snowplow-cli/internal/model"
 )
 
 func Test_GetChangesCreate(t *testing.T) {
@@ -239,5 +250,199 @@ func Test_GetChangesContentHashError(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("Expected an error for data that can't be hashed")
+	}
+}
+
+func namedDS(name string, version string, schemaType string) DataStructure {
+	return DataStructure{
+		Meta: DataStructureMeta{SchemaType: schemaType},
+		Data: map[string]any{
+			"self": map[string]any{
+				"vendor":  "com.acme",
+				"name":    name,
+				"format":  "jsonschema",
+				"version": version,
+			},
+			"schema": "string",
+		},
+	}
+}
+
+func recordingConsole(t *testing.T, calls *[]string) *ApiClient {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/validation-requests"):
+			var ds DataStructure
+			if err := json.Unmarshal(body, &ds); err != nil {
+				t.Error(err)
+			}
+			data, err := ds.ParseData()
+			if err != nil {
+				t.Error(err)
+			}
+			*calls = append(*calls, "validate "+data.Self.Name)
+			w.WriteHeader(http.StatusCreated)
+			if data.Self.Name == "invalid" {
+				_, _ = io.WriteString(w, `{"success":false,"message":"schema is broken"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"success":true}`)
+		case strings.HasSuffix(r.URL.Path, "/deployment-requests"):
+			var req struct {
+				Name string `json:"name"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil {
+				t.Error(err)
+			}
+			*calls = append(*calls, strings.TrimSpace("deploy "+req.Name+" "+r.URL.RawQuery))
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"success":true}`)
+		case strings.HasSuffix(r.URL.Path, "/meta"):
+			var meta struct {
+				SchemaType string `json:"schemaType"`
+			}
+			if err := json.Unmarshal(body, &meta); err != nil {
+				t.Error(err)
+			}
+			if meta.SchemaType != "" {
+				*calls = append(*calls, "update meta "+meta.SchemaType)
+			} else {
+				*calls = append(*calls, "lock")
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+}
+
+func Test_PerformChangesDev_ValidatesAndPublishesInOrder(t *testing.T) {
+	var calls []string
+	client := recordingConsole(t, &calls)
+	changes := Changes{
+		ToCreate:           []DSChangeContext{NewDSChangeContext(namedDS("created", "1-0-0", "entity"), "created.yml")},
+		ToUpdateNewVersion: []DSChangeContext{NewDSChangeContextWithVersion(namedDS("bumped", "2-0-0", "entity"), "bumped.yml", "1-0-0")},
+		ToUpdatePatch:      []DSChangeContext{NewDSChangeContextWithVersion(namedDS("patched", "1-0-0", "entity"), "patched.yml", "1-0-0")},
+		ToUpdateMeta:       []DSChangeContext{NewDSChangeContext(namedDS("meta", "1-0-0", "event"), "meta.yml")},
+	}
+
+	if err := PerformChangesDev(context.Background(), client, changes, "cli"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []string{
+		"validate created", "deploy created", "lock",
+		"validate bumped", "deploy bumped", "lock",
+		"validate patched", "deploy patched patch=true", "lock",
+		"update meta event",
+	}
+	if !slices.Equal(calls, want) {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+}
+
+func Test_PerformChangesDev_StopsAtInvalidDataStructure(t *testing.T) {
+	var calls []string
+	client := recordingConsole(t, &calls)
+	changes := Changes{
+		ToCreate:           []DSChangeContext{NewDSChangeContext(namedDS("created", "1-0-0", "entity"), "created.yml")},
+		ToUpdateNewVersion: []DSChangeContext{NewDSChangeContextWithVersion(namedDS("invalid", "2-0-0", "entity"), "invalid.yml", "1-0-0")},
+		ToUpdatePatch:      []DSChangeContext{NewDSChangeContextWithVersion(namedDS("patched", "1-0-0", "entity"), "patched.yml", "1-0-0")},
+		ToUpdateMeta:       []DSChangeContext{NewDSChangeContext(namedDS("meta", "1-0-0", "event"), "meta.yml")},
+	}
+
+	err := PerformChangesDev(context.Background(), client, changes, "cli")
+	if err == nil || !strings.Contains(err.Error(), "schema is broken") {
+		t.Fatalf("expected the validation message as the error, got %v", err)
+	}
+
+	want := []string{"validate created", "deploy created", "lock", "validate invalid"}
+	if !slices.Equal(calls, want) {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+}
+
+func Test_PerformChangesDev_StopsAtInvalidPatch(t *testing.T) {
+	var calls []string
+	client := recordingConsole(t, &calls)
+	changes := Changes{
+		ToUpdatePatch: []DSChangeContext{NewDSChangeContextWithVersion(namedDS("invalid", "1-0-0", "entity"), "invalid.yml", "1-0-0")},
+		ToUpdateMeta:  []DSChangeContext{NewDSChangeContext(namedDS("meta", "1-0-0", "event"), "meta.yml")},
+	}
+
+	if err := PerformChangesDev(context.Background(), client, changes, "cli"); err == nil {
+		t.Fatal("expected an error for an invalid patch")
+	}
+
+	want := []string{"validate invalid"}
+	if !slices.Equal(calls, want) {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+}
+
+func captureChangeset(t *testing.T, changes Changes) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	handler := slog.NewTextHandler(&out, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey && len(groups) == 0 {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(handler))
+	err := PrintChangeset(ctx, changes)
+	return out.String(), err
+}
+
+func Test_PrintChangeset(t *testing.T) {
+	changes := Changes{
+		ToCreate:           []DSChangeContext{NewDSChangeContext(namedDS("created", "1-0-0", "entity"), "created.yml")},
+		ToUpdateNewVersion: []DSChangeContext{NewDSChangeContextWithVersion(namedDS("bumped", "2-0-0", "entity"), "bumped.yml", "1-0-0")},
+		ToUpdatePatch:      []DSChangeContext{NewDSChangeContextWithVersionAndHashes(namedDS("patched", "1-0-0", "entity"), "patched.yml", "1-0-0", "localhash", "remotehash")},
+		ToUpdateMeta:       []DSChangeContext{NewDSChangeContext(namedDS("meta", "1-0-0", "event"), "meta.yml")},
+	}
+
+	got, err := captureChangeset(t, changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := `level=INFO msg="will update metadata of" file=meta.yml vendor=com.acme name=meta
+level=INFO msg="will create" file=created.yml vendor=com.acme name=created version=1-0-0
+level=INFO msg="will update" file=bumped.yml local=2-0-0 remote=1-0-0
+level=INFO msg="will patch" file=patched.yml vendor=com.acme name=patched version=1-0-0 local=localhash remote=remotehash
+`
+	if got != want {
+		t.Errorf("output:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func Test_PrintChangeset_ParseDataError(t *testing.T) {
+	broken := []DSChangeContext{NewDSChangeContext(DataStructure{Data: map[string]any{"self": "not an object"}}, "broken.yml")}
+	tests := map[string]Changes{
+		"metadata update": {ToUpdateMeta: broken},
+		"create":          {ToCreate: broken},
+		"new version":     {ToUpdateNewVersion: broken},
+		"patch":           {ToUpdatePatch: broken},
+	}
+	for name, changes := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := captureChangeset(t, changes)
+			if err == nil {
+				t.Error("expected an error for data that can't be parsed")
+			}
+			if got != "" {
+				t.Errorf("expected no output, got %s", got)
+			}
+		})
 	}
 }
