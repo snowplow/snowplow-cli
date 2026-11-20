@@ -188,6 +188,7 @@ func TestValidateDataStructuresWithClient_NoLoggerInContext(t *testing.T) {
 }
 
 func writeValidDataStructure(t *testing.T, dir string) {
+	t.Helper()
 	validDS := `apiVersion: v1
 resourceType: data-structure
 meta:
@@ -214,6 +215,7 @@ data:
 }
 
 func writeInvalidDataStructure(t *testing.T, dir, filename string) {
+	t.Helper()
 	invalidDS := `apiVersion: v1
 resourceType: data-structure
 meta:

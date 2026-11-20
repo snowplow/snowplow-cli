@@ -352,20 +352,7 @@ func TestCreateSourceAppsPathHandling(t *testing.T) {
 			ExtentionPreference:  "yaml",
 		}
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatalf("Failed to get current working directory for relative path test: %v", err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("Failed to restore working directory after relative path test: %v", err)
-			}
-		}()
-
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatalf("Failed to change to temp directory for relative path test: %v", err)
-		}
+		t.Chdir(tempDir)
 
 		result, err := files.CreateSourceApps(testSas, false)
 		if err != nil {
@@ -437,20 +424,7 @@ func TestCreateSourceAppsPathHandlingImageFolder(t *testing.T) {
 			ImagesLocation:       "images",
 		}
 
-		oldWd, err := os.Getwd()
-		if err != nil {
-			t.Fatalf("Failed to get current working directory for image folder test: %v", err)
-		}
-		defer func() {
-			if err := os.Chdir(oldWd); err != nil {
-				t.Errorf("Failed to restore working directory after image folder test: %v", err)
-			}
-		}()
-
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatalf("Failed to change to temp directory for image folder test: %v", err)
-		}
+		t.Chdir(tempDir)
 
 		imagesDir, err := relativeFiles.CreateImageFolder()
 		if err != nil {

@@ -35,7 +35,7 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
-func ReadLocalDataProducts_Test(t *testing.T) {
+func Test_ReadLocalDataProducts(t *testing.T) {
 	input := map[string]map[string]any{
 		"/base/source-apps/a/b/file1.yml": {
 			"apiVersion":   "v1",
@@ -66,13 +66,13 @@ func ReadLocalDataProducts_Test(t *testing.T) {
 			ResourceType: "data-product",
 			ResourceName: "dcdfd5cd-2a87-49c6-b291-62f904ac2f01",
 			Data: model.DataProductData{
-				ResourceName:        "dcdfd5cd-2a87-49c6-b291-62f904ac2f01",
+				ResourceName:        "",
 				Name:                "",
 				SourceApplications:  []map[string]string{{"id": "92017fd4-a87d-4cc4-9268-5f945fb5601d"}, {"id": "c3152a3f-4817-4300-9538-aaf3c9d92e0b"}},
 				Domain:              "",
 				Owner:               "",
 				Description:         "",
-				EventSpecifications: []model.EventSpec{},
+				EventSpecifications: nil,
 			},
 		}},
 		SourceApps: []model.SourceApp{{
@@ -87,15 +87,22 @@ func ReadLocalDataProducts_Test(t *testing.T) {
 				ResourceName: "92017fd4-a87d-4cc4-9268-5f945fb5601d",
 				Data:         model.SourceAppData{},
 			}},
+		IdToFileName: map[string]string{
+			"c3152a3f-4817-4300-9538-aaf3c9d92e0b": "/base/source-apps/a/b/file1.yml",
+			"92017fd4-a87d-4cc4-9268-5f945fb5601d": "/base/source-apps/a/file1.yml",
+			"dcdfd5cd-2a87-49c6-b291-62f904ac2f01": "/base/somedir/file2.yml",
+		},
+		TriggerImageRefsById: map[string]TriggerImageReference{},
 	}
 
 	result, err := ReadLocalDataProducts(context.Background(), input)
 	if err != nil {
-		t.Errorf("ReadLocalDataProducts_Test error %v", err)
+		t.Fatalf("ReadLocalDataProducts() error %v", err)
 	}
 
-	if !reflect.DeepEqual(expected, *result) {
-		t.Errorf("localSaToRemote() = %v, want %v", result, expected)
+	sourceAppsInAnyOrder := cmpopts.SortSlices(func(a, b model.SourceApp) bool { return a.ResourceName < b.ResourceName })
+	if diff := cmp.Diff(expected, *result, sourceAppsInAnyOrder, cmp.AllowUnexported(TriggerImageReference{})); diff != "" {
+		t.Errorf("ReadLocalDataProducts() mismatch (-want +got):\n%s", diff)
 	}
 }
 
