@@ -64,9 +64,11 @@ func (v *DPValidations) concat(r DPValidations) {
 }
 
 func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp map[string]map[string]any, changedIdToFile map[string]string, validateAll bool, concurrency int) (*DPLookup, error) {
-	probablyDps := map[string]model.DataProduct{}
-	probablySap := map[string]model.SourceApp{}
-	validation := map[string]DPValidations{}
+	result := &DPLookup{
+		DataProducts: map[string]model.DataProduct{},
+		SourceApps:   map[string]model.SourceApp{},
+		Validations:  map[string]DPValidations{},
+	}
 
 	changedFiles := make(map[string]bool)
 
@@ -75,60 +77,34 @@ func NewDPLookup(cc console.CompatChecker, sdc console.SchemaDeployChecker, dp m
 	}
 
 	for f, maybeDp := range dp {
-		v := DPValidations{}
-
 		if apiV, ok := maybeDp["apiVersion"]; !ok || apiV != "v1" {
-			v.Errors = append(v.Errors, fmt.Sprintf("ignoring, unknown or missing apiVersion: %s", apiV))
 			continue
 		}
 
-		if resourceType, ok := maybeDp["resourceType"]; ok {
-			switch resourceType {
-			case "data-product":
-				var dp model.DataProduct
-				if err := mapstructure.Decode(maybeDp, &dp); err == nil {
-					probablyDps[f] = dp
-				} else {
-					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode data product %s", err))
-				}
-				shapeValidations, ok := ValidateDPShape(maybeDp)
-				v.concat(shapeValidations)
-				changed := changedFiles[f]
-				if ok && cc != nil {
-					if validateAll {
-						v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
-					} else {
-						if changed {
-							v.concat(ValidateDPEventSpecCompat(cc, concurrency, dp))
-						} else {
-							v.Debug = append(v.Debug, fmt.Sprintf("skipping compatibility check for %s, since it was not changed, use --full to include it in validation", f))
-						}
-					}
-				}
-			case "source-application":
-				var sa model.SourceApp
-				if err := mapstructure.Decode(maybeDp, &sa); err == nil {
-					probablySap[f] = sa
-				} else {
-					v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %s", err))
-				}
-				shapeValidations, ok := ValidateSAShape(maybeDp)
-				v.concat(shapeValidations)
-				v.concat(ValidateSAEntitiesCardinalities(sa))
-				if ok && sdc != nil {
-					v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
-				}
-			default:
-				v.Debug = append(v.Debug, fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType))
-			}
-		} else {
-			v.Errors = append(v.Errors, "missing resourceType")
+		resourceType, ok := maybeDp["resourceType"]
+		if !ok {
+			result.Validations[f] = DPValidations{Errors: []string{"missing resourceType"}}
+			continue
 		}
 
-		validation[f] = v
+		switch resourceType {
+		case "data-product":
+			dataProduct, v, shapeOk := result.addDataProductAndValidateShape(f, maybeDp)
+			if shapeOk && cc != nil {
+				if validateAll || changedFiles[f] {
+					v.concat(ValidateDPEventSpecCompat(cc, concurrency, dataProduct))
+				} else {
+					v.Debug = append(v.Debug, fmt.Sprintf("skipping compatibility check for %s, since it was not changed, use --full to include it in validation", f))
+				}
+			}
+			result.Validations[f] = v
+		case "source-application":
+			result.Validations[f] = result.addSourceAppAndValidate(sdc, f, maybeDp)
+		default:
+			result.Validations[f] = DPValidations{Debug: []string{fmt.Sprintf("ignoring, unknown resourceType: %s", resourceType)}}
+		}
 	}
 
-	result := &DPLookup{probablyDps, probablySap, validation}
 	err := result.resolveRefs()
 	if err != nil {
 		return nil, err
@@ -229,6 +205,42 @@ func (lookup *DPLookup) ValidationErrorCount() int {
 	return count
 }
 
+func (lookup *DPLookup) addDataProductAndValidateShape(f string, maybeDp map[string]any) (model.DataProduct, DPValidations, bool) {
+	v := DPValidations{}
+
+	var dp model.DataProduct
+	if err := mapstructure.Decode(maybeDp, &dp); err == nil {
+		lookup.DataProducts[f] = dp
+	} else {
+		v.Errors = append(v.Errors, fmt.Sprintf("failed to decode data product %s", err))
+	}
+
+	shapeValidations, shapeOk := ValidateDPShape(maybeDp)
+	v.concat(shapeValidations)
+
+	return dp, v, shapeOk
+}
+
+func (lookup *DPLookup) addSourceAppAndValidate(sdc console.SchemaDeployChecker, f string, maybeSa map[string]any) DPValidations {
+	v := DPValidations{}
+
+	var sa model.SourceApp
+	if err := mapstructure.Decode(maybeSa, &sa); err == nil {
+		lookup.SourceApps[f] = sa
+	} else {
+		v.Errors = append(v.Errors, fmt.Sprintf("failed to decode source application %s", err))
+	}
+
+	shapeValidations, shapeOk := ValidateSAShape(maybeSa)
+	v.concat(shapeValidations)
+	v.concat(ValidateSAEntitiesCardinalities(sa))
+	if shapeOk && sdc != nil {
+		v.concat(ValidateSAEntitiesSchemaDeployed(sdc, sa))
+	}
+
+	return v
+}
+
 func (lookup *DPLookup) allSourceAppsRelativeTo(filename string) ([]string, error) {
 	relativeSas := []string{}
 	for path := range lookup.SourceApps {
@@ -244,64 +256,106 @@ func (lookup *DPLookup) allSourceAppsRelativeTo(filename string) ([]string, erro
 
 func (lookup *DPLookup) resolveRefs() error {
 	for dpFile, dp := range lookup.DataProducts {
-		resolvedSas := []string{}
-
 		v, ok := lookup.Validations[dpFile]
 		if !ok {
 			v = DPValidations{}
 		}
 
-		for _, ref := range dp.Data.SourceApplications {
-			if saRef, ok := ref["$ref"]; ok {
-				absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
-				if err != nil {
-					return err
-				}
-
-				if _, ok := lookup.SourceApps[absPath]; ok {
-					ref["$ref"] = absPath
-					resolvedSas = append(resolvedSas, absPath)
-				} else {
-					available, err := lookup.allSourceAppsRelativeTo(dpFile)
-					if err != nil {
-						return err
-					}
-					v.Errors = append(v.Errors, fmt.Sprintf("source application $ref not found %s, available list %v", saRef, available))
-				}
-			}
+		resolvedSas, notFound, err := lookup.resolveSourceAppRefs(dpFile, dp.Data.SourceApplications)
+		if err != nil {
+			return err
 		}
+		v.Errors = append(v.Errors, notFound...)
+
 		for _, spec := range dp.Data.EventSpecifications {
-			for _, ref := range spec.ExcludedSourceApplications {
-				if saRef, ok := ref["$ref"]; ok {
-					absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
-					if err != nil {
-						return err
-					}
-					ref["$ref"] = absPath
-
-					if !slices.Contains(resolvedSas, absPath) {
-						relativeSas := []string{}
-						for _, absSaPath := range resolvedSas {
-							relPath, err := filepath.Rel(filepath.Dir(dpFile), absSaPath)
-							if err != nil {
-								logging.LogFatal(err)
-							}
-							relativeSas = append(relativeSas, relPath)
-						}
-
-						v.Errors = append(v.Errors, fmt.Sprintf(
-							"event spec source app not in parent data product list (event spec: %s, source app: %s), available list %v",
-							spec.ResourceName,
-							saRef,
-							relativeSas,
-						))
-					}
-				}
+			notInParent, err := resolveExcludedSourceAppRefs(dpFile, spec, resolvedSas)
+			if err != nil {
+				return err
 			}
+			v.Errors = append(v.Errors, notInParent...)
 		}
 
 		lookup.Validations[dpFile] = v
 	}
 
 	return nil
+}
+
+func (lookup *DPLookup) resolveSourceAppRefs(dpFile string, refs []map[string]string) ([]string, []string, error) {
+	resolvedSas := []string{}
+	notFound := []string{}
+
+	for _, ref := range refs {
+		saRef, ok := ref["$ref"]
+		if !ok {
+			continue
+		}
+
+		absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if _, ok := lookup.SourceApps[absPath]; ok {
+			ref["$ref"] = absPath
+			resolvedSas = append(resolvedSas, absPath)
+			continue
+		}
+
+		available, err := lookup.allSourceAppsRelativeTo(dpFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		notFound = append(notFound, fmt.Sprintf("source application $ref not found %s, available list %v", saRef, available))
+	}
+
+	return resolvedSas, notFound, nil
+}
+
+func resolveExcludedSourceAppRefs(dpFile string, spec model.EventSpec, resolvedSas []string) ([]string, error) {
+	notInParent := []string{}
+
+	for _, ref := range spec.ExcludedSourceApplications {
+		saRef, ok := ref["$ref"]
+		if !ok {
+			continue
+		}
+
+		absPath, err := filepath.Abs(filepath.Join(filepath.Dir(dpFile), saRef))
+		if err != nil {
+			return nil, err
+		}
+		ref["$ref"] = absPath
+
+		if slices.Contains(resolvedSas, absPath) {
+			continue
+		}
+
+		relativeSas, err := pathsRelativeTo(dpFile, resolvedSas)
+		if err != nil {
+			logging.LogFatal(err)
+		}
+
+		notInParent = append(notInParent, fmt.Sprintf(
+			"event spec source app not in parent data product list (event spec: %s, source app: %s), available list %v",
+			spec.ResourceName,
+			saRef,
+			relativeSas,
+		))
+	}
+
+	return notInParent, nil
+}
+
+func pathsRelativeTo(filename string, absPaths []string) ([]string, error) {
+	relPaths := []string{}
+	for _, absPath := range absPaths {
+		relPath, err := filepath.Rel(filepath.Dir(filename), absPath)
+		if err != nil {
+			return nil, err
+		}
+		relPaths = append(relPaths, relPath)
+	}
+
+	return relPaths, nil
 }

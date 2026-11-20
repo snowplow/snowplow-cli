@@ -12,6 +12,7 @@ package validation
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -164,32 +165,14 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 	slices.Sort(fileNames)
 
 	for _, f := range fileNames {
-		if mismatches := mismatchesByFile[f]; len(mismatches) > 0 {
-			versions := map[int]int{}
-			for _, m := range mismatches {
-				versions[m.Index] = m.Expected
-			}
-			err := amend.SetEventSpecVersionsInFile(versions, f)
-			if err != nil {
-				return err
-			}
-			for _, m := range mismatches {
-				logger.Info("validation", "msg", "updated event specification version", "file", f, "name", m.Name, "from", m.Declared, "to", m.Expected)
-			}
+		err := setEventSpecVersionsInFileAndLog(logger, f, mismatchesByFile[f])
+		if err != nil {
+			return err
 		}
 
-		if missing := missingByFile[f]; len(missing) > 0 {
-			versions := map[int]int{}
-			for _, m := range missing {
-				versions[m.Index] = *m.Expected
-			}
-			err := amend.AddEventSpecVersionsInFile(versions, f)
-			if err != nil {
-				return err
-			}
-			for _, m := range missing {
-				logger.Info("validation", "msg", "added event specification version", "file", f, "name", m.Name, "version", *m.Expected)
-			}
+		err = addEventSpecVersionsInFileAndLog(logger, f, missingByFile[f])
+		if err != nil {
+			return err
 		}
 	}
 
@@ -201,6 +184,46 @@ func fixEventSpecVersions(ctx context.Context, versionMismatches []model.EventSp
 	})
 	for _, m := range notAdded {
 		logger.Warn("validation", "msg", "event specification version not added", "file", m.FileName, "name", m.Name, "reason", m.Reason)
+	}
+
+	return nil
+}
+
+func setEventSpecVersionsInFileAndLog(logger *slog.Logger, f string, mismatches []model.EventSpecVersionMismatch) error {
+	if len(mismatches) == 0 {
+		return nil
+	}
+
+	versions := map[int]int{}
+	for _, m := range mismatches {
+		versions[m.Index] = m.Expected
+	}
+	err := amend.SetEventSpecVersionsInFile(versions, f)
+	if err != nil {
+		return err
+	}
+	for _, m := range mismatches {
+		logger.Info("validation", "msg", "updated event specification version", "file", f, "name", m.Name, "from", m.Declared, "to", m.Expected)
+	}
+
+	return nil
+}
+
+func addEventSpecVersionsInFileAndLog(logger *slog.Logger, f string, missing []model.EventSpecMissingVersion) error {
+	if len(missing) == 0 {
+		return nil
+	}
+
+	versions := map[int]int{}
+	for _, m := range missing {
+		versions[m.Index] = *m.Expected
+	}
+	err := amend.AddEventSpecVersionsInFile(versions, f)
+	if err != nil {
+		return err
+	}
+	for _, m := range missing {
+		logger.Info("validation", "msg", "added event specification version", "file", f, "name", m.Name, "version", *m.Expected)
 	}
 
 	return nil

@@ -46,7 +46,7 @@ linters:
       ignore-rules:
         - avaliable
     nestif:
-      min-complexity: 15
+      min-complexity: 9
   exclusions:
     presets:
       - std-error-handling
