@@ -169,29 +169,42 @@ func processDocFile(filepath string) (string, error) {
 
 	// Process content
 	inCodeBlock := false
+	var codeBlock []string
 	for _, line := range lines {
 		if strings.HasPrefix(line, "## "+title) {
 			continue
 		}
 
+		// Remove link to the autocomplete command
+		if strings.HasPrefix(line, "### SEE ALSO") {
+			break
+		}
+
 		// Handle code blocks
 		if strings.HasPrefix(line, "```") {
+			if inCodeBlock {
+				for _, codeLine := range dedent(codeBlock) {
+					newContent.WriteString(codeLine + "\n")
+				}
+				codeBlock = nil
+			}
 			inCodeBlock = !inCodeBlock
 			if strings.HasPrefix(line, "```markdown") {
 				// Skip markdown code block markers
 				continue
 			}
+			newContent.WriteString(line + "\n")
+			continue
+		}
+
+		if inCodeBlock {
+			codeBlock = append(codeBlock, line)
+			continue
 		}
 
 		// Add line to new content with escaped angle brackets
 		escapedLine := strings.ReplaceAll(strings.ReplaceAll(line, "<", "\\<"), ">", "\\>")
-
-		// Remove link to the autocomplete command
-		if !strings.HasPrefix(escapedLine, "### SEE ALSO") {
-			newContent.WriteString(escapedLine + "\n")
-		} else {
-			break
-		}
+		newContent.WriteString(escapedLine + "\n")
 	}
 
 	// Remove the auto-generated notice
@@ -200,6 +213,34 @@ func processDocFile(filepath string) (string, error) {
 		"")
 
 	return final, nil
+}
+
+func dedent(lines []string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	indent := -1
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lineIndent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if indent < 0 || lineIndent < indent {
+			indent = lineIndent
+		}
+	}
+
+	dedented := make([]string, len(lines))
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			dedented[i] = strings.TrimRight(line[indent:], " \t")
+		}
+	}
+	return dedented
 }
 
 func init() {
