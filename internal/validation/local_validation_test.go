@@ -272,3 +272,43 @@ func Test_DuplicateFile(t *testing.T) {
 		t.Fatalf("Error message does not complain about duplicate files %s", e)
 	}
 }
+
+func Test_FailWithEveryKindOfFieldError(t *testing.T) {
+	jsonString := string(`{
+      "apiVersion": "v2",
+      "resourceType": "data-structure",
+      "meta": {
+        "hidden": true,
+        "schemaType": "helloThere"
+      },
+      "data": {
+        "self": {
+          "vendor": "example",
+          "name": "example",
+          "format": "avro"
+        },
+        "$schema": "string"
+      }
+    }`)
+	res := DataStructure{}
+	err := kjson.Unmarshal([]byte(jsonString), &res)
+	if err != nil {
+		t.Fatalf("Cant' parse json %s\n parsed ", err)
+	}
+	errs := ValidateLocalDs(map[string]DataStructure{"test": res})
+	if len(errs) != 1 {
+		t.Fatalf("Expected one error, got %v", errs)
+	}
+
+	expected := strings.Join([]string{
+		"validation failed for test",
+		"Invalid value v2 at dataStructure.apiVersion. Available values are: v1",
+		"Invalid value helloThere at dataStructure.meta.schemaType. Available values are: event, entity",
+		"required field dataStructure.meta.customData is missing",
+		"Invalid value avro at dataStructure.data.self.format. Available values are: jsonschema",
+		"required field dataStructure.data.self.version is missing",
+	}, "\n")
+	if errs[0].Error() != expected {
+		t.Fatalf("Unexpected error message, expected:\n%s\nactual:\n%s", expected, errs[0].Error())
+	}
+}

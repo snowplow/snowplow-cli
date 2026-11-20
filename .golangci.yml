@@ -11,7 +11,6 @@ linters:
     - wsl
     - wsl_v5
     - bodyclose
-    - cyclop
     - depguard
     - dupl
     - err113
@@ -33,6 +32,9 @@ linters:
     - tagliatelle
     - testpackage
     - wrapcheck
+  settings:
+    cyclop:
+      max-complexity: 17
   exclusions:
     presets:
       - std-error-handling

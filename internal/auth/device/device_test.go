@@ -14,11 +14,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/snowplow/snowplow-cli/internal/console"
+	"golang.org/x/oauth2"
 )
 
 func createTestJWTWithOrg(userEmail, userName, userSub, orgID string) string {
@@ -791,5 +795,184 @@ func Test_SelectIndex(t *testing.T) {
 		if (err != nil) != c.wantErr || (!c.wantErr && got != c.want) {
 			t.Errorf("input %q, default %d: got %d, %v", c.input, c.defaultIndex, got, err)
 		}
+	}
+}
+
+func captureStdout(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, colorOutput, noColor := os.Stdout, color.Output, color.NoColor
+	os.Stdout, color.Output, color.NoColor = w, w, true
+	defer func() {
+		os.Stdout, color.Output, color.NoColor = stdout, colorOutput, noColor
+		_ = w.Close()
+		_ = r.Close()
+	}()
+
+	var out []byte
+	var readErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		out, readErr = io.ReadAll(r)
+	}()
+
+	f()
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	return string(out)
+}
+
+func replaceStdin(t *testing.T, input string) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = stdin
+		_ = w.Close()
+		_ = r.Close()
+	})
+	if _, err := w.WriteString(input); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_pickOrganizationAndPrintIt_SingleOrganization(t *testing.T) {
+	organizations := []console.Organization{
+		{ID: "org-1", Name: "Organization 1"},
+	}
+
+	out := captureStdout(t, func() {
+		org, err := pickOrganizationAndPrintIt(organizations, "other-org", false)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if org != &organizations[0] {
+			t.Errorf("expected the only organization, got %v", org)
+		}
+	})
+
+	if !strings.Contains(out, "✓ Found organization: Organization 1\n") {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func Test_pickOrganizationAndPrintIt_HomeOrgOnly(t *testing.T) {
+	organizations := []console.Organization{
+		{ID: "org-1", Name: "Organization 1"},
+		{ID: "org-2", Name: "Organization 2"},
+		{ID: "org-3", Name: "Organization 3"},
+	}
+
+	out := captureStdout(t, func() {
+		org, err := pickOrganizationAndPrintIt(organizations, "org-2", true)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if org != &organizations[1] {
+			t.Errorf("expected the home organization, got %v", org)
+		}
+	})
+
+	if !strings.Contains(out, "✓ Using your organization: Organization 2\n") {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func Test_pickOrganizationAndPrintIt_AsksWithHomeOrgAsDefault(t *testing.T) {
+	organizations := []console.Organization{
+		{ID: "org-1", Name: "Organization 1"},
+		{ID: "org-2", Name: "Organization 2"},
+	}
+	replaceStdin(t, "\n")
+
+	out := captureStdout(t, func() {
+		org, err := pickOrganizationAndPrintIt(organizations, "org-2", false)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if org != &organizations[1] {
+			t.Errorf("expected the default organization on empty input, got %v", org)
+		}
+	})
+
+	if !strings.Contains(out, "Select organization [1-2] (default: 2): ") || !strings.Contains(out, "✓ Selected organization: Organization 2\n") {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func Test_pickOrganizationAndPrintIt_AsksWhenHomeOrgIsNotInTheList(t *testing.T) {
+	organizations := []console.Organization{
+		{ID: "org-1", Name: "Organization 1"},
+		{ID: "org-2", Name: "Organization 2"},
+	}
+	replaceStdin(t, "")
+
+	for _, homeOrgOnly := range []bool{true, false} {
+		out := captureStdout(t, func() {
+			org, err := pickOrganizationAndPrintIt(organizations, "other-org", homeOrgOnly)
+
+			if err == nil || !strings.Contains(err.Error(), "select organization") {
+				t.Errorf("expected the selection to fail on empty input, got: %v", err)
+			}
+			if org != nil {
+				t.Errorf("expected no organization, got %v", org)
+			}
+		})
+
+		if !strings.Contains(out, "Select organization [1-2]: ") {
+			t.Errorf("unexpected output: %q", out)
+		}
+	}
+}
+
+func Test_printSignInInstructions(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		deviceAuth    oauth2.DeviceAuthResponse
+		browserOpened bool
+		expected      string
+	}{
+		{
+			name:          "browser opened, code in the link",
+			deviceAuth:    oauth2.DeviceAuthResponse{UserCode: "ABCD-EFGH", VerificationURIComplete: "https://example.com/activate?user_code=ABCD-EFGH"},
+			browserOpened: true,
+			expected:      "If the browser didn't open, manually visit:\n  https://example.com/activate\n(Your verification code ABCD-EFGH should be pre-filled)\n",
+		},
+		{
+			name:          "browser not opened, code typed by hand",
+			deviceAuth:    oauth2.DeviceAuthResponse{UserCode: "ABCD-EFGH"},
+			browserOpened: false,
+			expected:      "\n! Please manually open this URL in your browser:\n  https://example.com/activate\nThen enter the code: ABCD-EFGH\n",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := captureStdout(t, func() {
+				printSignInInstructions(&tt.deviceAuth, "https://example.com/activate", tt.browserOpened)
+			})
+
+			if out != tt.expected {
+				t.Errorf("expected output %q, got %q", tt.expected, out)
+			}
+		})
 	}
 }

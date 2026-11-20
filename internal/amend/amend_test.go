@@ -752,3 +752,92 @@ func Test_AddEventSpecVersionsJsonRefusesUnsafeEdits(t *testing.T) {
 		}
 	}
 }
+
+func Test_AddYaml_ErrorsForUnexpectedShape(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		original string
+		expected string
+	}{
+		{name: "root is a list", original: "- data\n", expected: "root node is not a mapping"},
+		{name: "no data", original: "apiVersion: v1\n", expected: "'data' key not found"},
+		{name: "data is a string", original: "apiVersion: v1\ndata: test\n", expected: "data value is not a mapping"},
+		{name: "no event specifications", original: "apiVersion: v1\ndata:\n  name: test\n", expected: "'eventSpecifications' key not found"},
+		{name: "event specifications is a string", original: "apiVersion: v1\ndata:\n  name: test\n  eventSpecifications: test\n", expected: "data.eventSpecifications is not an array"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := AddEventSpecs([]model.EventSpecCanonical{{ResourceName: "a", Name: "test1"}}, []byte(tt.original), "test.yaml")
+			if err == nil || err.Error() != tt.expected {
+				t.Fatalf("expected error %q, got: %v", tt.expected, err)
+			}
+		})
+	}
+}
+
+func Test_AddEventSpecVersionsYamlErrors(t *testing.T) {
+	original := "data:\n  eventSpecifications:\n    - name: test1\n    - name: test2\n      version: 2\n    - resourceName: a\n    - test4\n"
+
+	for _, tt := range []struct {
+		idx      int
+		expected string
+	}{
+		{idx: 1, expected: "event specification 1 already declares a version"},
+		{idx: 2, expected: "name of event specification 2 not found"},
+		{idx: 3, expected: "event specification 3 is not a mapping"},
+		{idx: 4, expected: "event specification 4 not found"},
+		{idx: -1, expected: "event specification -1 not found"},
+	} {
+		_, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.yaml")
+		if err == nil || err.Error() != tt.expected {
+			t.Errorf("expected error %q, got: %v", tt.expected, err)
+		}
+	}
+}
+
+func Test_AddEventSpecVersionsJsonErrors(t *testing.T) {
+	original := `{"data": {"eventSpecifications": [{"name": "test1"}, {"name": "test2", "version": 2}]}}`
+
+	for _, tt := range []struct {
+		idx      int
+		expected string
+	}{
+		{idx: 1, expected: "event specification 1 already declares a version"},
+		{idx: 2, expected: "event specification 2 not found"},
+		{idx: -1, expected: "event specification -1 not found"},
+	} {
+		_, err := AddEventSpecVersions(map[int]int{tt.idx: 1}, []byte(original), "test.json")
+		if err == nil || err.Error() != tt.expected {
+			t.Errorf("expected error %q, got: %v", tt.expected, err)
+		}
+	}
+}
+
+func Test_AddEventSpecVersionsJsonChecksEverySpecBeforeEditing(t *testing.T) {
+	specs := []string{}
+	versionsByIndex := map[int]int{}
+	for i := range 20 {
+		specs = append(specs, fmt.Sprintf(`{"name": "test%d"}`, i))
+		versionsByIndex[i] = 1
+	}
+	specs = append(specs, `{"name": "test20", "version": 2}`)
+	versionsByIndex[20] = 1
+	original := `{"data": {"eventSpecifications": [` + strings.Join(specs, ", ") + `]}}`
+
+	_, err := AddEventSpecVersions(versionsByIndex, []byte(original), "test.json")
+	if err == nil || err.Error() != "event specification 20 already declares a version" {
+		t.Errorf("expected the spec with a version to be refused, got: %v", err)
+	}
+}
+
+func Test_AddEventSpecVersionsJsonKeepsWindowsLineEndings(t *testing.T) {
+	original := "{\r\n  \"data\": {\r\n    \"eventSpecifications\": [\r\n      {\r\n        \"name\": \"test1\"\r\n      }\r\n    ]\r\n  }\r\n}\r\n"
+	expected := "{\r\n  \"data\": {\r\n    \"eventSpecifications\": [\r\n      {\r\n        \"name\": \"test1\",\r\n        \"version\": 3\r\n      }\r\n    ]\r\n  }\r\n}\r\n"
+
+	res, err := AddEventSpecVersions(map[int]int{0: 3}, []byte(original), "test.json")
+	if err != nil {
+		t.Fatalf("Can't add event spec versions %s", err)
+	}
+	if string(res) != expected {
+		t.Fatalf("Result of adding the versions is not expected, expected:\n%q\nactual:\n%q", expected, string(res))
+	}
+}

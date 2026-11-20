@@ -1165,6 +1165,22 @@ func TestDownload_UnreadableFileKeepsOtherVersions(t *testing.T) {
 	}
 }
 
+func TestDownload_ReadableFileBeforeKeepsOtherVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "another.yaml"), []byte("apiVersion: v1\nresourceType: source-application\nresourceName: 9f1b9d3e-6f5e-4c56-9a0c-3d7f6f0a1b2c\ndata:\n  name: another\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "checkout.yaml"), []byte(fmt.Sprintf(baseDataProduct, 1, "1-0-0")), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	written := downloadInTest(t, tmpDir, "yaml", false)
+
+	if !strings.Contains(written, "version: 3") {
+		t.Errorf("a file read before should not drop the versions of the data product read after it, got:\n%s", written)
+	}
+}
+
 func TestDownload_SymbolicLinkDirectoryKeepsVersions(t *testing.T) {
 	tmpDir := t.TempDir()
 	target := filepath.Join(tmpDir, "data-products")
