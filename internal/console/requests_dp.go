@@ -21,8 +21,6 @@ import (
 	"strings"
 
 	kjson "k8s.io/apimachinery/pkg/util/json"
-
-	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type DataProductsAndRelatedResources struct {
@@ -137,7 +135,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +155,7 @@ func GetDataProductsAndRelatedResources(cnx context.Context, client *ApiClient) 
 		return nil, err
 	}
 	sarbody, err := io.ReadAll(saResp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, saResp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +229,7 @@ func CompatCheck(cnx context.Context, client *ApiClient, event CompatCheckable, 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -258,10 +256,10 @@ func CreateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -286,10 +284,10 @@ func UpdateSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -310,10 +308,10 @@ func DeleteSourceApp(cnx context.Context, client *ApiClient, sa RemoteSourceAppl
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -338,10 +336,10 @@ func CreateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -367,10 +365,10 @@ func UpdateDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -391,10 +389,10 @@ func DeleteDataProduct(cnx context.Context, client *ApiClient, dp RemoteDataProd
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -421,10 +419,10 @@ func CreateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec,
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusCreated {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -453,10 +451,10 @@ func UpdateEventSpec(cnx context.Context, client *ApiClient, es RemoteEventSpec,
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -477,10 +475,10 @@ func DeleteEventSpec(cnx context.Context, client *ApiClient, id string) error {
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusNoContent {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}
@@ -521,10 +519,10 @@ func BatchPublishEventSpecs(cnx context.Context, client *ApiClient, eventSpecIds
 	if err != nil {
 		return err
 	}
+	defer closeBody(cnx, resp.Body)
 
 	if resp.StatusCode != http.StatusAccepted {
 		rbody, err := io.ReadAll(resp.Body)
-		defer util.LoggingCloser(cnx, resp.Body)
 		if err != nil {
 			return err
 		}

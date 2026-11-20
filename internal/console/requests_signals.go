@@ -18,8 +18,6 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
 type SignalsEnvironment struct {
@@ -67,7 +65,7 @@ func GetSignalsEnvironments(ctx context.Context, accessToken, consoleHost, orgID
 	if err != nil {
 		return nil, err
 	}
-	defer util.LoggingCloser(ctx, resp.Body)
+	defer closeBody(ctx, resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

@@ -19,7 +19,6 @@ import (
 	"net/http"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
-	"github.com/snowplow/snowplow-cli/internal/util"
 	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -75,7 +74,7 @@ func fetchMigration(cnx context.Context, client *ApiClient, destination string, 
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +110,7 @@ func fetchDestinations(cnx context.Context, client *ApiClient) ([]destination, e
 		return nil, err
 	}
 	rbody, err := io.ReadAll(resp.Body)
-	defer util.LoggingCloser(cnx, resp.Body)
+	defer closeBody(cnx, resp.Body)
 	if err != nil {
 		return nil, err
 	}

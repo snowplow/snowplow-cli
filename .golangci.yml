@@ -10,7 +10,6 @@ linters:
     - varnamelen
     - wsl
     - wsl_v5
-    - bodyclose
     - depguard
     - dupl
     - err113
