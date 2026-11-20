@@ -12,7 +12,6 @@ package logging
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -56,7 +55,7 @@ func InitLogging(cmd *cobra.Command) error {
 	}
 
 	if silent {
-		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+		slog.SetDefault(slog.New(slog.DiscardHandler))
 		return nil
 	}
 

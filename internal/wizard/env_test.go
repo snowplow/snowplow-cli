@@ -85,22 +85,22 @@ func TestGitTracked(t *testing.T) {
 	dir := t.TempDir()
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
 	}
 	git("init", "-q")
 	_ = os.WriteFile(filepath.Join(dir, ".env"), []byte("A=1\n"), 0600)
-	if envTracked(dir) {
+	if envTracked(t.Context(), dir) {
 		t.Fatal("an untracked .env reported as tracked")
 	}
 	git("add", ".env")
 	git("commit", "-q", "-m", "oops")
-	if !envTracked(dir) {
+	if !envTracked(t.Context(), dir) {
 		t.Fatal("a committed .env wasn't detected")
 	}
-	if envTracked(t.TempDir()) {
+	if envTracked(t.Context(), t.TempDir()) {
 		t.Fatal("outside a repo nothing is tracked")
 	}
 }

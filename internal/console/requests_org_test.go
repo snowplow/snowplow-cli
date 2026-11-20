@@ -13,7 +13,6 @@ package console
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,7 +24,8 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
-func createTestJWTForOrg() string {
+func createTestJWTForOrg(t *testing.T) string {
+	t.Helper()
 	header := map[string]any{
 		"alg": "HS256",
 		"typ": "JWT",
@@ -43,10 +43,10 @@ func createTestJWTForOrg() string {
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
 
-	headerBytes, _ := json.Marshal(header)
+	headerBytes := marshalInTest(t, header)
 	encodedHeader := base64.RawURLEncoding.EncodeToString(headerBytes)
 
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 
 	signature := base64.RawURLEncoding.EncodeToString([]byte("fake-signature"))
@@ -55,7 +55,7 @@ func createTestJWTForOrg() string {
 }
 
 func Test_GetOrganizations_Success(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -112,7 +112,7 @@ func Test_GetOrganizations_Success(t *testing.T) {
 }
 
 func Test_GetOrganizations_EmptyResponse(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -143,7 +143,7 @@ func Test_GetOrganizations_EmptyResponse(t *testing.T) {
 }
 
 func Test_GetOrganizations_SingleOrganization(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -186,7 +186,7 @@ func Test_GetOrganizations_SingleOrganization(t *testing.T) {
 }
 
 func Test_GetOrganizations_ServerError(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -210,7 +210,7 @@ func Test_GetOrganizations_ServerError(t *testing.T) {
 }
 
 func Test_GetOrganizations_Unauthorized(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -234,7 +234,7 @@ func Test_GetOrganizations_Unauthorized(t *testing.T) {
 }
 
 func Test_GetOrganizations_Forbidden(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -258,7 +258,7 @@ func Test_GetOrganizations_Forbidden(t *testing.T) {
 }
 
 func Test_GetOrganizations_InvalidResponseJSON(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -282,7 +282,7 @@ func Test_GetOrganizations_InvalidResponseJSON(t *testing.T) {
 }
 
 func Test_GetOrganizations_MalformedJSONArray(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -306,7 +306,7 @@ func Test_GetOrganizations_MalformedJSONArray(t *testing.T) {
 }
 
 func Test_GetOrganizations_NetworkError(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	ctx := context.Background()
 	_, err := GetOrganizations(ctx, accessToken, "http://invalid-host-that-does-not-exist")
@@ -317,7 +317,7 @@ func Test_GetOrganizations_NetworkError(t *testing.T) {
 }
 
 func Test_GetOrganizations_ContextCancellation(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Simulate slow server
@@ -338,7 +338,7 @@ func Test_GetOrganizations_ContextCancellation(t *testing.T) {
 }
 
 func Test_GetOrganizations_PartialOrganizationData(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -389,7 +389,7 @@ func Test_GetOrganizations_PartialOrganizationData(t *testing.T) {
 }
 
 func Test_GetOrganizations_ExtraJSONFields(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {
@@ -433,7 +433,7 @@ func Test_GetOrganizations_ExtraJSONFields(t *testing.T) {
 }
 
 func Test_GetOrganizations_EmptyFieldValues(t *testing.T) {
-	accessToken := createTestJWTForOrg()
+	accessToken := createTestJWTForOrg(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations" && r.Method == http.MethodGet {

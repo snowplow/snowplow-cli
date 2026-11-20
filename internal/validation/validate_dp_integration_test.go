@@ -522,7 +522,7 @@ func TestValidateDataProductsWithClient_DownloadThenValidate(t *testing.T) {
 	for _, ext := range []string{"yaml", "json"} {
 		t.Run(ext, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 
 			files := util.Files{DataProductsLocation: tmpDir, SourceAppsLocation: "source-apps", ExtentionPreference: ext, ImagesLocation: "images"}
@@ -580,7 +580,7 @@ func TestValidateDataProductsWithClient_VersionFix(t *testing.T) {
 		t.Fatalf("Failed to write data product file: %v", err)
 	}
 
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 
 	err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true)
@@ -623,7 +623,7 @@ data:
 
 func gitInTest(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=test@example.com", "-c", "user.name=test", "-c", "commit.gpgsign=false"}, args...)...)
+	cmd := exec.CommandContext(t.Context(), "git", append([]string{"-c", "user.email=test@example.com", "-c", "user.name=test", "-c", "commit.gpgsign=false"}, args...)...)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v failed: %v\n%s", args, err, out)
@@ -661,7 +661,7 @@ func setupBaseRepo(t *testing.T) (string, string) {
 
 func TestValidateDataProductsAgainstBase_UnchangedUsesMergeBase(t *testing.T) {
 	tracking, _ := setupBaseRepo(t)
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 
 	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
 	if err != nil {
@@ -694,7 +694,7 @@ func TestValidateDataProductsAgainstBase_Fix(t *testing.T) {
 	if err := os.WriteFile(dpFile, []byte(fmt.Sprintf(baseDataProduct, 3, "1-0-1")), 0644); err != nil {
 		t.Fatal(err)
 	}
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 
 	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", true)
 	if err != nil {
@@ -716,7 +716,7 @@ func TestValidateDataProductsAgainstBase_Fix(t *testing.T) {
 
 func TestValidateDataProductsAgainstBase_InvalidRef(t *testing.T) {
 	tracking, _ := setupBaseRepo(t)
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 
 	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "origin/does-not-exist", false)
 	if err == nil || !strings.Contains(err.Error(), "merge-base") {
@@ -810,7 +810,7 @@ func TestSyncWorkflow_StoppedByVersionMismatchBeforeWriting(t *testing.T) {
 		t.Fatalf("Failed to write data product file: %v", err)
 	}
 
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 	transport := &MockDataProductRecordingTransport{MockDataProductRemoteTransport: MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts}}
 	mockClient := createMockDataProductClient(transport)
 
@@ -837,7 +837,7 @@ func TestSyncWorkflow_StoppedByVersionMismatchBeforeWriting(t *testing.T) {
 
 func downloadInTest(t *testing.T, dir string, ext string, withVersions bool) string {
 	t.Helper()
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 	files := util.Files{DataProductsLocation: dir, SourceAppsLocation: "source-apps", ExtentionPreference: ext, ImagesLocation: "images"}
 	if err := download.DownloadDataProductsAndRelatedResources(files, ctx, mockClient, false, withVersions); err != nil {
@@ -978,7 +978,7 @@ data:
 		t.Run(tt.name, func(t *testing.T) {
 			tracking, dpFile := setupBaseRepo(t)
 			tt.arrange(t, tracking, dpFile)
-			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 
 			err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
 
@@ -1260,7 +1260,7 @@ data:
 	if err := os.WriteFile(filepath.Join(tracking, "outside.yaml"), []byte(outsideNow), 0644); err != nil {
 		t.Fatal(err)
 	}
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 
 	err := ValidateDataProductsAgainstBase(ctx, []string{tracking}, tracking, false, "main", false)
 	if err != nil {
@@ -1295,7 +1295,7 @@ func TestValidateDataProductsWithClient_AddedSpecAtZeroPasses(t *testing.T) {
 		t.Fatalf("expected the added spec to declare version 0, got:\n%s", written)
 	}
 
-	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 	mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 
 	err = ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, false)
@@ -1510,7 +1510,7 @@ func TestValidateDataProductsWithClient_FixOnDownloadMatchesDownloadWithVersions
 			tmpDir := t.TempDir()
 			downloadInTest(t, tmpDir, ext, false)
 
-			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
 			mockClient := createMockDataProductClient(&MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts})
 			if err := ValidateDataProductsWithClient(ctx, mockClient, []string{tmpDir}, tmpDir, false, false, 1, true); err != nil {
 				t.Fatalf("Expected --fix to succeed, got: %v", err)

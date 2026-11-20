@@ -44,11 +44,11 @@ var (
 )
 
 func SetupSignals(ctx context.Context, opts SignalsOptions) error {
-	if envTracked(opts.ProjectDir) {
+	if envTracked(ctx, opts.ProjectDir) {
 		return errors.New(".env is committed to git, so the Signals key would be committed too. " +
 			"Stop tracking it with `git rm --cached .env`, commit that, then run this again")
 	}
-	if gitDirty(opts.ProjectDir) {
+	if gitDirty(ctx, opts.ProjectDir) {
 		_, _ = yellow.Println("! This project has uncommitted changes. Your agent will edit files, so consider committing first.")
 	}
 
@@ -75,7 +75,7 @@ func SetupSignals(ctx context.Context, opts SignalsOptions) error {
 	installPlugin(ctx, agents, opts.ProjectDir)
 
 	_, _ = green.Printf("\n✓ Snowplow Signals is ready for your agent in %s.\n", org.Name)
-	return startAgent(agents)
+	return startAgent(ctx, agents)
 }
 
 func pickSignalsEnvironment(ctx context.Context, opts SignalsOptions, s *device.Session) (console.SignalsEnvironment, error) {
@@ -240,7 +240,7 @@ func npx(ctx context.Context, what string, args ...string) {
 	_, _ = green.Printf("✓ Installed %s\n", what)
 }
 
-func startAgent(agents []agent) error {
+func startAgent(ctx context.Context, agents []agent) error {
 	var launchable []agent
 	var options []string
 	for _, a := range agents {
@@ -260,7 +260,7 @@ func startAgent(agents []agent) error {
 				args = claudeArgs(signalsStarterPrompt)
 			}
 			_, _ = cyan.Println("\nIf your browser opens to sign in to the Snowplow MCP, accept it to continue.")
-			return launch(a.Bin, args)
+			return launch(ctx, a.Bin, args)
 		}
 	}
 

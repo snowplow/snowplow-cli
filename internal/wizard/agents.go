@@ -11,6 +11,7 @@ OF THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.
 package wizard
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -65,8 +66,8 @@ func claudeArgs(prompt string) []string {
 // Stops Claude Code's file tools, but not shell commands, from reading the app's key in .env.
 const claudeSessionSettings = `{"permissions":{"deny":["Read(./.env)","Read(./.env.*)"]}}`
 
-func launch(bin string, args []string) error {
-	cmd := exec.Command(bin, args...)
+func launch(ctx context.Context, bin string, args []string) error {
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 
 	// Ctrl-C and closing the terminal reach us too: ignore them while the agent has the terminal.

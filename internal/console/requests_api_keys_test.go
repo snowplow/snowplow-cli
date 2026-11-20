@@ -25,7 +25,17 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/util"
 )
 
-func createTestJWT(userEmail, userName, userSub string) string {
+func marshalInTest(t *testing.T, v any) []byte {
+	t.Helper()
+	out, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func createTestJWT(t *testing.T, userEmail, userName, userSub string) string {
+	t.Helper()
 	header := map[string]any{
 		"alg": "HS256",
 		"typ": "JWT",
@@ -43,10 +53,10 @@ func createTestJWT(userEmail, userName, userSub string) string {
 		"exp": time.Now().Add(time.Hour).Unix(),
 	}
 
-	headerBytes, _ := json.Marshal(header)
+	headerBytes := marshalInTest(t, header)
 	encodedHeader := base64.RawURLEncoding.EncodeToString(headerBytes)
 
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 
 	signature := base64.RawURLEncoding.EncodeToString([]byte("fake-signature"))
@@ -55,7 +65,7 @@ func createTestJWT(userEmail, userName, userSub string) string {
 }
 
 func Test_CreateAPIKey_FullAccess(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
@@ -117,7 +127,7 @@ func Test_CreateAPIKey_FullAccess(t *testing.T) {
 }
 
 func Test_CreateAPIKey_ReadOnly(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
@@ -173,7 +183,7 @@ func Test_CreateAPIKey_ReadOnly(t *testing.T) {
 }
 
 func Test_CreateAPIKey_ServerError(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
@@ -194,7 +204,7 @@ func Test_CreateAPIKey_ServerError(t *testing.T) {
 }
 
 func Test_CreateAPIKey_Unauthorized(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
@@ -248,7 +258,7 @@ func Test_CreateAPIKey_MalformedJWT(t *testing.T) {
 }
 
 func Test_CreateAPIKey_InvalidResponseJSON(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
@@ -271,7 +281,7 @@ func Test_CreateAPIKey_InvalidResponseJSON(t *testing.T) {
 }
 
 func Test_CreateAPIKey_NetworkError(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	ctx := context.Background()
 	_, err := CreateAPIKey(ctx, accessToken, "http://invalid-host-that-does-not-exist", "test-org-id", false)
@@ -281,7 +291,7 @@ func Test_CreateAPIKey_NetworkError(t *testing.T) {
 }
 
 func Test_GetUserInfo_ValidJWT(t *testing.T) {
-	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
+	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	ctx := context.Background()
 	userInfo, err := GetUserInfo(ctx, accessToken)
@@ -302,7 +312,7 @@ func Test_GetUserInfo_ValidJWT(t *testing.T) {
 }
 
 func Test_GetUserInfo_MinimalJWT(t *testing.T) {
-	accessToken := createTestJWT("minimal@example.com", "", "minimal-sub")
+	accessToken := createTestJWT(t, "minimal@example.com", "", "minimal-sub")
 
 	ctx := context.Background()
 	userInfo, err := GetUserInfo(ctx, accessToken)
@@ -323,7 +333,7 @@ func Test_GetUserInfo_MinimalJWT(t *testing.T) {
 }
 
 func Test_GetUserInfo_EmptyValues(t *testing.T) {
-	accessToken := createTestJWT("", "", "")
+	accessToken := createTestJWT(t, "", "", "")
 
 	ctx := context.Background()
 	userInfo, err := GetUserInfo(ctx, accessToken)
@@ -396,7 +406,7 @@ func Test_GetUserInfo_InvalidJSON(t *testing.T) {
 
 func Test_GetUserInfo_MissingSnowplowRoles(t *testing.T) {
 	payload := map[string]any{"sub": "test-sub"}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -418,7 +428,7 @@ func Test_GetUserInfo_MissingUserInfo(t *testing.T) {
 			"admin": map[string]any{"level": "org"},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -438,7 +448,7 @@ func Test_GetUserInfo_RolesNotMap(t *testing.T) {
 		"sub":                                 "test-sub",
 		"https://snowplowanalytics.com/roles": "not-a-map",
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
@@ -460,7 +470,7 @@ func Test_GetUserInfo_UserInfoNotMap(t *testing.T) {
 			"user": "not-a-map",
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes := marshalInTest(t, payload)
 	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadBytes)
 	token := fmt.Sprintf("header.%s.signature", encodedPayload)
 
