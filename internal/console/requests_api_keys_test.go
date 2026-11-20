@@ -58,46 +58,46 @@ func Test_CreateAPIKey_FullAccess(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
-			if r.Header.Get("Authorization") != "Bearer "+accessToken {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
-			}
-			if r.Header.Get("Content-Type") != "application/json" {
-				t.Errorf("bad content type, got: %s", r.Header.Get("Content-Type"))
-			}
-			if r.Header.Get("X-Snowplow-Cli") != util.VersionInfo {
-				t.Errorf("bad version header, got: %s", r.Header.Get("X-Snowplow-Cli"))
-			}
-
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Errorf("failed to read request body: %v", err)
-			}
-
-			var reqBody map[string]any
-			if err := json.Unmarshal(body, &reqBody); err != nil {
-				t.Errorf("failed to parse request body: %v", err)
-			}
-
-			expectedDesc := "test@example.com CLI key"
-			if reqBody["description"] != expectedDesc {
-				t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
-			}
-
-			permissions, ok := reqBody["permissions"].([]any)
-			if !ok {
-				t.Errorf("permissions should be an array")
-			}
-			if len(permissions) != 1 {
-				t.Errorf("expected 1 permission, got %d", len(permissions))
-			}
-
-			resp := `{"id": "test-key-id", "key": "test-key-secret"}`
-			w.WriteHeader(http.StatusCreated)
-			_, _ = io.WriteString(w, resp)
+		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
+			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
 			return
 		}
-		t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+		if r.Header.Get("Authorization") != "Bearer "+accessToken {
+			t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("bad content type, got: %s", r.Header.Get("Content-Type"))
+		}
+		if r.Header.Get("X-Snowplow-Cli") != util.VersionInfo {
+			t.Errorf("bad version header, got: %s", r.Header.Get("X-Snowplow-Cli"))
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
+		}
+
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Errorf("failed to parse request body: %v", err)
+		}
+
+		expectedDesc := "test@example.com CLI key"
+		if reqBody["description"] != expectedDesc {
+			t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
+		}
+
+		permissions, ok := reqBody["permissions"].([]any)
+		if !ok {
+			t.Errorf("permissions should be an array")
+		}
+		if len(permissions) != 1 {
+			t.Errorf("expected 1 permission, got %d", len(permissions))
+		}
+
+		resp := `{"id": "test-key-id", "key": "test-key-secret"}`
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, resp)
 	}))
 	defer server.Close()
 
@@ -120,40 +120,40 @@ func Test_CreateAPIKey_ReadOnly(t *testing.T) {
 	accessToken := createTestJWT("test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
-			if r.Header.Get("Authorization") != "Bearer "+accessToken {
-				t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
-			}
-
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Errorf("failed to read request body: %v", err)
-			}
-
-			var reqBody map[string]any
-			if err := json.Unmarshal(body, &reqBody); err != nil {
-				t.Errorf("failed to parse request body: %v", err)
-			}
-
-			expectedDesc := "test@example.com CLI key (read-only)"
-			if reqBody["description"] != expectedDesc {
-				t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
-			}
-
-			permissions, ok := reqBody["permissions"].([]any)
-			if !ok {
-				t.Errorf("permissions should be an array")
-			}
-			if len(permissions) != 1 {
-				t.Errorf("expected 1 permission, got %d", len(permissions))
-			}
-
-			resp := `{"id": "readonly-key-id", "key": "readonly-key-secret"}`
-			w.WriteHeader(http.StatusCreated)
-			_, _ = io.WriteString(w, resp)
+		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
+			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
 			return
 		}
-		t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
+		if r.Header.Get("Authorization") != "Bearer "+accessToken {
+			t.Errorf("bad auth token, got: %s", r.Header.Get("Authorization"))
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
+		}
+
+		var reqBody map[string]any
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Errorf("failed to parse request body: %v", err)
+		}
+
+		expectedDesc := "test@example.com CLI key (read-only)"
+		if reqBody["description"] != expectedDesc {
+			t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
+		}
+
+		permissions, ok := reqBody["permissions"].([]any)
+		if !ok {
+			t.Errorf("permissions should be an array")
+		}
+		if len(permissions) != 1 {
+			t.Errorf("expected 1 permission, got %d", len(permissions))
+		}
+
+		resp := `{"id": "readonly-key-id", "key": "readonly-key-secret"}`
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, resp)
 	}))
 	defer server.Close()
 

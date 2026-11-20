@@ -426,7 +426,9 @@ func TestCreateSourceAppsPathHandling(t *testing.T) {
 			t.Fatalf("CreateSourceApps with absolute path should return resource with name '%s', got '%s'", testSa.ResourceName, returnedResource.ResourceName)
 		}
 	})
+}
 
+func TestCreateSourceAppsPathHandlingImageFolder(t *testing.T) {
 	t.Run("ImageFolderHandling", func(t *testing.T) {
 		tempDir := t.TempDir()
 

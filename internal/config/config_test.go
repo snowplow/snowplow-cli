@@ -254,7 +254,7 @@ func Test_ConfigEnvFileDiscovery(t *testing.T) {
 	}
 }
 
-func Test_SaveConfig(t *testing.T) {
+func Test_SaveConfigMergesExistingFile(t *testing.T) {
 	t.Run("SaveConfig with existing file - merge values", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configDir := filepath.Join(tempDir, ".config", "snowplow")
@@ -339,7 +339,9 @@ func Test_SaveConfig(t *testing.T) {
 			t.Errorf("other-key got '%v' want 'other-value'", otherSection["other-key"])
 		}
 	})
+}
 
+func Test_SaveConfigCreatesNewFile(t *testing.T) {
 	t.Run("SaveConfig with non-existent file - create new", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configDir := filepath.Join(tempDir, ".config", "snowplow")
@@ -389,7 +391,9 @@ func Test_SaveConfig(t *testing.T) {
 			t.Errorf("host got '%v' want 'https://new.example.com'", consoleConfig["host"])
 		}
 	})
+}
 
+func Test_SaveConfigDefaultHost(t *testing.T) {
 	t.Run("SaveConfig with default host - no host saved", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configDir := filepath.Join(tempDir, ".config", "snowplow")
@@ -436,7 +440,9 @@ func Test_SaveConfig(t *testing.T) {
 			t.Errorf("org-id got '%v' want 'org-id'", consoleConfig["org-id"])
 		}
 	})
+}
 
+func Test_SaveConfigCorruptedFile(t *testing.T) {
 	t.Run("SaveConfig with corrupted existing file - create new", func(t *testing.T) {
 		tempDir := t.TempDir()
 		configDir := filepath.Join(tempDir, ".config", "snowplow")
@@ -494,7 +500,7 @@ func Test_SaveConfig(t *testing.T) {
 	})
 }
 
-func Test_SaveDotenvFile(t *testing.T) {
+func Test_SaveDotenvFileMergesExistingFile(t *testing.T) {
 	t.Run("SaveDotenvFile with existing file - merge values", func(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
@@ -552,7 +558,9 @@ OTHER_VAR=other_value`
 			t.Errorf("OTHER_VAR got '%v' want 'other_value'", dotenvContent["OTHER_VAR"])
 		}
 	})
+}
 
+func Test_SaveDotenvFileCreatesNewFile(t *testing.T) {
 	t.Run("SaveDotenvFile with non-existent file - create new", func(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
@@ -599,7 +607,9 @@ OTHER_VAR=other_value`
 			t.Errorf("SNOWPLOW_CONSOLE_HOST got '%v' want 'https://new.example.com'", dotenvContent["SNOWPLOW_CONSOLE_HOST"])
 		}
 	})
+}
 
+func Test_SaveDotenvFileDefaultHost(t *testing.T) {
 	t.Run("SaveDotenvFile with default host - no host saved", func(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")
@@ -643,7 +653,9 @@ OTHER_VAR=other_value`
 			t.Errorf("SNOWPLOW_CONSOLE_ORG_ID got '%v' want 'org-id'", dotenvContent["SNOWPLOW_CONSOLE_ORG_ID"])
 		}
 	})
+}
 
+func Test_SaveDotenvFileEmptyValues(t *testing.T) {
 	t.Run("SaveDotenvFile with empty values", func(t *testing.T) {
 		tempDir := t.TempDir()
 		dotenvPath := filepath.Join(tempDir, ".env")

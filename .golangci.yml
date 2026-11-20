@@ -36,17 +36,9 @@ linters:
     - usetesting
     - wrapcheck
   settings:
-    gocognit:
-      min-complexity: 84
-    gocyclo:
-      min-complexity: 42
-    maintidx:
-      under: 16
     misspell:
       ignore-rules:
         - avaliable
-    nestif:
-      min-complexity: 9
   exclusions:
     presets:
       - std-error-handling
