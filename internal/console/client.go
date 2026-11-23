@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/snowplow/snowplow-cli/internal/auth"
@@ -150,7 +151,11 @@ func DoConsoleRequest(method string, path string, client *ApiClient, cnx context
 }
 
 func addStandardHeaders(req *http.Request, cnx context.Context, client *ApiClient) {
-	addStandardHeadersWithJwt(req, cnx, client.Jwt)
+	// Server-supplied URLs must never receive our bearer token; only the configured Console host may.
+	base, err := url.Parse(client.BaseUrl)
+	if err == nil && req.URL.Host == base.Host {
+		addStandardHeadersWithJwt(req, cnx, client.Jwt)
+	}
 }
 
 func addStandardHeadersWithJwt(req *http.Request, cnx context.Context, jwt string) {
