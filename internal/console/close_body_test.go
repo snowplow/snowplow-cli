@@ -191,7 +191,7 @@ func imageAndAPIKeyRequestCalls(t *testing.T) []requestCall {
 			return err
 		}},
 		{"postAPIKey", "", func(ctx context.Context, c *ApiClient) error {
-			_, err := postAPIKey(ctx, c, c.BaseUrl+"/credentials/v3/api-keys", "description", nil)
+			_, err := postAPIKey(ctx, c, "description", nil)
 			return err
 		}},
 	}

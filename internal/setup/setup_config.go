@@ -49,7 +49,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	if readOnly {
 		green.Printf("✓ API key created with read-only permissions for %s\n", session.Org.Name)
 	} else {
-		green.Printf("✓ API key created with admin permissions for %s\n", session.Org.Name)
+		green.Printf("✓ API key created with permissions to manage tracking plans and data structures for %s\n", session.Org.Name)
 	}
 
 	return nil

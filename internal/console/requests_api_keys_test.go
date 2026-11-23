@@ -68,7 +68,7 @@ func Test_CreateAPIKey_FullAccess(t *testing.T) {
 	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
+		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v3/api-keys" || r.Method != http.MethodPost {
 			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
 			return
 		}
@@ -97,12 +97,21 @@ func Test_CreateAPIKey_FullAccess(t *testing.T) {
 			t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
 		}
 
-		permissions, ok := reqBody["permissions"].([]any)
-		if !ok {
-			t.Errorf("permissions should be an array")
+		var permissions struct {
+			Permissions []struct {
+				Capabilities []Capability `json:"capabilities"`
+			} `json:"permissions"`
 		}
-		if len(permissions) != 1 {
-			t.Errorf("expected 1 permission, got %d", len(permissions))
+		if err := json.Unmarshal(body, &permissions); err != nil {
+			t.Errorf("failed to parse permissions: %v", err)
+		}
+		if len(permissions.Permissions) != 1 {
+			t.Errorf("expected 1 permission, got %d", len(permissions.Permissions))
+			return
+		}
+		expectedCaps := "DATA-PRODUCTS (LIST, VIEW, CREATE, EDIT), DATA-STRUCTURES (LIST, VIEW, CREATE, EDIT, PUBLISH), ENVIRONMENTS (LIST)"
+		if got := describeCapabilities(permissions.Permissions[0].Capabilities); got != expectedCaps {
+			t.Errorf("expected capabilities %s, got %s", expectedCaps, got)
 		}
 
 		resp := `{"id": "test-key-id", "key": "test-key-secret"}`
@@ -130,7 +139,7 @@ func Test_CreateAPIKey_ReadOnly(t *testing.T) {
 	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" || r.Method != http.MethodPost {
+		if r.URL.Path != "/api/msc/v1/organizations/test-org-id/credentials/v3/api-keys" || r.Method != http.MethodPost {
 			t.Errorf("Unexpected request, got: %s %s", r.Method, r.URL.Path)
 			return
 		}
@@ -153,12 +162,21 @@ func Test_CreateAPIKey_ReadOnly(t *testing.T) {
 			t.Errorf("expected description %s, got %s", expectedDesc, reqBody["description"])
 		}
 
-		permissions, ok := reqBody["permissions"].([]any)
-		if !ok {
-			t.Errorf("permissions should be an array")
+		var permissions struct {
+			Permissions []struct {
+				Capabilities []Capability `json:"capabilities"`
+			} `json:"permissions"`
 		}
-		if len(permissions) != 1 {
-			t.Errorf("expected 1 permission, got %d", len(permissions))
+		if err := json.Unmarshal(body, &permissions); err != nil {
+			t.Errorf("failed to parse permissions: %v", err)
+		}
+		if len(permissions.Permissions) != 1 {
+			t.Errorf("expected 1 permission, got %d", len(permissions.Permissions))
+			return
+		}
+		expectedCaps := "DATA-PRODUCTS (LIST, VIEW), DATA-STRUCTURES (LIST, VIEW), ENVIRONMENTS (LIST)"
+		if got := describeCapabilities(permissions.Permissions[0].Capabilities); got != expectedCaps {
+			t.Errorf("expected capabilities %s, got %s", expectedCaps, got)
 		}
 
 		resp := `{"id": "readonly-key-id", "key": "readonly-key-secret"}`
@@ -186,7 +204,7 @@ func Test_CreateAPIKey_ServerError(t *testing.T) {
 	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v3/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = io.WriteString(w, `{"error": "Internal server error"}`)
 			return
@@ -207,7 +225,7 @@ func Test_CreateAPIKey_Unauthorized(t *testing.T) {
 	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v3/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"error": "Unauthorized"}`)
 			return
@@ -261,7 +279,7 @@ func Test_CreateAPIKey_InvalidResponseJSON(t *testing.T) {
 	accessToken := createTestJWT(t, "test@example.com", "Test User", "test-sub-123")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v2/api-keys" && r.Method == http.MethodPost {
+		if r.URL.Path == "/api/msc/v1/organizations/test-org-id/credentials/v3/api-keys" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `invalid json response`)
 			return
@@ -526,11 +544,20 @@ func Test_CreateScopedAPIKey(t *testing.T) {
 func Test_CreateScopedAPIKey_Forbidden(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"message":"not allowed"}`))
+		_, _ = w.Write([]byte(`{"message":"raw-body"}`))
 	}))
 	defer server.Close()
 
-	if _, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsAppCapabilities); err == nil {
+	_, err := CreateScopedAPIKey(context.Background(), "token", server.URL, "org", "app key", SignalsAppCapabilities)
+	if err == nil {
 		t.Fatal("expected an error")
+	}
+	for _, expected := range []string{"SIGNALS (LIST, VIEW, EDIT)", "snowplow-cli login", apiKeyDocsURL} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("expected error to contain %q, got: %v", expected, err)
+		}
+	}
+	if strings.Contains(err.Error(), "raw-body") {
+		t.Errorf("expected no raw response body in error, got: %v", err)
 	}
 }
