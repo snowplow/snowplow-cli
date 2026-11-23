@@ -1,0 +1,194 @@
+# Asks first-time outside contributors to sign the Snowplow CLA.
+#
+# Run on public repositories by the "cla-nudge" enterprise ruleset.
+# Rulesets ignore event filters and make this a required check, so the job:
+#   - runs on opened, synchronize and reopened, and only comments once per PR
+#     (it looks for its own hidden marker comment, so maintainers can change labels freely)
+#   - never fails, so it never blocks a merge
+#
+# Never prompts Snowplow staff. It skips bots, returning contributors, repo collaborators
+# and members of any Snowplow org. Membership is checked with the snowplow-cla-nudge
+# GitHub App (Organization Members: read), which sees private memberships. If a lookup
+# fails, it still asks and logs a warning, so an outside contributor is never missed and
+# a broken check shows up (staff being asked, plus the daily health check).
+# Private repositories are covered by staff agreements and are skipped.
+# Uses pull_request_target so it can comment on fork PRs. It never checks out PR code.
+
+# Issue #179: the cla:requested label was only ever added. cla-signed removes it
+# once the PR author posts a CLA signature confirmation comment.
+
+name: CLA nudge
+
+on:
+  pull_request_target:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  cla-nudge:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      !github.event.repository.private &&
+      !endsWith(github.event.pull_request.user.login, '[bot]') &&
+      contains(fromJSON('["FIRST_TIME_CONTRIBUTOR","FIRST_TIMER","NONE"]'),
+               github.event.pull_request.author_association)
+    concurrency:
+      group: cla-nudge-${{ github.repository }}-${{ github.event.pull_request.number }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # snowplow-cla-nudge GitHub App (App ID 5525224). A Client ID is a public identifier,
+      # not a secret, so it lives here. The private key stays in CLA_NUDGE_APP_PRIVATE_KEY.
+      CLA_NUDGE_CLIENT_ID: Iv23liqwvpsz8kBTqnfD
+    steps:
+      # One installation token per Snowplow org: a token only sees its own org's members.
+      # continue-on-error so a missing install or secret never fails the required check.
+      - id: token-snowplow
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ env.CLA_NUDGE_CLIENT_ID }}
+          private-key: ${{ secrets.CLA_NUDGE_APP_PRIVATE_KEY }}
+          owner: snowplow
+          permission-members: read
+
+      - id: token-snowplow-incubator
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ env.CLA_NUDGE_CLIENT_ID }}
+          private-key: ${{ secrets.CLA_NUDGE_APP_PRIVATE_KEY }}
+          owner: snowplow-incubator
+          permission-members: read
+
+      - id: token-snowplow-product
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ env.CLA_NUDGE_CLIENT_ID }}
+          private-key: ${{ secrets.CLA_NUDGE_APP_PRIVATE_KEY }}
+          owner: snowplow-product
+          permission-members: read
+
+      - id: token-snowplow-devops
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ env.CLA_NUDGE_CLIENT_ID }}
+          private-key: ${{ secrets.CLA_NUDGE_APP_PRIVATE_KEY }}
+          owner: snowplow-devops
+          permission-members: read
+
+      - id: token-snowplow-referer-parser
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ env.CLA_NUDGE_CLIENT_ID }}
+          private-key: ${{ secrets.CLA_NUDGE_APP_PRIVATE_KEY }}
+          owner: snowplow-referer-parser
+          permission-members: read
+
+      - name: Ask for the CLA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          TOKEN_SNOWPLOW: ${{ steps.token-snowplow.outputs.token }}
+          TOKEN_SNOWPLOW_INCUBATOR: ${{ steps.token-snowplow-incubator.outputs.token }}
+          TOKEN_SNOWPLOW_PRODUCT: ${{ steps.token-snowplow-product.outputs.token }}
+          TOKEN_SNOWPLOW_DEVOPS: ${{ steps.token-snowplow-devops.outputs.token }}
+          TOKEN_SNOWPLOW_REFERER_PARSER: ${{ steps.token-snowplow-referer-parser.outputs.token }}
+        run: |
+          set +e
+          MARKER='<!-- cla-nudge -->'
+
+          if gh api --paginate "repos/$REPO/issues/$PR/comments" --jq '.[].body' | grep -qF "$MARKER"; then
+            echo "Already asked on this PR"
+            exit 0
+          fi
+
+          # Repo collaborators, including this org's members through base read access
+          if gh api "repos/$REPO/collaborators/$AUTHOR" --silent 2>/dev/null; then
+            echo "$AUTHOR is a collaborator on $REPO, skipping"
+            exit 0
+          fi
+
+          # Members of any Snowplow org, public or private. 204 = member, 404 = not a member.
+          # Anything else (missing token, API error) is a broken check. Fail open: warn and
+          # still ask, so an outside contributor is never missed and the breakage gets noticed.
+          check_org() {
+            local org=$1 token=$2 code
+            if [ -z "$token" ]; then
+              echo "::warning title=CLA nudge membership check failed::No membership token for $org, asking anyway"
+              return
+            fi
+            code=$(GH_TOKEN="$token" gh api -i "orgs/$org/members/$AUTHOR" 2>/dev/null | head -1 | awk '{print $2}')
+            case "$code" in
+              204) echo "$AUTHOR is a member of $org, skipping"; exit 0 ;;
+              404) ;;
+              *)   echo "::warning title=CLA nudge membership check failed::Membership lookup for $org returned '${code:-none}', asking anyway" ;;
+            esac
+          }
+          check_org snowplow "$TOKEN_SNOWPLOW"
+          check_org snowplow-incubator "$TOKEN_SNOWPLOW_INCUBATOR"
+          check_org snowplow-product "$TOKEN_SNOWPLOW_PRODUCT"
+          check_org snowplow-devops "$TOKEN_SNOWPLOW_DEVOPS"
+          check_org snowplow-referer-parser "$TOKEN_SNOWPLOW_REFERER_PARSER"
+
+          LOGO="https://raw.githubusercontent.com/snowplow/.github/main/assets"
+          cat > "$RUNNER_TEMP/cla-comment.md" <<EOF
+          $MARKER
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="$LOGO/snowplow-logo-white.png">
+            <img alt="Snowplow" src="$LOGO/snowplow-logo-navy.png" width="180">
+          </picture>
+
+          ### Thanks for your contribution, @$AUTHOR! 👋
+
+          Before we can review this pull request, we need you to sign the Snowplow Contributor License Agreement (CLA). It only takes a minute, and you only need to do it once.
+
+          - **Contributing for yourself?** Sign the [Individual CLA](https://docs.google.com/forms/d/1J1FNYq9538ndzzcBdlCbxPo1yFiOY4mwalhDTSl1pgg/viewform)
+          - **Contributing for your employer?** Sign the [Corporate CLA](https://docs.google.com/forms/d/1ZUzz7lQJhs7oZqbkBL1bp0r048hAi7uIN6aLWCyZWWs/viewform)
+
+          Once you've signed, reply here (e.g. *"I've signed the CLA"*) and a maintainer will pick up your review.
+
+          <sub>This is an automated message. Find out more about the CLA [here](https://docs.snowplow.io/docs/contributing/contributor-license-agreement/). If you've already signed, you can ignore this.</sub>
+          EOF
+
+          gh label create 'cla:requested' -R "$REPO" --color FBCA04 \
+            --description 'Asked the contributor to sign the CLA' 2>/dev/null
+          gh pr edit "$PR" -R "$REPO" --add-label 'cla:requested'
+          gh pr comment "$PR" -R "$REPO" --body-file "$RUNNER_TEMP/cla-comment.md"
+
+          exit 0
+
+  cla-signed:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Remove cla:requested after signature confirmation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          author=$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')
+          [ "$author" = "$COMMENTER" ] || exit 0
+          gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx 'cla:requested' || exit 0
+          printf '%s\n' "$BODY" | grep -Eiq 'signed (the )?CLA' || exit 0
+          gh pr edit "$PR" -R "$REPO" --remove-label 'cla:requested'
