@@ -1,0 +1,37 @@
+# Issue #179: the CLA nudge ruleset adds cla:requested but never removes it
+# after the contributor signs. This only cleans up the label; the nudge itself
+# still comes from snowplow/.github. Separate name avoids a duplicate check.
+
+name: CLA label cleanup
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  remove-cla-label:
+    if: >-
+      !github.event.repository.private &&
+      github.event.issue.pull_request &&
+      !endsWith(github.event.comment.user.login, '[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remove cla:requested after signature confirmation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          author=$(gh api "repos/$REPO/pulls/$PR" --jq '.user.login')
+          [ "$author" = "$COMMENTER" ] || exit 0
+          gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx 'cla:requested' || exit 0
+          printf '%s\n' "$BODY" | grep -Eiq 'signed (the )?CLA' || exit 0
+          gh pr edit "$PR" -R "$REPO" --remove-label 'cla:requested'
