@@ -124,9 +124,9 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		return err
 	}
 
-	setErr := setFlagsFromConfigFile(cmd, config)
+	setErr := setFlagsFromEnv(cmd)
 	if setErr == nil {
-		setErr = setFlagsFromEnv(cmd)
+		setErr = setFlagsFromConfigFile(cmd, config)
 	}
 	if skipMissingCheck {
 		return setErr
@@ -211,7 +211,8 @@ func setFlagsFromEnv(cmd *cobra.Command) error {
 	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		envName := toEnvName(f.Name)
-		if value, ok := os.LookupEnv(envName); err == nil && ok && value != "" {
+		// Explicit flags win: an untrusted .env file must not redirect credentials or host.
+		if value, ok := os.LookupEnv(envName); err == nil && ok && value != "" && !f.Changed {
 			err = cmd.Flags().Set(f.Name, value)
 			slog.Debug("config value found in env", "flag", f.Name, "env", envName)
 		}
