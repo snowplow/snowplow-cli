@@ -205,3 +205,7 @@ Flag mapping:
 | `--schema` / `-s` | `--schema` / `-d` | new shorthand  |
 | `--ipaddress` / `-ip` | `--ip-address` / `-i` | renamed (kebab-case); old name still works but is deprecated |
 | `--contexts` / `-ctx` | `--entities` / `-e` | renamed to current Snowplow terminology |
+
+### Contributing
+
+Please find the contribution guide [here](CONTRIBUTING.md).
