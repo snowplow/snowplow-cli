@@ -39,6 +39,8 @@ golangci-lint run        # config in .golangci.yml
 
 Run all four after every code change and fix what they report before you call the change done. CI runs the tests (`.github/workflows/ci.yaml`) and the linter (`.github/workflows/golangci-lint.yml`) on every PR, and a PR that fails either won't be merged.
 
+**Mutation testing:** After writing or changing ANY test, load the [mutation-testing](.claude/skills/mutation-testing/SKILL.md) skill before you call the test work done. It runs Gremlins on the lines the branch changed and tells you when a run can be skipped. It is not part of CI, so running it is on the PR author.
+
 The release pipeline is GitHub Actions and publishes to GitHub Releases, Homebrew (`snowplow/taps`), and npm (`@snowplow/snowplow-cli` via `npm/`). Release steps and known issues are in `RELEASING.md`.
 
 # Updating the documentation

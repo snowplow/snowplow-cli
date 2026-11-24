@@ -1,0 +1,14 @@
+unleash:
+  timeout-coefficient: 10
+  output-statuses: "lct"
+mutants:
+  invert-assignments:
+    enabled: true
+  invert-bwassign:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: true
+  remove-self-assignments:
+    enabled: true
