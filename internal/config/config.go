@@ -193,7 +193,6 @@ func readConfigFile(cmd *cobra.Command) (rawAppConfig, error) {
 	return config, err
 }
 
-// applyConfig resolves precedence in one pass: explicit flag > env > config file.
 func applyConfig(cmd *cobra.Command, config rawAppConfig) error {
 	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
