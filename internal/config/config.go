@@ -381,7 +381,7 @@ func SaveDotenvFile(orgID, apiKeyID, apiKeySecret, consoleHost string) error {
 
 	err := godotenv.Write(dotenvContent, dotenvPath)
 	if err == nil {
-		err = os.Chmod(dotenvPath, 0o600) // godotenv.Write creates 0644; secret must be 0600.
+		err = os.Chmod(dotenvPath, 0o600)
 	}
 	if err == nil {
 		green.Printf("✓ Configuration saved to %s\n", dotenvPath)
