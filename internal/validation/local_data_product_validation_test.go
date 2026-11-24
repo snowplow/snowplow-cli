@@ -68,10 +68,53 @@ func Test_ValidateDPEventSpecCompatMissingEvent(t *testing.T) {
 	result := ValidateDPEventSpecCompat(nil, 1, dp).WarningsWithPaths
 
 	expectPath := "/data/eventSpecifications/0"
-	expectValue := []string{"will not run compatibility check without an event defined"}
+	expectValue := []string{"will not run compatibility checks on entities without an event defined"}
 
-	if resultValue, ok := result[expectPath]; !ok || slices.Equal(expectValue, resultValue) {
-		t.Fatal("unexpected")
+	if resultValue, ok := result[expectPath]; !ok || !slices.Equal(expectValue, resultValue) {
+		t.Fatalf("unexpected warnings %#v", result)
+	}
+}
+
+func Test_ValidateDPEventSpecCompatNothingToCheckNoWarning(t *testing.T) {
+	dp := newValidDPForCompatTesting()
+	dp.Data.EventSpecifications[0].Event = model.SchemaRef{}
+	dp.Data.EventSpecifications[0].Entities = model.EntitiesDef{}
+
+	result := ValidateDPEventSpecCompat(nil, 1, dp)
+
+	if len(result.WarningsWithPaths) != 0 || len(result.ErrorsWithPaths) != 0 {
+		t.Fatalf("unexpected validations %#v", result)
+	}
+}
+
+func Test_ValidateDPEventSpecCompatChecksSpecsAfterOneWithoutEvent(t *testing.T) {
+	dp := newDPForCompatPathTesting()
+	dp.Data.EventSpecifications[0].Event = model.SchemaRef{}
+	cc := &recordingCompatChecker{}
+
+	ValidateDPEventSpecCompat(cc.check, 2, dp)
+
+	wantEvents := map[string]map[string]any{
+		"iglu:vendor/event_b/format/1-0-0": {"is": "event_b"},
+	}
+	if cc.calls != 1 || !reflect.DeepEqual(cc.events, wantEvents) {
+		t.Errorf("calls got: %d events got: %#v want: %#v", cc.calls, cc.events, wantEvents)
+	}
+}
+
+func Test_ValidateDPEventSpecCompatEnrichedEntityWithoutSchemaNotSent(t *testing.T) {
+	dp := newDPForCompatPathTesting()
+	dp.Data.EventSpecifications[1].Entities.Enriched[0].Schema = map[string]any{}
+	cc := &recordingCompatChecker{}
+
+	ValidateDPEventSpecCompat(cc.check, 2, dp)
+
+	sent := cc.entities["iglu:vendor/event_b/format/1-0-0"]
+	if _, ok := sent["iglu:vendor/enriched_b0/format/1-0-0"]; ok {
+		t.Errorf("an enriched entity without a schema was sent: %#v", sent)
+	}
+	if _, ok := sent["iglu:vendor/enriched_b1/format/1-0-0"]; !ok {
+		t.Errorf("an enriched entity with a schema was not sent: %#v", sent)
 	}
 }
 

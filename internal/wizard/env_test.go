@@ -104,3 +104,34 @@ func TestGitTracked(t *testing.T) {
 		t.Fatal("outside a repo nothing is tracked")
 	}
 }
+
+func TestGitDirty(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	if gitDirty(t.Context(), t.TempDir()) {
+		t.Fatal("outside a repo nothing is dirty")
+	}
+
+	dir := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	if gitDirty(t.Context(), dir) {
+		t.Fatal("an empty repo reported as dirty")
+	}
+	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0600)
+	if !gitDirty(t.Context(), dir) {
+		t.Fatal("an untracked file wasn't detected")
+	}
+	git("add", "a.txt")
+	git("commit", "-q", "-m", "add")
+	if gitDirty(t.Context(), dir) {
+		t.Fatal("a clean repo reported as dirty")
+	}
+}

@@ -184,3 +184,29 @@ func Test_IsDeployed_ConsoleAlternativesWithoutRequestedVersion(t *testing.T) {
 		t.Fatal("bad alternatives", alts)
 	}
 }
+
+func Test_IsDeployed_ConsolePartialMatchIsNotDeployed(t *testing.T) {
+	uri := "iglu:vendor/name/format/1-0-0"
+	deployed := []Deployment{{"1-0-0", DEV, ""}}
+
+	for _, ds := range []ListResponse{
+		{Hash: "hash", Vendor: "vendor", Name: "other", Format: "other", Deployments: deployed},
+		{Hash: "hash", Vendor: "other", Name: "name", Format: "other", Deployments: deployed},
+		{Hash: "hash", Vendor: "other", Name: "other", Format: "format", Deployments: deployed},
+		{Hash: "hash", Vendor: "vendor", Name: "name", Format: "other", Deployments: deployed},
+		{Hash: "hash", Vendor: "other", Name: "name", Format: "format", Deployments: deployed},
+	} {
+		mock := &SchemaDeployCheckProvider{
+			[]string{},
+			[]ListResponse{ds},
+			func(h string) ([]Deployment, error) {
+				return deployed, nil
+			},
+		}
+
+		found, alternatives, err := mock.IsDSDeployed(uri)
+		if found || len(alternatives) != 0 || err != nil {
+			t.Errorf("%s/%s/%s: got found %t alternatives %v err %v, want not found", ds.Vendor, ds.Name, ds.Format, found, alternatives, err)
+		}
+	}
+}

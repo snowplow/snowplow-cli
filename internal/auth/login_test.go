@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 const host = "https://console.snowplowanalytics.com"
@@ -1127,5 +1129,25 @@ func Test_Version_NewerIsReplacedByLoginAndRemovedByLogout(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("logout must remove a file with a newer version")
+	}
+}
+
+func Test_rejected(t *testing.T) {
+	if rejected(&oauth2.RetrieveError{}) {
+		t.Error("an error without a response should not count as rejected")
+	}
+
+	for status, want := range map[int]bool{
+		399: false,
+		400: true,
+		401: true,
+		429: false,
+		499: true,
+		500: false,
+		503: false,
+	} {
+		if got := rejected(&oauth2.RetrieveError{Response: &http.Response{StatusCode: status}}); got != want {
+			t.Errorf("rejected for status %d = %t, want %t", status, got, want)
+		}
 	}
 }

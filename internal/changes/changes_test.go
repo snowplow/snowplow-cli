@@ -446,3 +446,70 @@ func Test_PrintChangeset_ParseDataError(t *testing.T) {
 		})
 	}
 }
+
+func Test_GetChangesFindsDeploymentAfterOtherEnv(t *testing.T) {
+	local := namedDS("string", "1-0-0", "entity")
+	remote := ListResponse{
+		Hash:   "different",
+		Vendor: "com.acme",
+		Name:   "string",
+		Meta:   DataStructureMeta{SchemaType: "entity"},
+		Format: "jsonschema",
+		Deployments: []Deployment{
+			{Version: "1-0-0", Env: "PROD", ContentHash: "prod"},
+			{Version: "1-0-0", Env: "DEV", ContentHash: "different"},
+		},
+	}
+
+	res, err := GetChanges(map[string]DataStructure{"file": local}, []ListResponse{remote}, "DEV")
+	if err != nil {
+		t.Fatalf("Can't calcuate changes %s", err)
+	}
+
+	if len(res.ToCreate) != 0 || len(res.ToUpdateMeta) != 0 || len(res.ToUpdatePatch) != 1 || len(res.ToUpdateNewVersion) != 0 {
+		t.Fatalf("Unexpected result, expecting one data structre to update patch, got %+v", res)
+	}
+}
+
+func Test_PerformChangesDev_UpdatesEveryMeta(t *testing.T) {
+	var calls []string
+	client := recordingConsole(t, &calls)
+	changes := Changes{
+		ToUpdateMeta: []DSChangeContext{
+			NewDSChangeContext(namedDS("first", "1-0-0", "event"), "first.yml"),
+			NewDSChangeContext(namedDS("second", "1-0-0", "entity"), "second.yml"),
+		},
+	}
+
+	if err := PerformChangesDev(context.Background(), client, changes, "cli"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []string{"update meta event", "update meta entity"}
+	if !slices.Equal(calls, want) {
+		t.Errorf("calls = %q, want %q", calls, want)
+	}
+}
+
+func Test_PerformChangesDev_StopsAtFailedMetaUpdate(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL}
+	changes := Changes{
+		ToUpdateMeta: []DSChangeContext{
+			NewDSChangeContext(namedDS("first", "1-0-0", "event"), "first.yml"),
+			NewDSChangeContext(namedDS("second", "1-0-0", "entity"), "second.yml"),
+		},
+	}
+
+	if err := PerformChangesDev(context.Background(), client, changes, "cli"); err == nil {
+		t.Fatal("expected an error for a failed metadata update")
+	}
+	if requests != 1 {
+		t.Errorf("requests = %d, want 1", requests)
+	}
+}

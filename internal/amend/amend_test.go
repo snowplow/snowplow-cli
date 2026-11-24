@@ -841,3 +841,67 @@ func Test_AddEventSpecVersionsJsonKeepsWindowsLineEndings(t *testing.T) {
 		t.Fatalf("Result of adding the versions is not expected, expected:\n%q\nactual:\n%q", expected, string(res))
 	}
 }
+
+func Test_SetEventSpecVersionsIndexOutOfRange(t *testing.T) {
+	files := map[string]string{
+		"test.yaml": `apiVersion: v1
+resourceType: data-product
+data:
+  eventSpecifications:
+    - resourceName: 15c70141-c223-4172-ab39-86a0194e44e8
+      name: test1
+      version: 1
+`,
+		"test.json": `{"data": {"eventSpecifications": [{"name": "test1", "version": 1}]}}`,
+	}
+
+	for fileName, file := range files {
+		for _, idx := range []int{-1, 1, 2} {
+			res, err := SetEventSpecVersions(map[int]int{idx: 5}, []byte(file), fileName)
+			if err == nil || err.Error() != fmt.Sprintf("version of event specification %d not found", idx) {
+				t.Errorf("%s index %d: unexpected error: %v", fileName, idx, err)
+			}
+			if res != nil {
+				t.Errorf("%s index %d: expected no output on error, got: %s", fileName, idx, res)
+			}
+		}
+	}
+}
+
+func Test_SetEventSpecVersionsJsonFirstSpec(t *testing.T) {
+	original := `{"data": {"eventSpecifications": [{"name": "test1", "version": 1}, {"name": "test2", "version": 2}]}}`
+	expected := `{"data": {"eventSpecifications": [{"name": "test1", "version": 5}, {"name": "test2", "version": 2}]}}`
+
+	res, err := SetEventSpecVersions(map[int]int{0: 5}, []byte(original), "test.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(res) != expected {
+		t.Fatalf("not expected output, expected: %s, actual: %s", expected, res)
+	}
+}
+
+func Test_SetEventSpecVersionsYamlVersionAsFirstKey(t *testing.T) {
+	original := `apiVersion: v1
+resourceType: data-product
+data:
+  eventSpecifications:
+    - version: 1
+      name: test1
+`
+	expected := `apiVersion: v1
+resourceType: data-product
+data:
+  eventSpecifications:
+    - version: 5
+      name: test1
+`
+
+	res, err := SetEventSpecVersions(map[int]int{0: 5}, []byte(original), "test.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(res) != expected {
+		t.Fatalf("not expected output, expected: %s, actual: %s", expected, res)
+	}
+}

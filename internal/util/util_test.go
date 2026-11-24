@@ -85,6 +85,83 @@ func Test_MaybeResourcesfromPaths(t *testing.T) {
 			t.Fatal("missing path", p)
 		}
 	}
+
+	if got := dps[saPath]["resourceType"]; got != "source-application" {
+		t.Fatalf("unexpected resourceType of %s: %v", saPath, got)
+	}
+	if got := dps[dp1Path]["resourceType"]; got != "data-product" {
+		t.Fatalf("unexpected resourceType of %s: %v", dp1Path, got)
+	}
+}
+
+func Test_MaybeResourcesfromPathsUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "broken.yaml"), []byte("a: [unclosed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "broken.json"), []byte("{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, path := range []string{filepath.Join(dir, "broken.yaml"), filepath.Join(dir, "broken.json"), filepath.Join(dir, "missing")} {
+		res, err := MaybeResourcesfromPaths([]string{path})
+		if err == nil {
+			t.Errorf("%s: expected an error, got %v", path, res)
+		}
+		if res != nil {
+			t.Errorf("%s: expected no resources on error, got %v", path, res)
+		}
+	}
+}
+
+func Test_DataStructuresFromPathsExtensions(t *testing.T) {
+	dir := t.TempDir()
+	ds := "apiVersion: v1\nresourceType: data-structure\nmeta:\n  schemaType: event\n"
+	dsJson := `{"apiVersion": "v1", "resourceType": "data-structure", "meta": {"schemaType": "event"}}`
+	for name, content := range map[string]string{"a.yaml": ds, "b.yml": ds, "c.json": dsJson, "d.txt": ds, "e": ds} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := DataStructuresFromPaths([]string{dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys := []string{}
+	for k, v := range got {
+		keys = append(keys, filepath.Base(k))
+		if v.Meta.SchemaType != "event" {
+			t.Errorf("%s: unexpected unmarshalling: %+v", k, v)
+		}
+	}
+	slices.Sort(keys)
+	if !slices.Equal(keys, []string{"a.yaml", "b.yml", "c.json"}) {
+		t.Fatalf("unexpected files read: %v", keys)
+	}
+}
+
+func Test_StringSlicesEqual(t *testing.T) {
+	tests := []struct {
+		one, other []string
+		want       bool
+	}{
+		{nil, nil, true},
+		{nil, []string{}, true},
+		{[]string{}, nil, true},
+		{[]string{"a"}, []string{"a"}, true},
+		{[]string{"a"}, nil, false},
+		{nil, []string{"a"}, false},
+		{[]string{"a"}, []string{"b"}, false},
+		{[]string{"a", "b"}, []string{"b", "a"}, false},
+	}
+
+	for _, tt := range tests {
+		if got := StringSlicesEqual(tt.one, tt.other); got != tt.want {
+			t.Errorf("StringSlicesEqual(%#v, %#v) = %t, want %t", tt.one, tt.other, got, tt.want)
+		}
+	}
 }
 
 func Test_ResourceNameToFileName(t *testing.T) {
@@ -97,6 +174,7 @@ func Test_ResourceNameToFileName(t *testing.T) {
 		"/щ💡test":                  "-test",
 		"lpt1":                     "unnamed",
 		longName:                   expectedLongNameTruncated,
+		strings.Repeat("b", 200):   strings.Repeat("b", 200),
 	}
 
 	for input, expected := range tests {

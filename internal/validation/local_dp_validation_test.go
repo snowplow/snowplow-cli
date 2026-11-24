@@ -12,6 +12,8 @@ package validation
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -586,5 +588,116 @@ func Test_DPLookup_AddVersionMismatches(t *testing.T) {
 				t.Errorf("expected 1 error, got %d", lookup.ValidationErrorCount())
 			}
 		})
+	}
+}
+
+func Test_DPLookup_IgnoresOtherApiVersions(t *testing.T) {
+	input := map[string]map[string]any{
+		"somedir/file1.yml": {
+			"apiVersion":   "v2",
+			"resourceType": "data-product",
+		},
+		"somedir/file2.yml": {
+			"resourceType": "data-product",
+		},
+	}
+
+	for i := range 20 {
+		input[fmt.Sprintf("somedir/v1-%d.yml", i)] = map[string]any{"apiVersion": "v1"}
+	}
+
+	lookup, err := NewDPLookup(nil, nil, input, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(lookup.Validations) != 20 || len(lookup.DataProducts) != 0 {
+		t.Fatalf("expected only the 20 v1 files to be looked at, got %#v", lookup)
+	}
+	for f := range lookup.Validations {
+		if !strings.HasPrefix(f, "somedir/v1-") {
+			t.Errorf("expected %s to be ignored", f)
+		}
+	}
+}
+
+func Test_DPLookup_GhAnnotateValidations(t *testing.T) {
+	tests := []struct {
+		name        string
+		validations DPValidations
+		want        string
+	}{
+		{name: "nothing", validations: DPValidations{}, want: ""},
+		{name: "info", validations: DPValidations{Info: []string{"i1", "i2"}}, want: "::info file=dp.yml::i1%0Ai2\n"},
+		{name: "warnings", validations: DPValidations{Warnings: []string{"w1", "w2"}}, want: "::warn file=dp.yml::w1%0Aw2\n"},
+		{name: "errors", validations: DPValidations{Errors: []string{"e1", "e2"}}, want: "::error file=dp.yml::e1%0Ae2\n"},
+		{name: "warnings with paths", validations: DPValidations{WarningsWithPaths: map[string][]string{"/a": {"w1", "w2"}}}, want: "::warn file=dp.yml::/a%0Aw1%0Aw2\n"},
+		{name: "errors with paths", validations: DPValidations{ErrorsWithPaths: map[string][]string{"/a": {"e1", "e2"}}}, want: "::error file=dp.yml::/a%0Ae1%0Ae2\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lookup := &DPLookup{Validations: map[string]DPValidations{"/base/dp.yml": tt.validations}}
+
+			stdout := os.Stdout
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			os.Stdout = w
+			annotateErr := lookup.GhAnnotateValidations("/base")
+			os.Stdout = stdout
+			_ = w.Close()
+			got, err := io.ReadAll(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if annotateErr != nil {
+				t.Fatalf("unexpected error: %v", annotateErr)
+			}
+			if string(got) != tt.want {
+				t.Errorf("got: %q want: %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_DPValidations_concat(t *testing.T) {
+	v := DPValidations{
+		Errors:            []string{"e1"},
+		Warnings:          []string{"w1"},
+		Info:              []string{"i1"},
+		Debug:             []string{"d1"},
+		ErrorsWithPaths:   map[string][]string{"/a": {"ea1"}},
+		WarningsWithPaths: map[string][]string{"/a": {"wa1"}},
+	}
+
+	v.concat(DPValidations{
+		Errors:            []string{"e2"},
+		Warnings:          []string{"w2"},
+		Info:              []string{"i2"},
+		Debug:             []string{"d2"},
+		ErrorsWithPaths:   map[string][]string{"/a": {"ea2"}, "/b": {"eb1"}},
+		WarningsWithPaths: map[string][]string{"/a": {"wa2"}, "/b": {"wb1"}},
+	})
+
+	want := DPValidations{
+		Errors:            []string{"e1", "e2"},
+		Warnings:          []string{"w1", "w2"},
+		Info:              []string{"i1", "i2"},
+		Debug:             []string{"d1", "d2"},
+		ErrorsWithPaths:   map[string][]string{"/a": {"ea1", "ea2"}, "/b": {"eb1"}},
+		WarningsWithPaths: map[string][]string{"/a": {"wa1", "wa2"}, "/b": {"wb1"}},
+	}
+	if !reflect.DeepEqual(v, want) {
+		t.Errorf("got: %#v want: %#v", v, want)
+	}
+
+	empty := DPValidations{}
+	empty.concat(DPValidations{WarningsWithPaths: map[string][]string{"/a": {"wa1"}}, ErrorsWithPaths: map[string][]string{"/a": {"ea1"}}})
+	wantFromEmpty := DPValidations{ErrorsWithPaths: map[string][]string{"/a": {"ea1"}}, WarningsWithPaths: map[string][]string{"/a": {"wa1"}}}
+	if !reflect.DeepEqual(empty, wantFromEmpty) {
+		t.Errorf("got: %#v want: %#v", empty, wantFromEmpty)
 	}
 }

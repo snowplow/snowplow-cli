@@ -12,6 +12,7 @@ package wizard
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -200,5 +201,39 @@ func TestInstallPlugin(t *testing.T) {
 		"-y\nskills@1\nadd\nsnowplow/skills\n-g\n-y\n-a\ncodex\n--\n"
 	if string(args) != want {
 		t.Fatalf("expected the plugin for Claude Code (an update) and Cursor, and only skills for Codex, got:\n%s", args)
+	}
+}
+
+func signalsEnvironmentInTest(t *testing.T, body string) console.SignalsEnvironment {
+	t.Helper()
+	var e console.SignalsEnvironment
+	if err := json.Unmarshal([]byte(body), &e); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func Test_isReady(t *testing.T) {
+	for body, want := range map[string]bool{
+		`{"status":"ready","config":{"personalizationApiHost":"prod.signals.example"}}`:    true,
+		`{"status":"creating","config":{"personalizationApiHost":"prod.signals.example"}}`: false,
+		`{"status":"ready","config":{"personalizationApiHost":""}}`:                        false,
+		`{"status":"ready"}`:    false,
+		`{"status":"creating"}`: false,
+	} {
+		if got := isReady(signalsEnvironmentInTest(t, body)); got != want {
+			t.Errorf("isReady(%s) = %t, want %t", body, got, want)
+		}
+	}
+}
+
+func Test_envLabel(t *testing.T) {
+	for body, want := range map[string]string{
+		`{"pipeline":{"id":"p1","name":"Prod"},"config":{"personalizationApiHost":"prod.signals.example"}}`: "Prod (https://prod.signals.example)",
+		`{"pipeline":{"id":"p1"},"config":{"personalizationApiHost":"prod.signals.example"}}`:               "p1 (https://prod.signals.example)",
+	} {
+		if got := envLabel(signalsEnvironmentInTest(t, body)); got != want {
+			t.Errorf("envLabel(%s) = %q, want %q", body, got, want)
+		}
 	}
 }
