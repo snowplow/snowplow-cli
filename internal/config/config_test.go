@@ -850,6 +850,107 @@ func Test_ConfigInvalidYamlFile(t *testing.T) {
 	}
 }
 
+func Test_ApplyConfigPrecedence(t *testing.T) {
+	envNames := []string{"API_KEY_ID", "API_KEY", "HOST", "ORG_ID", "DRY_RUN"}
+	fileConfig := rawAppConfig{Console: map[string]string{
+		"api-key-id": "file-id",
+		"api-key":    "file-key",
+		"host":       "file-host",
+		"org-id":     "file-org",
+		"dry-run":    "true",
+	}}
+
+	newCmd := func() *cobra.Command {
+		cmd := &cobra.Command{}
+		cmd.Flags().String("api-key-id", "", "")
+		cmd.Flags().String("api-key", "", "")
+		cmd.Flags().String("host", "default-host", "")
+		cmd.Flags().String("org-id", "", "")
+		cmd.Flags().Bool("dry-run", false, "")
+		return cmd
+	}
+
+	tests := []struct {
+		name    string
+		env     map[string]string
+		flags   map[string]string
+		config  rawAppConfig
+		want    map[string]string
+		wantErr string
+	}{
+		{
+			name:   "explicit flag beats env and file",
+			env:    map[string]string{"API_KEY_ID": "env-id", "HOST": "env-host"},
+			flags:  map[string]string{"api-key-id": "cli-id"},
+			config: fileConfig,
+			want:   map[string]string{"api-key-id": "cli-id", "host": "env-host", "api-key": "file-key"},
+		},
+		{
+			name:   "explicit empty flag wins even when set by env and file",
+			env:    map[string]string{"API_KEY_ID": "env-id"},
+			flags:  map[string]string{"api-key-id": ""},
+			config: fileConfig,
+			want:   map[string]string{"api-key-id": ""},
+		},
+		{
+			name:   "env beats file",
+			env:    map[string]string{"HOST": "env-host"},
+			config: fileConfig,
+			want:   map[string]string{"host": "env-host", "org-id": "file-org"},
+		},
+		{
+			name:   "file used when no env or flag",
+			config: fileConfig,
+			want:   map[string]string{"api-key-id": "file-id", "host": "file-host"},
+		},
+		{
+			name: "default kept when no source provides a value",
+			want: map[string]string{"host": "default-host", "api-key-id": ""},
+		},
+		{
+			name:   "empty env does not block file fallback",
+			env:    map[string]string{"API_KEY_ID": ""},
+			config: fileConfig,
+			want:   map[string]string{"api-key-id": "file-id"},
+		},
+		{
+			name:    "parse error stops applying later flags",
+			env:     map[string]string{"DRY_RUN": "notabool"},
+			config:  fileConfig,
+			want:    map[string]string{"api-key-id": "file-id", "host": "default-host"},
+			wantErr: "notabool",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range envNames {
+				t.Setenv(envNamePrefix+name, tt.env[name])
+			}
+			cmd := newCmd()
+			for name, value := range tt.flags {
+				if err := cmd.Flags().Set(name, value); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := applyConfig(cmd, tt.config)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("applyConfig error got %v want to contain %q", err, tt.wantErr)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			for name, want := range tt.want {
+				got, _ := cmd.Flags().GetString(name)
+				if got != want {
+					t.Errorf("%s got %q want %q", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func Test_ConfigFlagBeatsConfigFile(t *testing.T) {
 	defer func(old []string) { os.Args = old }(os.Args)
 	useLogin(t, nil)

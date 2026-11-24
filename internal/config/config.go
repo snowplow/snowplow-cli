@@ -124,10 +124,7 @@ func initConsoleConfigWithOptions(cmd *cobra.Command, skipMissingCheck bool, bas
 		return err
 	}
 
-	setErr := setFlagsFromConfigFile(cmd, config)
-	if setErr == nil {
-		setErr = setFlagsFromEnv(cmd)
-	}
+	setErr := applyConfig(cmd, config)
 	if skipMissingCheck {
 		return setErr
 	}
@@ -196,24 +193,21 @@ func readConfigFile(cmd *cobra.Command) (rawAppConfig, error) {
 	return config, err
 }
 
-func setFlagsFromConfigFile(cmd *cobra.Command, config rawAppConfig) error {
+func applyConfig(cmd *cobra.Command, config rawAppConfig) error {
 	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if value, ok := config.Console[f.Name]; ok && !f.Changed && err == nil {
-			err = cmd.Flags().Set(f.Name, value)
-			slog.Debug("config value found in file", "flag", f.Name)
+		if err != nil || f.Changed {
+			return
 		}
-	})
-	return err
-}
-
-func setFlagsFromEnv(cmd *cobra.Command) error {
-	var err error
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		envName := toEnvName(f.Name)
-		if value, ok := os.LookupEnv(envName); err == nil && ok && value != "" {
+		if value, ok := os.LookupEnv(envName); ok && value != "" {
 			err = cmd.Flags().Set(f.Name, value)
 			slog.Debug("config value found in env", "flag", f.Name, "env", envName)
+			return
+		}
+		if value, ok := config.Console[f.Name]; ok {
+			err = cmd.Flags().Set(f.Name, value)
+			slog.Debug("config value found in file", "flag", f.Name)
 		}
 	})
 	return err
