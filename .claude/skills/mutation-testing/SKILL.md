@@ -82,9 +82,10 @@ For each `LIVED` or `NOT COVERED` mutant in code you wrote or changed:
 
 Don't chase 100%. Equivalent mutants can't be killed.
 
-A `NOT COVERED` mutant inside a `case` expression of a `switch` can be a false report:
-Go coverage doesn't count `case` expressions, so Gremlins never runs these mutants. Check
-that a test reaches the `case` body and move on.
+Gremlins never runs a mutant inside a `case` expression of a `switch`: Go coverage
+doesn't count `case` expressions, so it shows as `NOT COVERED`. Reaching the `case`
+body isn't enough. Check that tests assert the expected behaviour for both outcomes
+of the condition. If unsure, apply the mutation by hand and confirm a test fails.
 
 ## Example
 
