@@ -207,7 +207,6 @@ func (f Files) CreateImageFolder() (string, error) {
 }
 
 func (f Files) WriteImage(name string, dir string, image *model.Image) (string, error) {
-	// The extension comes from the server's Content-Type; never let it choose what kind of file lands in the repo.
 	switch strings.ToLower(image.Ext) {
 	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
 	default:
