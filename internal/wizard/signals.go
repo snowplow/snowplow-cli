@@ -193,6 +193,10 @@ func ensureAppKey(ctx context.Context, opts SignalsOptions, s *device.Session, a
 	project := filepath.Base(opts.ProjectDir)
 	key, err := console.CreateScopedAPIKey(ctx, s.AccessToken, opts.ConsoleHost, s.Org.ID,
 		fmt.Sprintf("%s Signals app key (%s)", s.Email, project), console.SignalsAppCapabilities)
+	if errors.Is(err, console.ErrAPIKeyForbidden) {
+		return fmt.Errorf("failed to create the Signals app key: %w. Ask an organization admin for them, or ask someone who has them to create an API key (%s). Then set %s=%s, %s and %s in %s and run 'snowplow-cli signals setup' again",
+			err, console.APIKeyDocsURL, envSignalsOrgID, s.Org.ID, envSignalsAPIKeyID, envSignalsAPIKey, envPath)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create the Signals app key: %w", err)
 	}

@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -552,10 +553,11 @@ func Test_CreateScopedAPIKey_Forbidden(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, expected := range []string{"SIGNALS (LIST, VIEW, EDIT)", "snowplow-cli login", apiKeyDocsURL} {
-		if !strings.Contains(err.Error(), expected) {
-			t.Errorf("expected error to contain %q, got: %v", expected, err)
-		}
+	if !errors.Is(err, ErrAPIKeyForbidden) {
+		t.Errorf("expected ErrAPIKeyForbidden, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "SIGNALS (LIST, VIEW, EDIT)") {
+		t.Errorf("expected error to list the permissions, got: %v", err)
 	}
 	if strings.Contains(err.Error(), "raw-body") {
 		t.Errorf("expected no raw response body in error, got: %v", err)

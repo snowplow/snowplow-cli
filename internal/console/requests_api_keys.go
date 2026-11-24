@@ -24,7 +24,9 @@ import (
 	"strings"
 )
 
-const apiKeyDocsURL = "https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/"
+const APIKeyDocsURL = "https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/"
+
+var ErrAPIKeyForbidden = errors.New("you are not allowed to create API keys, or you don't have all the permissions the key needs")
 
 type APIKeyResponse struct {
 	ID     string `json:"id"`
@@ -126,8 +128,7 @@ func postAPIKey(ctx context.Context, client *ApiClient, description string, capa
 	slog.Debug("API response", "status", resp.StatusCode)
 
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, fmt.Errorf("you are not allowed to create API keys, or you don't have all the permissions the key needs: %s. Ask an organization admin for them, create an API key with the permissions you have (%s), or run 'snowplow-cli login' to work without an API key",
-			describeCapabilities(capabilities), apiKeyDocsURL)
+		return nil, fmt.Errorf("%w: %s", ErrAPIKeyForbidden, describeCapabilities(capabilities))
 	}
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("API key creation failed: %d %s", resp.StatusCode, string(body))
