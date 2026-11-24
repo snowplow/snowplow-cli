@@ -157,7 +157,6 @@ func ResourceNameToFileName(s string) string {
 	maxLength := 200
 	reservedWindowsNamesRegex := regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
 	allPrintableAsciiNegates := regexp.MustCompile("[^ -~]")
-	// Backslash is a path separator on Windows; leaving it lets remote names escape the output directory.
 	invalidPathCharacters := regexp.MustCompile(`[ /\\]`)
 	t := invalidPathCharacters.ReplaceAllLiteralString(reservedWindowsNamesRegex.ReplaceAllLiteralString(allPrintableAsciiNegates.ReplaceAllLiteralString(s, ""), ""), "-")
 	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
