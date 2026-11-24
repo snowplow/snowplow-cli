@@ -12,7 +12,7 @@
 # Conventions
 **CLI framework:** Cobra + Viper for config. New top-level command families live under their own subpackage in `cmd/`. Each family exposes one exported `*cobra.Command` and is registered in `cmd/root.go`. Leaf commands sit in sibling files in the same package.
 
-**License header:** Every Go source file starts with the Snowplow Limited Use License Agreement v1.0 header. Match the exact wording used in existing files when creating new ones.
+**License header:** Every Go source file starts with the Snowplow Limited Use License Agreement v1.0 header. The `goheader` linter fails on a file without it; the template is in `.golangci.yml`. Copy the header from an existing file. Don't rely on `golangci-lint run --fix` for it: it corrupts some headers.
 
 **Config precedence (highest → lowest):** CLI flags → env vars (`SNOWPLOW_CONSOLE_*`) → `.env` file → YAML at `~/.config/snowplow/snowplow.yml` (or platform equivalent). Console credentials (`org-id`, `api-key-id`, `api-key`) are required for any command that hits Console, unless a login saved by `snowplow-cli login` stands in for the API key — initialize them in a command's `PersistentPreRunE` via `config.InitConsoleConfig(cmd)` and register flags with `config.InitConsoleFlags(cmd)` (see `cmd/dp/data_products.go`).
 
@@ -34,8 +34,10 @@
 go build ./...
 go test ./...
 go vet ./...
-golangci-lint run        # config in .golangci.yml (see CI workflow)
+golangci-lint run        # config in .golangci.yml
 ```
+
+Run all four after every code change and fix what they report before you call the change done. CI runs the tests (`.github/workflows/ci.yaml`) and the linter (`.github/workflows/golangci-lint.yml`) on every PR, and a PR that fails either won't be merged.
 
 The release pipeline is GitHub Actions and publishes to GitHub Releases, Homebrew (`snowplow/taps`), and npm (`@snowplow/snowplow-cli` via `npm/`). Release steps and known issues are in `RELEASING.md`.
 
