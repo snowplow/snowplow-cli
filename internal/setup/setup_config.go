@@ -12,6 +12,7 @@ package setup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -36,6 +37,9 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	green := color.New(color.FgGreen)
 
 	apiKey, err := console.CreateAPIKey(ctx, session.AccessToken, consoleHost, session.Org.ID, readOnly)
+	if errors.Is(err, console.ErrAPIKeyForbidden) {
+		return fmt.Errorf("failed to create API key: %w. Ask an organization admin for them, create an API key with the permissions you have (%s), or run 'snowplow-cli login' to work without an API key", err, console.APIKeyDocsURL)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create API key: %w", err)
 	}
@@ -49,7 +53,7 @@ func SetupConfig(clientID, auth0Domain, consoleHost string, readOnly, isDotenv b
 	if readOnly {
 		green.Printf("✓ API key created with read-only permissions for %s\n", session.Org.Name)
 	} else {
-		green.Printf("✓ API key created with admin permissions for %s\n", session.Org.Name)
+		green.Printf("✓ API key created with permissions to manage tracking plans and data structures for %s\n", session.Org.Name)
 	}
 
 	return nil

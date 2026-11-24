@@ -64,6 +64,29 @@ func Test_ensureAppKey_ReplacesKeySignalsRejects(t *testing.T) {
 	}
 }
 
+func Test_ensureAppKey_ForbiddenKeyCreation(t *testing.T) {
+	consoleSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer consoleSrv.Close()
+	envPath := filepath.Join(t.TempDir(), ".env")
+
+	s := &device.Session{AccessToken: "token", Email: "dev@example.com", Org: console.Organization{ID: "org"}}
+	opts := SignalsOptions{ConsoleHost: consoleSrv.URL, ProjectDir: filepath.Dir(envPath)}
+	err := ensureAppKey(context.Background(), opts, s, "https://signals.example.com", envPath)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	for _, expected := range []string{"SIGNALS (LIST, VIEW, EDIT)", "SNOWPLOW_SIGNALS_ORG_ID=org", "SNOWPLOW_SIGNALS_API_KEY_ID", envPath, "snowplow-cli signals setup"} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("expected error to contain %q, got: %v", expected, err)
+		}
+	}
+	if strings.Contains(err.Error(), "snowplow-cli login") {
+		t.Errorf("login can't replace a Signals app key, got: %v", err)
+	}
+}
+
 func Test_ensureAppKey_KeepsKeyWhenSignalsFails(t *testing.T) {
 	consoleURL, signalsURL := fakeConsoleAndSignals(t, http.StatusServiceUnavailable, ``)
 	envPath := writeEnv(t, signalsURL, "secret")

@@ -20,8 +20,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 )
+
+const APIKeyDocsURL = "https://docs.snowplow.io/docs/using-the-snowplow-console/managing-console-api-authentication/"
+
+var ErrAPIKeyForbidden = errors.New("you are not allowed to create API keys, or you don't have all the permissions the key needs")
 
 type APIKeyResponse struct {
 	ID     string `json:"id"`
@@ -40,6 +45,42 @@ type UserInfo struct {
 	Name  string `json:"name"`
 }
 
+var cliCapabilities = slices.Concat(
+	actionsOn("DATA-PRODUCTS", "LIST", "VIEW", "CREATE", "EDIT"),
+	actionsOn("DATA-STRUCTURES", "LIST", "VIEW", "CREATE", "EDIT", "PUBLISH"),
+	actionsOn("ENVIRONMENTS", "LIST"),
+)
+
+var cliReadOnlyCapabilities = slices.Concat(
+	actionsOn("DATA-PRODUCTS", "LIST", "VIEW"),
+	actionsOn("DATA-STRUCTURES", "LIST", "VIEW"),
+	actionsOn("ENVIRONMENTS", "LIST"),
+)
+
+func actionsOn(resourceType string, actions ...string) []Capability {
+	result := make([]Capability, len(actions))
+	for i, action := range actions {
+		result[i] = Capability{ResourceType: resourceType, Action: action, Filters: []any{}}
+	}
+	return result
+}
+
+func describeCapabilities(capabilities []Capability) string {
+	var resourceTypes []string
+	actions := map[string][]string{}
+	for _, c := range capabilities {
+		if _, seen := actions[c.ResourceType]; !seen {
+			resourceTypes = append(resourceTypes, c.ResourceType)
+		}
+		actions[c.ResourceType] = append(actions[c.ResourceType], c.Action)
+	}
+	parts := make([]string, len(resourceTypes))
+	for i, resourceType := range resourceTypes {
+		parts[i] = fmt.Sprintf("%s (%s)", resourceType, strings.Join(actions[resourceType], ", "))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, readOnly bool) (*APIKeyResponse, error) {
 	slog.Debug("Creating API key for organization", "org-id", orgID)
 
@@ -48,26 +89,18 @@ func CreateAPIKey(ctx context.Context, accessToken, consoleHost, orgID string, r
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	description := userInfo.Email + " CLI key"
-	capabilities := []Capability{{ResourceType: "*", Action: "*", Filters: []any{}}}
 	if readOnly {
-		description = userInfo.Email + " CLI key (read-only)"
-		capabilities = []Capability{
-			{ResourceType: "DATA-PRODUCTS", Action: "LIST", Filters: []any{}},
-			{ResourceType: "DATA-PRODUCTS", Action: "VIEW", Filters: []any{}},
-		}
+		return CreateScopedAPIKey(ctx, accessToken, consoleHost, orgID, userInfo.Email+" CLI key (read-only)", cliReadOnlyCapabilities)
 	}
-
-	client := userClient(consoleHost, orgID, accessToken)
-	return postAPIKey(ctx, client, client.BaseUrl+"/credentials/v2/api-keys", description, capabilities)
+	return CreateScopedAPIKey(ctx, accessToken, consoleHost, orgID, userInfo.Email+" CLI key", cliCapabilities)
 }
 
 func CreateScopedAPIKey(ctx context.Context, accessToken, consoleHost, orgID, description string, capabilities []Capability) (*APIKeyResponse, error) {
-	client := userClient(consoleHost, orgID, accessToken)
-	return postAPIKey(ctx, client, client.BaseUrl+"/credentials/v3/api-keys", description, capabilities)
+	return postAPIKey(ctx, userClient(consoleHost, orgID, accessToken), description, capabilities)
 }
 
-func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description string, capabilities []Capability) (*APIKeyResponse, error) {
+func postAPIKey(ctx context.Context, client *ApiClient, description string, capabilities []Capability) (*APIKeyResponse, error) {
+	apiURL := client.BaseUrl + "/credentials/v3/api-keys"
 	slog.Debug("Creating API key", "url", apiURL)
 
 	jsonBody, err := json.Marshal(map[string]any{
@@ -94,6 +127,9 @@ func postAPIKey(ctx context.Context, client *ApiClient, apiURL, description stri
 	}
 	slog.Debug("API response", "status", resp.StatusCode)
 
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("%w: %s", ErrAPIKeyForbidden, describeCapabilities(capabilities))
+	}
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("API key creation failed: %d %s", resp.StatusCode, string(body))
 	}

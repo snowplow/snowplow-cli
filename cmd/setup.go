@@ -24,7 +24,20 @@ import (
 var SetupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Set up Snowplow CLI with device authentication",
-	Long:  `Authenticate with Snowplow Console using device authentication flow and create an API key`,
+	Long: `Authenticate with Snowplow Console using device authentication flow and create an API key
+
+The key gets only the permissions snowplow-cli needs:
+  - tracking plans: list, view, create, edit (edit includes delete)
+  - data structures: list, view, create, edit, publish
+  - environments: list (to check data structure changes against your destinations)
+
+With --read-only the key can only list and view tracking plans and data structures,
+and list environments. That is enough to download and validate.
+
+You need to be allowed to create API keys and to hold these permissions yourself.
+If you don't, create an API key with the permissions you have in Console and
+configure it for the other commands with --api-key-id and --api-key, or run
+'snowplow-cli login' to work without an API key.`,
 	Example: `  $ snowplow-cli setup
   $ snowplow-cli setup --read-only`,
 	SilenceUsage: true,
@@ -80,6 +93,6 @@ func init() {
 
 	SetupCmd.Flags().String("client-id", device.DefaultClientID, "Auth0 Client ID for device auth")
 	SetupCmd.Flags().String("auth0-domain", device.DefaultAuth0Domain, "Auth0 domain")
-	SetupCmd.Flags().Bool("read-only", false, "Create a read-only API key")
+	SetupCmd.Flags().Bool("read-only", false, "Create an API key that can only download and validate tracking plans and data structures")
 	SetupCmd.Flags().Bool("dotenv", false, "Store as .env file in current working directory")
 }
