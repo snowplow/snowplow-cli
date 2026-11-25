@@ -431,3 +431,23 @@ func Test_remoteDpsToLocalResources_NoVersionWithoutRemoteSpec(t *testing.T) {
 		t.Errorf("expected no version for a spec missing from the lookup, got %d", *specs[1].Version)
 	}
 }
+
+func Test_remoteEsToTriggerIdToUrl_SingleTriggerHasNoSuffix(t *testing.T) {
+	remoteEs := []console.RemoteEventSpec{{
+		Id:   "84614b3b-6039-458e-8ce2-615eaf2113e3",
+		Name: "test ES",
+		Triggers: []console.RemoteTrigger{{
+			Id:          "11d52733-bf70-4758-b64d-c4eb694003e3",
+			VariantUrls: map[string]string{"original": "http://example.com/nice"},
+		}},
+	}}
+
+	res := remoteEsToTriggerIdToUrlAndFilename(remoteEs)
+	expected := map[string]imgUrlFile{
+		"11d52733-bf70-4758-b64d-c4eb694003e3": {"http://example.com/nice", "test-es"},
+	}
+
+	if !reflect.DeepEqual(expected, res) {
+		t.Errorf("Unexpected trigger urls expected:%+v got:%+v", expected, res)
+	}
+}

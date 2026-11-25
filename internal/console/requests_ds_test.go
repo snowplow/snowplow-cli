@@ -757,6 +757,19 @@ func TestGetAllDataStructures_Matching(t *testing.T) {
 	if data, _ := res[0].ParseData(); data.Self.Name != "event" {
 		t.Errorf("unexpected data structure: %+v", data.Self)
 	}
+
+	res, err = GetAllDataStructures(ctx, client, []string{"org.example/purchase"}, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(res) != 1 {
+		t.Fatalf("expected 1 matching data structure, got %d", len(res))
+	}
+
+	if data, _ := res[0].ParseData(); data.Self.Name != "purchase" {
+		t.Errorf("unexpected data structure: %+v", data.Self)
+	}
 }
 
 func TestGetAllDataStructuresDrafts_Matching(t *testing.T) {

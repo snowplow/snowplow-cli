@@ -297,3 +297,55 @@ func Test_structuralEntity_LeavesCommentOutOfWhatIsSent(t *testing.T) {
 		t.Errorf("comment = %v, want none for an entity sent to Console", sent["comment"])
 	}
 }
+
+func Test_structuralEvent(t *testing.T) {
+	schema := map[string]any{"type": "object"}
+
+	for _, tt := range []struct {
+		name   string
+		event  *console.EventWrapper
+		isSent bool
+		want   any
+	}{
+		{name: "no event sent", event: nil, isSent: true, want: nil},
+		{name: "no event read", event: nil, isSent: false, want: nil},
+		{name: "empty event sent", event: &console.EventWrapper{}, isSent: true, want: nil},
+		{name: "empty event read", event: &console.EventWrapper{}, isSent: false, want: map[string]any{"source": ""}},
+		{name: "source only sent", event: &console.EventWrapper{Event: console.Event{Source: "s"}}, isSent: true, want: map[string]any{"source": "s"}},
+		{name: "schema only sent", event: &console.EventWrapper{Event: console.Event{Schema: schema}}, isSent: true, want: map[string]any{"source": "", "schema": schema}},
+		{name: "empty schema sent", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: map[string]any{}}}, isSent: true, want: map[string]any{"source": "s"}},
+		{name: "empty schema read", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: map[string]any{}}}, isSent: false, want: map[string]any{"source": "s", "schema": map[string]any{}}},
+		{name: "schema read", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: schema}}, isSent: false, want: map[string]any{"source": "s", "schema": schema}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := structuralEvent(tt.event, tt.isSent); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_structuralEntity_Schema(t *testing.T) {
+	schema := map[string]any{"type": "object"}
+
+	for _, tt := range []struct {
+		name       string
+		schema     map[string]any
+		isSent     bool
+		wantSchema bool
+	}{
+		{name: "schema sent", schema: schema, isSent: true, wantSchema: true},
+		{name: "empty schema sent", schema: map[string]any{}, isSent: true, wantSchema: false},
+		{name: "no schema sent", schema: nil, isSent: true, wantSchema: false},
+		{name: "schema read", schema: schema, isSent: false, wantSchema: true},
+		{name: "empty schema read", schema: map[string]any{}, isSent: false, wantSchema: true},
+		{name: "no schema read", schema: nil, isSent: false, wantSchema: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := structuralEntity(console.Entity{Source: "s", Schema: tt.schema}, tt.isSent)
+			if _, ok := got["schema"]; ok != tt.wantSchema {
+				t.Errorf("has schema = %t, want %t: %#v", ok, tt.wantSchema, got)
+			}
+		})
+	}
+}

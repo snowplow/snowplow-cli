@@ -12,6 +12,7 @@ package validation
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -158,14 +159,8 @@ func Test_ValidateSAEntitesCardinalities(t *testing.T) {
 		"/data/entities/tracked/3/maxCardinality": {"without minCardinality"},
 	}
 
-	for k, v := range expected {
-		if errs, ok := result[k]; ok {
-			if !slices.Equal(errs, v) {
-				t.Fatalf("unexpected got: %#v want %#v", errs, v)
-			}
-		} else {
-			t.Fatalf("missing err at path %s", k)
-		}
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected got: %#v want %#v", result, expected)
 	}
 }
 
@@ -206,6 +201,9 @@ func Test_ValidateSAEntitiesSchemaDeployed(t *testing.T) {
 		if _, ok := result[p]; !ok {
 			t.Fatalf("expected errors at %s", p)
 		}
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected errors at 2 paths, got %#v", result)
 	}
 }
 

@@ -2289,3 +2289,164 @@ func Test_FindMissingVersionsAgainstBase_UnreadableDataProduct(t *testing.T) {
 		t.Fatal("expected an error for a data product that can't be read")
 	}
 }
+
+func Test_DataProductChangeSet_isEmpty(t *testing.T) {
+	if !(DataProductChangeSet{}).isEmpty() {
+		t.Error("a change set without changes should be empty")
+	}
+
+	for name, cs := range map[string]DataProductChangeSet{
+		"saCreate":    {saCreate: []console.RemoteSourceApplication{{}}},
+		"saUpdate":    {saUpdate: []console.RemoteSourceApplication{{}}},
+		"dpCreate":    {dpCreate: []console.RemoteDataProduct{{}}},
+		"dpUpdate":    {dpUpdate: []console.RemoteDataProduct{{}}},
+		"esCreate":    {esCreate: []console.RemoteEventSpec{{}}},
+		"esUpdate":    {esUpdate: []console.RemoteEventSpec{{}}},
+		"esDelete":    {esDelete: []console.RemoteEventSpec{{}}},
+		"imageCreate": {imageCreate: []TriggerImageReference{{}}},
+	} {
+		if cs.isEmpty() {
+			t.Errorf("a change set with only %s should not be empty", name)
+		}
+	}
+}
+
+func Test_findTriggerChanges_TextData(t *testing.T) {
+	remote := []console.RemoteTrigger{
+		{Id: "f8500e68-4d1d-491c-b413-61f643e310aa", Description: "first", AppIds: []string{"web"}, Url: "first.com"},
+		{Id: "a191e2ab-b3e8-4d7d-8218-962c19469675", Description: "second", AppIds: []string{"web"}, Url: "second.com"},
+	}
+
+	for _, tt := range []struct {
+		name        string
+		change      func(local []console.RemoteTrigger)
+		wantChanged bool
+	}{
+		{name: "nothing", change: func(local []console.RemoteTrigger) {}, wantChanged: false},
+		{name: "description of the first", change: func(local []console.RemoteTrigger) { local[0].Description = "changed" }, wantChanged: true},
+		{name: "description of the last", change: func(local []console.RemoteTrigger) { local[1].Description = "changed" }, wantChanged: true},
+		{name: "url", change: func(local []console.RemoteTrigger) { local[1].Url = "changed.com" }, wantChanged: true},
+		{name: "app ids", change: func(local []console.RemoteTrigger) { local[1].AppIds = []string{"web", "ios"} }, wantChanged: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			local := slices.Clone(remote)
+			tt.change(local)
+
+			res := findTriggerChanges(local, remote, map[string]TriggerImageReference{}, map[string]string{})
+			if res.isChanged != tt.wantChanged {
+				t.Errorf("isChanged = %t, want %t", res.isChanged, tt.wantChanged)
+			}
+		})
+	}
+}
+
+func Test_withoutDuplicatedEventSpecs(t *testing.T) {
+	zero := 0
+	missing := []model.EventSpecMissingVersion{
+		{FileName: "/base/one.yaml", Name: "single", Expected: &zero},
+		{FileName: "/base/one.yaml", Name: "duplicate", Expected: &zero},
+		{FileName: "/base/two.yaml", Name: "duplicate", Expected: &zero},
+	}
+	ids := []string{"single-id", "duplicate-id", "duplicate-id"}
+
+	got := withoutDuplicatedEventSpecs(missing, ids, map[string]int{"single-id": 1, "duplicate-id": 2})
+
+	want := []model.EventSpecMissingVersion{
+		{FileName: "/base/one.yaml", Name: "single", Expected: &zero},
+		{FileName: "/base/two.yaml", Name: "duplicate", Reason: missingVersionDuplicateReason},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("missing versions (-want +got):\n%s", diff)
+	}
+}
+
+func twoSpecRuleFile(first map[string]any, second map[string]any) map[string]map[string]any {
+	second["resourceName"] = "aaa70141-c223-4172-ab39-86a0194e44e8"
+	second["name"] = "Checkout Finished"
+	return map[string]map[string]any{
+		"/base/dp.yaml": {
+			"apiVersion":   "v1",
+			"resourceType": "data-product",
+			"resourceName": "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+			"data": map[string]any{
+				"name":                "Data Product 1",
+				"eventSpecifications": []any{first, second},
+			},
+		},
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_ChecksSpecsAfterOneWithoutVersion(t *testing.T) {
+	local := twoSpecRuleFile(baseRuleSpec(nil), baseRuleSpec(5))
+
+	mismatches, skipped, err := FindVersionMismatchesAgainstBase(local, map[string]map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []model.EventSpecVersionMismatch{{FileName: "/base/dp.yaml", Index: 1, Name: "Checkout Finished", Declared: 5, Expected: 0, IsNew: true, Changed: []string{}}}
+	if diff := cmp.Diff(want, mismatches); diff != "" {
+		t.Errorf("version mismatch (-want +got):\n%s", diff)
+	}
+	if len(skipped) != 0 {
+		t.Errorf("skipped = %v, want nothing", skipped)
+	}
+}
+
+func Test_FindVersionMismatchesAgainstBase_ChecksSpecsAfterSkippedOne(t *testing.T) {
+	local := twoSpecRuleFile(baseRuleSpec(7), baseRuleSpec(5))
+
+	mismatches, skipped, err := FindVersionMismatchesAgainstBase(local, baseRuleFile(baseRuleSpec(nil)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []model.EventSpecVersionMismatch{{FileName: "/base/dp.yaml", Index: 1, Name: "Checkout Finished", Declared: 5, Expected: 0, IsNew: true, Changed: []string{}}}
+	if diff := cmp.Diff(want, mismatches); diff != "" {
+		t.Errorf("version mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]string{"Checkout Started"}, skipped); diff != "" {
+		t.Errorf("skipped (-want +got):\n%s", diff)
+	}
+}
+
+func Test_FindMissingVersionsAgainstBase_ReportsSpecsAfterOneWithVersion(t *testing.T) {
+	local := twoSpecRuleFile(baseRuleSpec(1), baseRuleSpec(nil))
+
+	missing, err := FindMissingVersionsAgainstBase(local, map[string]map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	zero := 0
+	want := []model.EventSpecMissingVersion{{FileName: "/base/dp.yaml", Index: 1, Name: "Checkout Finished", Expected: &zero}}
+	if diff := cmp.Diff(want, missing); diff != "" {
+		t.Errorf("missing versions (-want +got):\n%s", diff)
+	}
+}
+
+func Test_FindMissingVersionsAgainstBase_ExpectedFromBase(t *testing.T) {
+	changed := baseRuleSpec(nil)
+	changed["name"] = "Checkout Begun"
+
+	for _, tt := range []struct {
+		name         string
+		local        map[string]any
+		base         map[string]any
+		wantName     string
+		wantExpected *int
+		wantReason   string
+	}{
+		{name: "unchanged keeps the base version", local: baseRuleSpec(nil), base: baseRuleSpec(3), wantName: "Checkout Started", wantExpected: intPtr(3)},
+		{name: "structural change raises the base version", local: changed, base: baseRuleSpec(3), wantName: "Checkout Begun", wantExpected: intPtr(4)},
+		{name: "no version at the base", local: baseRuleSpec(nil), base: baseRuleSpec(nil), wantName: "Checkout Started", wantReason: "no version declared at the base, run dp validate --fix against Snowplow Console to add it"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			missing, err := FindMissingVersionsAgainstBase(baseRuleFile(tt.local), baseRuleFile(tt.base))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			want := []model.EventSpecMissingVersion{{FileName: "/base/dp.yaml", Index: 0, Name: tt.wantName, Expected: tt.wantExpected, Reason: tt.wantReason}}
+			if diff := cmp.Diff(want, missing); diff != "" {
+				t.Errorf("missing versions (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

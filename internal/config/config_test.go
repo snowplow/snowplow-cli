@@ -983,3 +983,15 @@ func Test_ConfigFlagBeatsConfigFile(t *testing.T) {
 		}
 	}
 }
+
+func Test_missingConfigError(t *testing.T) {
+	one := missingConfigError([]string{"org-id"}).Error()
+	if !strings.HasPrefix(one, "config value \"org-id\" not set\n") {
+		t.Errorf("unexpected error for one missing value: %s", one)
+	}
+
+	two := missingConfigError([]string{"org-id", "api-key"}).Error()
+	if !strings.HasPrefix(two, "config values not set: org-id, api-key\n") {
+		t.Errorf("unexpected error for two missing values: %s", two)
+	}
+}

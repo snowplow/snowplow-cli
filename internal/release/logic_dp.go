@@ -481,8 +481,8 @@ func findTriggerChanges(local []console.RemoteTrigger, remote []console.RemoteTr
 		rt, remoteExists := remoteById[lt.Id]
 		if !remoteExists {
 			differentTriggerSet = true
-		} else {
-			differentTextData = (lt.Url != rt.Url || lt.Description != rt.Description || !util.StringSlicesEqual(lt.AppIds, rt.AppIds))
+		} else if lt.Url != rt.Url || lt.Description != rt.Description || !util.StringSlicesEqual(lt.AppIds, rt.AppIds) {
+			differentTextData = true
 		}
 		localImage := localImagesByTriggerId[lt.Id]
 		remoteImageHash := getRemoteImageHashFromTriggerAndHashes(rt, remoteImageHashById)
