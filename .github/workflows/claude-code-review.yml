@@ -3,25 +3,18 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, ready_for_review]
-  issue_comment:
-    types: [created]
 
 concurrency:
-  group: claude-code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: claude-code-review-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   claude-review:
     if: |
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.draft == false &&
-       github.event.pull_request.head.repo.full_name == github.repository &&
-       github.event.pull_request.user.type != 'Bot') ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       github.event.comment.user.type != 'Bot' &&
-       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) &&
-       contains(github.event.comment.body, '@claude review'))
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
 
     runs-on: ubuntu-latest
     permissions:
@@ -34,7 +27,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || '' }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -45,7 +37,7 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
 
             Review this pull request by following `.claude/skills/pr-review/SKILL.md`
             step by step. It is the team's review standard: what to read, what to check,
