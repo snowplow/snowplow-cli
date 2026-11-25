@@ -146,19 +146,19 @@ func (lookup *DPLookup) GhAnnotateValidations(basePath string) error {
 			return err
 		}
 		if len(v.Info) > 0 {
-			fmt.Printf("::info file=%s::%s\n", rp, strings.Join(v.Info, "%0A"))
+			writeGhAnnotation(ghAnnotationNotice, rp, v.Info...)
 		}
 		if len(v.Warnings) > 0 {
-			fmt.Printf("::warn file=%s::%s\n", rp, strings.Join(v.Warnings, "%0A"))
+			writeGhAnnotation(ghAnnotationWarning, rp, v.Warnings...)
 		}
 		for k, se := range v.WarningsWithPaths {
-			fmt.Printf("::warn file=%s::%s%%0A%s\n", rp, k, strings.Join(se, "%0A"))
+			writeGhAnnotation(ghAnnotationWarning, rp, append([]string{k}, se...)...)
 		}
 		if len(v.Errors) > 0 {
-			fmt.Printf("::error file=%s::%s\n", rp, strings.Join(v.Errors, "%0A"))
+			writeGhAnnotation(ghAnnotationError, rp, v.Errors...)
 		}
 		for k, se := range v.ErrorsWithPaths {
-			fmt.Printf("::error file=%s::%s%%0A%s\n", rp, k, strings.Join(se, "%0A"))
+			writeGhAnnotation(ghAnnotationError, rp, append([]string{k}, se...)...)
 		}
 	}
 
