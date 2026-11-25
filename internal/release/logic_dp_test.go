@@ -2450,3 +2450,53 @@ func Test_FindMissingVersionsAgainstBase_ExpectedFromBase(t *testing.T) {
 		})
 	}
 }
+
+func Test_findChanges_EventSpecMovedToLaterDataProductIsNotDeleted(t *testing.T) {
+	dpA := model.DataProduct{
+		ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
+		Data:         model.DataProductData{Name: "Data Product A"},
+	}
+	dpB := model.DataProduct{
+		ResourceName: "0f2b1b3a-6a3f-4d0c-9d7e-4a1d5a0b8c11",
+		Data: model.DataProductData{
+			Name: "Data Product B",
+			EventSpecifications: []model.EventSpec{{
+				ResourceName: "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+				Name:         "Event Spec 1",
+			}},
+		},
+	}
+	local := LocalFilesRefsResolved{
+		DataProudcts: []model.DataProduct{dpA, dpB},
+	}
+
+	remote := console.DataProductsAndRelatedResources{
+		DataProducts: []console.RemoteDataProduct{
+			{
+				Id:         dpA.ResourceName,
+				Name:       "Data Product A",
+				EventSpecs: []console.EventSpecReference{{Id: "6557ceee-a1c7-4ea9-910a-2a97194fb3f6"}},
+			},
+			{Id: dpB.ResourceName, Name: "Data Product B"},
+		},
+		EventSpecs: []console.RemoteEventSpec{{
+			Id:            "6557ceee-a1c7-4ea9-910a-2a97194fb3f6",
+			Name:          "Event Spec 1",
+			DataProductId: dpA.ResourceName,
+		}},
+	}
+
+	changes, err := findChanges(local, remote, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(changes.esDelete) != 0 {
+		t.Errorf("expected no event spec deletes, got %d", len(changes.esDelete))
+	}
+	if len(changes.esUpdate) != 1 {
+		t.Fatalf("expected 1 event spec update, got %d", len(changes.esUpdate))
+	}
+	if changes.esUpdate[0].DataProductId != dpB.ResourceName {
+		t.Errorf("expected event spec to move to %s, got %s", dpB.ResourceName, changes.esUpdate[0].DataProductId)
+	}
+}

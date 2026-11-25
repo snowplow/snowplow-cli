@@ -271,6 +271,8 @@ func findChanges(local LocalFilesRefsResolved, remote console.DataProductsAndRel
 		if err := finder.addEventSpecChanges(localDp); err != nil {
 			return nil, err
 		}
+	}
+	for _, localDp := range local.DataProudcts {
 		finder.addEventSpecDeletes(localDp)
 	}
 
