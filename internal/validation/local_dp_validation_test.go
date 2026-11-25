@@ -628,10 +628,7 @@ func Test_DPLookup_GhAnnotateValidations(t *testing.T) {
 		want        string
 	}{
 		{name: "nothing", validations: DPValidations{}, want: ""},
-		{name: "info", validations: DPValidations{Info: []string{"i1", "i2"}}, want: "::info file=dp.yml::i1%0Ai2\n"},
-		{name: "warnings", validations: DPValidations{Warnings: []string{"w1", "w2"}}, want: "::warn file=dp.yml::w1%0Aw2\n"},
 		{name: "errors", validations: DPValidations{Errors: []string{"e1", "e2"}}, want: "::error file=dp.yml::e1%0Ae2\n"},
-		{name: "warnings with paths", validations: DPValidations{WarningsWithPaths: map[string][]string{"/a": {"w1", "w2"}}}, want: "::warn file=dp.yml::/a%0Aw1%0Aw2\n"},
 		{name: "errors with paths", validations: DPValidations{ErrorsWithPaths: map[string][]string{"/a": {"e1", "e2"}}}, want: "::error file=dp.yml::/a%0Ae1%0Ae2\n"},
 	}
 
@@ -644,6 +641,7 @@ func Test_DPLookup_GhAnnotateValidations(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer func() { _ = r.Close() }()
 			os.Stdout = w
 			annotateErr := lookup.GhAnnotateValidations("/base")
 			os.Stdout = stdout

@@ -125,13 +125,24 @@ func TestGitDirty(t *testing.T) {
 	if gitDirty(t.Context(), dir) {
 		t.Fatal("an empty repo reported as dirty")
 	}
-	_ = os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0600)
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	if !gitDirty(t.Context(), dir) {
 		t.Fatal("an untracked file wasn't detected")
 	}
 	git("add", "a.txt")
+	if !gitDirty(t.Context(), dir) {
+		t.Fatal("a staged file wasn't detected")
+	}
 	git("commit", "-q", "-m", "add")
 	if gitDirty(t.Context(), dir) {
 		t.Fatal("a clean repo reported as dirty")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("b\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if !gitDirty(t.Context(), dir) {
+		t.Fatal("a changed tracked file wasn't detected")
 	}
 }
