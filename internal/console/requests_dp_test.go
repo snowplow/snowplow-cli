@@ -19,20 +19,16 @@ import (
 	"testing"
 )
 
-func intPtr(i int) *int {
-	return &i
-}
-
 var sampleEntity1 = Entity{
 	Source:         "iglu:com.snplow.msc.aws/data-product-auto/jsonschema/1-0-0",
-	MinCardinality: intPtr(0),
-	MaxCardinality: intPtr(5),
+	MinCardinality: new(0),
+	MaxCardinality: new(5),
 	Schema:         map[string]any{},
 }
 
 var sampleEntity2 = Entity{
 	Source:         "iglu:com.snplow.msc.aws/spo_zod_2/jsonschema/1-0-0",
-	MinCardinality: intPtr(0),
+	MinCardinality: new(0),
 	MaxCardinality: nil,
 	Schema:         map[string]any{},
 }
@@ -426,7 +422,7 @@ func Test_CreateEventSpecWithExpectedVersion(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
-	err := CreateEventSpec(cnx, client, sampleRemoteEs, intPtr(0))
+	err := CreateEventSpec(cnx, client, sampleRemoteEs, new(0))
 
 	if err != nil {
 		t.Error(err)
@@ -500,7 +496,7 @@ func Test_UpdateEventSpecWithExpectedVersion(t *testing.T) {
 	cnx := context.Background()
 	client := &ApiClient{Http: &http.Client{}, Jwt: "token", BaseUrl: server.URL + "/api/msc/v1/organizations/orgid"}
 
-	err := UpdateEventSpec(cnx, client, sampleRemoteEs, intPtr(4))
+	err := UpdateEventSpec(cnx, client, sampleRemoteEs, new(4))
 
 	if err != nil {
 		t.Error(err)

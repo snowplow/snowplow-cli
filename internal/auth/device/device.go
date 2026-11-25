@@ -289,8 +289,7 @@ func getDefaultIndex(organizations []console.Organization, jwtOrgID string) int 
 }
 
 func handleAuthError(err error, clientID, auth0Domain string) {
-	var retrieveErr *oauth2.RetrieveError
-	if errors.As(err, &retrieveErr) {
+	if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok {
 		slog.Error("Authentication failed",
 			"error", err.Error(),
 			"client-id", clientID,

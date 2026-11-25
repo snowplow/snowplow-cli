@@ -20,10 +20,6 @@ import (
 	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
-func intPtr(i int) *int {
-	return &i
-}
-
 func TestLocalSaToRemote(t *testing.T) {
 	input := model.SourceApp{
 		ResourceName: "test-app",
@@ -36,16 +32,16 @@ func TestLocalSaToRemote(t *testing.T) {
 				Tracked: []model.SchemaRef{
 					{
 						Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-						MinCardinality: intPtr(0),
-						MaxCardinality: intPtr(1),
+						MinCardinality: new(0),
+						MaxCardinality: new(1),
 						Schema:         map[string]any{},
 					},
 				},
 				Enriched: []model.SchemaRef{
 					{
 						Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-						MinCardinality: intPtr(0),
-						MaxCardinality: intPtr(1),
+						MinCardinality: new(0),
+						MaxCardinality: new(1),
 						Schema:         map[string]any{},
 					},
 				},
@@ -63,16 +59,16 @@ func TestLocalSaToRemote(t *testing.T) {
 			Tracked: []console.Entity{
 				{
 					Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-					MinCardinality: intPtr(0),
-					MaxCardinality: intPtr(1),
+					MinCardinality: new(0),
+					MaxCardinality: new(1),
 					Schema:         map[string]any{},
 				},
 			},
 			Enriched: []console.Entity{
 				{
 					Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-					MinCardinality: intPtr(0),
-					MaxCardinality: intPtr(1),
+					MinCardinality: new(0),
+					MaxCardinality: new(1),
 					Schema:         map[string]any{},
 				},
 			},
@@ -130,16 +126,16 @@ func TestLocalEventSpecToRemote(t *testing.T) {
 			Tracked: []model.SchemaRef{
 				{
 					Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-					MinCardinality: intPtr(0),
-					MaxCardinality: intPtr(1),
+					MinCardinality: new(0),
+					MaxCardinality: new(1),
 					Schema:         map[string]any{},
 				},
 			},
 			Enriched: []model.SchemaRef{
 				{
 					Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-					MinCardinality: intPtr(0),
-					MaxCardinality: intPtr(1),
+					MinCardinality: new(0),
+					MaxCardinality: new(1),
 					Schema:         map[string]any{},
 				},
 			},
@@ -173,17 +169,15 @@ func TestEsToDiff(t *testing.T) {
 		Name:                 "Test Event",
 		SourceApplicationIds: []string{"app1", "app3"},
 		Event: &console.EventWrapper{
-			Event: console.Event{
-				Source: "test-source",
-				Schema: map[string]any{},
-			},
+			Source: "test-source",
+			Schema: map[string]any{},
 		},
 		Entities: console.Entities{
 			Tracked: []console.Entity{
 				{
 					Source:         "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
-					MinCardinality: intPtr(0),
-					MaxCardinality: intPtr(1),
+					MinCardinality: new(0),
+					MaxCardinality: new(1),
 					Schema:         map[string]any{},
 				},
 			},
@@ -311,11 +305,11 @@ func Test_structuralEvent(t *testing.T) {
 		{name: "no event read", event: nil, isSent: false, want: nil},
 		{name: "empty event sent", event: &console.EventWrapper{}, isSent: true, want: nil},
 		{name: "empty event read", event: &console.EventWrapper{}, isSent: false, want: map[string]any{"source": ""}},
-		{name: "source only sent", event: &console.EventWrapper{Event: console.Event{Source: "s"}}, isSent: true, want: map[string]any{"source": "s"}},
-		{name: "schema only sent", event: &console.EventWrapper{Event: console.Event{Schema: schema}}, isSent: true, want: map[string]any{"source": "", "schema": schema}},
-		{name: "empty schema sent", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: map[string]any{}}}, isSent: true, want: map[string]any{"source": "s"}},
-		{name: "empty schema read", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: map[string]any{}}}, isSent: false, want: map[string]any{"source": "s", "schema": map[string]any{}}},
-		{name: "schema read", event: &console.EventWrapper{Event: console.Event{Source: "s", Schema: schema}}, isSent: false, want: map[string]any{"source": "s", "schema": schema}},
+		{name: "source only sent", event: &console.EventWrapper{Source: "s"}, isSent: true, want: map[string]any{"source": "s"}},
+		{name: "schema only sent", event: &console.EventWrapper{Schema: schema}, isSent: true, want: map[string]any{"source": "", "schema": schema}},
+		{name: "empty schema sent", event: &console.EventWrapper{Source: "s", Schema: map[string]any{}}, isSent: true, want: map[string]any{"source": "s"}},
+		{name: "empty schema read", event: &console.EventWrapper{Source: "s", Schema: map[string]any{}}, isSent: false, want: map[string]any{"source": "s", "schema": map[string]any{}}},
+		{name: "schema read", event: &console.EventWrapper{Source: "s", Schema: schema}, isSent: false, want: map[string]any{"source": "s", "schema": schema}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := structuralEvent(tt.event, tt.isSent); !reflect.DeepEqual(got, tt.want) {
