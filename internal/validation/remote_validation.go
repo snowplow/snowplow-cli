@@ -53,11 +53,11 @@ func (vr *ValidationResults) GithubAnnotate() {
 	for _, iglu := range vr.Iglu {
 		switch iglu.Level {
 		case igluValidationError:
-			fmt.Printf("::error file=%s::%s\n", iglu.File, strings.Join(iglu.Messages, "%0A"))
+			writeGhAnnotation(ghAnnotationError, iglu.File, iglu.Messages...)
 		case igluValidationWarn:
-			fmt.Printf("::warning file=%s::%s\n", iglu.File, strings.Join(iglu.Messages, "%0A"))
+			writeGhAnnotation(ghAnnotationWarning, iglu.File, iglu.Messages...)
 		case igluValidationInfo:
-			fmt.Printf("::notice file=%s::%s\n", iglu.File, strings.Join(iglu.Messages, "%0A"))
+			writeGhAnnotation(ghAnnotationNotice, iglu.File, iglu.Messages...)
 		}
 	}
 
@@ -67,11 +67,12 @@ func (vr *ValidationResults) GithubAnnotate() {
 	}
 
 	for f, ms := range byFile {
-		fmt.Printf("::error file=%s::", f)
+		lines := []string{""}
 		for _, m := range ms {
-			fmt.Printf("%%0ASuggested version %s for %s%%0A%s", m.Suggested, m.Destination, strings.Join(m.Messages, "%0A"))
+			lines = append(lines, fmt.Sprintf("Suggested version %s for %s", m.Suggested, m.Destination))
+			lines = append(lines, m.Messages...)
 		}
-		fmt.Println()
+		writeGhAnnotation(ghAnnotationError, f, lines...)
 	}
 }
 
