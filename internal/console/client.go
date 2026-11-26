@@ -70,6 +70,7 @@ func (t *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 func NewApiClient(ctx context.Context, host string, apiKeyId string, apiKeySecret string, orgid string) (*ApiClient, error) {
 	h := &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &loggingRoundTripper{
 			Transport: http.DefaultTransport,
 		},
