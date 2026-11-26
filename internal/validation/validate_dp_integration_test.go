@@ -811,7 +811,7 @@ func TestSyncWorkflow_StoppedByVersionMismatchBeforeWriting(t *testing.T) {
 	}
 
 	ctx := logging.ContextWithLogger(context.Background(), slog.New(slog.DiscardHandler))
-	transport := &MockDataProductRecordingTransport{MockDataProductRemoteTransport: MockDataProductRemoteTransport{dataProducts: versionRemoteDataProducts}}
+	transport := &MockDataProductRecordingTransport{dataProducts: versionRemoteDataProducts}
 	mockClient := createMockDataProductClient(transport)
 
 	files, err := util.MaybeResourcesfromPaths([]string{tmpDir})

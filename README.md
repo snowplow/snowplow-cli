@@ -125,13 +125,7 @@ SNOWPLOW_CONSOLE_API_KEY=********-****-****-****-************
 
 ### Claude Code GitHub Actions Integration
 
-This repository includes a GitHub Actions workflow that connects directly with Claude for automated code assistance. The workflow runs when:
-
-- `@claude` is mentioned in issue comments, PR reviews, or review comments  
-- An issue is opened or assigned with `@claude` in the title or body  
-- A pull request is opened, triggering an automatic Claude review
-
-This lets team members request Claude’s help on code reviews, bug fixes, and development tasks directly in GitHub. Claude can read CI results, write to PRs, and manage issues as needed for collaboration.
+This repository includes a GitHub Actions workflow that runs an automatic Claude review when a pull request is opened or marked ready for review. Draft pull requests and pull requests from forks are skipped.
 
 ## Setting up Signals (`signals setup`)
 

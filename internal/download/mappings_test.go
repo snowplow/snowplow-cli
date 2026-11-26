@@ -18,20 +18,16 @@ import (
 	"github.com/snowplow/snowplow-cli/internal/model"
 )
 
-func intPtr(i int) *int {
-	return &i
-}
-
 var sampleEntity1 = console.Entity{
 	Source:         "iglu:com.snplow.msc.aws/data-product-auto/jsonschema/1-0-0",
-	MinCardinality: intPtr(0),
-	MaxCardinality: intPtr(5),
+	MinCardinality: new(0),
+	MaxCardinality: new(5),
 	Schema:         map[string]any{},
 }
 
 var sampleEntity2 = console.Entity{
 	Source:         "iglu:com.snplow.msc.aws/event-spec-auto/jsonschema/1-0-0",
-	MinCardinality: intPtr(0),
+	MinCardinality: new(0),
 	MaxCardinality: nil,
 	Schema:         map[string]any{},
 }
@@ -104,10 +100,9 @@ var sampleRemoteEs = console.RemoteEventSpec{
 	SourceApplicationIds: []string{sampleSa1.Id},
 	Name:                 "test ES",
 	Version:              7,
-	Event: &console.EventWrapper{Event: console.Event{
+	Event: &console.EventWrapper{
 		Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
 		Schema: map[string]any{},
-	},
 	},
 	Entities: console.Entities{Tracked: []console.Entity{
 		{
@@ -198,7 +193,7 @@ func Test_remoteDpsToLocalResources_OK(t *testing.T) {
 				ResourceName:               sampleRemoteEs.Id,
 				ExcludedSourceApplications: nil,
 				Name:                       sampleRemoteEs.Name,
-				Version:                    intPtr(7),
+				Version:                    new(7),
 				Event: &model.SchemaRef{
 					Source:         sampleRemoteEs.Event.Source,
 					MinCardinality: nil,
@@ -232,10 +227,9 @@ func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
 		Id:                   "84614b3b-6039-458e-8ce2-615eaf2113e3",
 		SourceApplicationIds: []string{sampleSa1.Id},
 		Name:                 "test ES",
-		Event: &console.EventWrapper{Event: console.Event{
+		Event: &console.EventWrapper{
 			Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
 			Schema: map[string]any{},
-		},
 		},
 		Triggers: []console.RemoteTrigger{{
 			Id:          "11d52733-bf70-4758-b64d-c4eb694003e3",
@@ -256,10 +250,9 @@ func Test_remoteEsToTriggerIdToUrl_OK(t *testing.T) {
 			Id:                   "39b421d4-5f1a-4ca1-8f89-559cf72f0d91",
 			SourceApplicationIds: []string{sampleSa1.Id},
 			Name:                 "test ES",
-			Event: &console.EventWrapper{Event: console.Event{
+			Event: &console.EventWrapper{
 				Source: "iglu:com.yalo.schemas.events.channel/YaloMessage/jsonschema/1-0-0",
 				Schema: map[string]any{},
-			},
 			},
 			Triggers: []console.RemoteTrigger{{
 				Id:          "291a4a6b-b46a-4d16-87d1-c3464139b8d9",
@@ -338,10 +331,9 @@ func Test_remoteEsToLocal_ExclusionOrderingConsistency(t *testing.T) {
 		Id:                   "test-es",
 		Name:                 "Test ES",
 		SourceApplicationIds: []string{"include-x"},
-		Event: &console.EventWrapper{Event: console.Event{
+		Event: &console.EventWrapper{
 			Source: "iglu:test/schema/jsonschema/1-0-0",
-			Schema: map[string]any{},
-		}},
+			Schema: map[string]any{}},
 		Entities: console.Entities{Tracked: []console.Entity{}, Enriched: []console.Entity{}},
 	}
 
@@ -395,10 +387,9 @@ func Test_remoteEsToLocal_NoExclusions(t *testing.T) {
 		Id:                   "test-es",
 		Name:                 "Test ES",
 		SourceApplicationIds: []string{"app1", "app2"},
-		Event: &console.EventWrapper{Event: console.Event{
+		Event: &console.EventWrapper{
 			Source: "iglu:test/schema/jsonschema/1-0-0",
-			Schema: map[string]any{},
-		}},
+			Schema: map[string]any{}},
 		Entities: console.Entities{Tracked: []console.Entity{}, Enriched: []console.Entity{}},
 	}
 

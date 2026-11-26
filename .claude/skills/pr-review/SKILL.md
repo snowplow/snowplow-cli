@@ -3,8 +3,7 @@ name: pr-review
 description: >-
   Review a pull request of this repository against the team standard (CLAUDE.md) and
   post one short, plain-language review comment. The Claude Code Review workflow runs it
-  when a PR becomes ready for review and when someone comments "@claude review" on the
-  PR. Run it locally with /pr-review <PR number> before asking a teammate for a review.
+  when a PR becomes ready for review. Run it locally with /pr-review <PR number> before asking a teammate for a review.
 ---
 
 # PR Review
@@ -86,7 +85,7 @@ Confidence Score: <1 to 5>/5
 
 - ...
 
-New pushes are not reviewed automatically. Comment `@claude review` to review the latest commit.
+New pushes are not reviewed automatically.
 ```
 
 The verdict is one line: `Nothing to report.`, `No blocking issues.` or
@@ -156,10 +155,6 @@ Never split the review across comments, never post inline review comments and ne
 The `Claude Code Review` workflow (`.github/workflows/claude-code-review.yml`) runs this
 skill:
 
-- once, when a PR is opened ready for review or is marked "Ready for review". Draft PRs
-  and PRs from forks are skipped. Pushes after that do not start a new review.
-- again only when a repository owner, member or collaborator writes `@claude review` in a
-  top-level PR comment.
-
-Every other `@claude` comment goes to the general `Claude Code` workflow
-(`.github/workflows/claude.yml`), which does not run this skill.
+- once, when a PR is opened ready for review or is marked "Ready for review". Draft PRs,
+  PRs from forks and PRs whose author is not a repository owner, member or collaborator
+  are skipped. Pushes after that do not start a new review.

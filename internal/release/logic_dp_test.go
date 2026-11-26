@@ -992,10 +992,6 @@ func Test_Release_Logs(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string {
-	return &s
-}
-
 func versionRuleLocalAndRemote(localEs model.EventSpec, remoteEs console.RemoteEventSpec) (LocalFilesRefsResolved, console.DataProductsAndRelatedResources) {
 	dp := model.DataProduct{
 		ResourceName: "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
@@ -1030,15 +1026,14 @@ func versionRuleRemoteEs() console.RemoteEventSpec {
 		SourceApplicationIds: []string{},
 		Version:              3,
 		DataProductId:        "d9967fb4-6233-49c1-94d2-6cc417abd7ed",
-		Event: &console.EventWrapper{Event: console.Event{
+		Event: &console.EventWrapper{
 			Source: "iglu:com.example/checkout/jsonschema/1-0-0",
-			Schema: map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": int64(10)}}},
-		}},
+			Schema: map[string]any{"type": "object", "properties": map[string]any{"a": map[string]any{"maxLength": int64(10)}}}},
 		Entities: console.Entities{
 			Tracked: []console.Entity{{
 				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
-				MinCardinality: intPtr(0),
-				MaxCardinality: intPtr(1),
+				MinCardinality: new(0),
+				MaxCardinality: new(1),
 			}},
 			Enriched: []console.Entity{},
 		},
@@ -1057,8 +1052,8 @@ func versionRuleLocalEs() model.EventSpec {
 		Entities: model.EntitiesDef{
 			Tracked: []model.SchemaRef{{
 				Source:         "iglu:com.example/cart/jsonschema/1-0-0",
-				MinCardinality: intPtr(0),
-				MaxCardinality: intPtr(1),
+				MinCardinality: new(0),
+				MaxCardinality: new(1),
 			}},
 		},
 	}
@@ -1122,7 +1117,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 		},
 		{
 			name:         "entity cardinality change adds one",
-			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = new(2) },
 			wantUpdate:   true,
 			wantExpected: 4,
 			wantChanged:  []string{"entities"},
@@ -1140,7 +1135,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 		},
 		{
 			name:         "remote entity comment alone sends nothing and keeps the version",
-			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = new("a note") },
 			wantUpdate:   false,
 			wantExpected: 3,
 			wantChanged:  []string{},
@@ -1148,7 +1143,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 		{
 			name:         "remote entity comment is dropped by an update and adds one",
 			changeLocal:  func(es *model.EventSpec) { es.Description = "other" },
-			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = new("a note") },
 			wantUpdate:   true,
 			wantExpected: 4,
 			wantChanged:  []string{"entities"},
@@ -1157,8 +1152,8 @@ func Test_findChanges_VersionRule(t *testing.T) {
 		},
 		{
 			name:         "remote entity comment alongside a real entity change is not the only cause",
-			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = intPtr(2) },
-			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = strPtr("a note") },
+			changeLocal:  func(es *model.EventSpec) { es.Entities.Tracked[0].MaxCardinality = new(2) },
+			changeRemote: func(es *console.RemoteEventSpec) { es.Entities.Tracked[0].Comment = new("a note") },
 			wantUpdate:   true,
 			wantExpected: 4,
 			wantChanged:  []string{"entities"},
@@ -1201,7 +1196,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 			if tt.changeLocal != nil {
 				tt.changeLocal(&localEs)
 			}
-			localEs.Version = intPtr(99)
+			localEs.Version = new(99)
 			remoteEs := versionRuleRemoteEs()
 			if tt.changeRemote != nil {
 				tt.changeRemote(&remoteEs)
@@ -1239,7 +1234,7 @@ func Test_findChanges_VersionRule(t *testing.T) {
 func Test_findChanges_VersionMatchesNoMismatch(t *testing.T) {
 	localEs := versionRuleLocalEs()
 	localEs.Name = "Checkout Begun"
-	localEs.Version = intPtr(4)
+	localEs.Version = new(4)
 	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
 
 	changes, err := findChanges(local, remote, map[string]string{})
@@ -1256,7 +1251,7 @@ func Test_findChanges_VersionMatchesNoMismatch(t *testing.T) {
 
 func Test_findChanges_NewEventSpecExpectsZero(t *testing.T) {
 	localEs := versionRuleLocalEs()
-	localEs.Version = intPtr(0)
+	localEs.Version = new(0)
 	local, remote := versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
 	remote.EventSpecs = []console.RemoteEventSpec{}
 	remote.DataProducts[0].EventSpecs = nil
@@ -1272,7 +1267,7 @@ func Test_findChanges_NewEventSpecExpectsZero(t *testing.T) {
 		t.Errorf("expected no version mismatch, got %+v", changes.VersionMismatches)
 	}
 
-	localEs.Version = intPtr(1)
+	localEs.Version = new(1)
 	local, _ = versionRuleLocalAndRemote(localEs, versionRuleRemoteEs())
 	changes, err = findChanges(local, remote, map[string]string{})
 	if err != nil {
@@ -1659,8 +1654,8 @@ func Test_findChanges_DuplicateEventSpecId(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "no version declared keeps the old behaviour", local: duplicateSpecLocal(nil, nil), wantErr: false},
-		{name: "first declares a version", local: duplicateSpecLocal(intPtr(1), nil), wantErr: true},
-		{name: "second declares a version", local: duplicateSpecLocal(nil, intPtr(1)), wantErr: true},
+		{name: "first declares a version", local: duplicateSpecLocal(new(1), nil), wantErr: true},
+		{name: "second declares a version", local: duplicateSpecLocal(nil, new(1)), wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := findChanges(tt.local, remote, map[string]string{})
@@ -1678,7 +1673,7 @@ func Test_findChanges_DuplicateEventSpecId(t *testing.T) {
 }
 
 func Test_findChanges_DuplicateEventSpecIdNamesFilesInOrder(t *testing.T) {
-	local := duplicateSpecLocal(intPtr(1), intPtr(1))
+	local := duplicateSpecLocal(new(1), new(1))
 	slices.Reverse(local.DataProudcts)
 
 	_, err := findChanges(local, console.DataProductsAndRelatedResources{}, map[string]string{})
@@ -1754,7 +1749,7 @@ func Test_FindVersionMismatchesAgainstBase_DuplicateEventSpecId(t *testing.T) {
 func Test_findChanges_EntityCommentOnlyDifferenceWithoutVersion(t *testing.T) {
 	localEs := versionRuleLocalEs()
 	remoteEs := versionRuleRemoteEs()
-	remoteEs.Entities.Tracked[0].Comment = strPtr("a note")
+	remoteEs.Entities.Tracked[0].Comment = new("a note")
 	local, remote := versionRuleLocalAndRemote(localEs, remoteEs)
 
 	changes, err := findChanges(local, remote, map[string]string{})
@@ -1771,14 +1766,14 @@ func Test_findChanges_SourceAppEntityCommentOnlyDifference(t *testing.T) {
 		ResourceName: "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
 		Data: model.SourceAppData{
 			Name:     "Source App 1",
-			Entities: &model.EntitiesDef{Tracked: []model.SchemaRef{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0)}}},
+			Entities: &model.EntitiesDef{Tracked: []model.SchemaRef{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: new(0)}}},
 		},
 	}
 	remoteSa := console.RemoteSourceApplication{
 		Id:   "9b6e4e4c-c34a-483c-a5e7-f728d66a53b3",
 		Name: "Source App 1",
 		Entities: console.Entities{
-			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: intPtr(0), Comment: strPtr("a note")}},
+			Tracked:  []console.Entity{{Source: "iglu:com.example/a/jsonschema/1-0-0", MinCardinality: new(0), Comment: new("a note")}},
 			Enriched: []console.Entity{},
 		},
 	}
@@ -2434,8 +2429,8 @@ func Test_FindMissingVersionsAgainstBase_ExpectedFromBase(t *testing.T) {
 		wantExpected *int
 		wantReason   string
 	}{
-		{name: "unchanged keeps the base version", local: baseRuleSpec(nil), base: baseRuleSpec(3), wantName: "Checkout Started", wantExpected: intPtr(3)},
-		{name: "structural change raises the base version", local: changed, base: baseRuleSpec(3), wantName: "Checkout Begun", wantExpected: intPtr(4)},
+		{name: "unchanged keeps the base version", local: baseRuleSpec(nil), base: baseRuleSpec(3), wantName: "Checkout Started", wantExpected: new(3)},
+		{name: "structural change raises the base version", local: changed, base: baseRuleSpec(3), wantName: "Checkout Begun", wantExpected: new(4)},
 		{name: "no version at the base", local: baseRuleSpec(nil), base: baseRuleSpec(nil), wantName: "Checkout Started", wantReason: "no version declared at the base, run dp validate --fix against Snowplow Console to add it"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
