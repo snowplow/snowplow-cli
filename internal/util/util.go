@@ -157,7 +157,7 @@ func ResourceNameToFileName(s string) string {
 	maxLength := 200
 	reservedWindowsNamesRegex := regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
 	allPrintableAsciiNegates := regexp.MustCompile("[^ -~]")
-	invalidPathCharacters := regexp.MustCompile("[ /]")
+	invalidPathCharacters := regexp.MustCompile(`[ /\\]`)
 	t := invalidPathCharacters.ReplaceAllLiteralString(reservedWindowsNamesRegex.ReplaceAllLiteralString(allPrintableAsciiNegates.ReplaceAllLiteralString(s, ""), ""), "-")
 	res := strings.ToLower(strings.ReplaceAll(strings.Trim(t, " "), " ", "-"))
 	if len(res) == 0 {
