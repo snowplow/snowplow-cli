@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/snowplow/snowplow-cli/internal/model"
 
@@ -206,6 +207,12 @@ func (f Files) CreateImageFolder() (string, error) {
 }
 
 func (f Files) WriteImage(name string, dir string, image *model.Image) (string, error) {
+	switch strings.ToLower(image.Ext) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
+	default:
+		return "", fmt.Errorf("unsupported image extension %q", image.Ext)
+	}
+
 	filePath := filepath.Join(dir, fmt.Sprintf("%s%s", name, image.Ext))
 	err := os.WriteFile(filePath, image.Data, 0644)
 	if err != nil {
